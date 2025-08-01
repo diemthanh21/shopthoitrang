@@ -1,55 +1,35 @@
-require('dotenv').config();
+require('dotenv').config(); 
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const { swaggerUi, specs } = require('./src/swagger'); // 👉 import swagger cấu hình
+const expressOasGenerator = require('express-oas-generator');
+const { swaggerUi, specs } = require('./src/swagger');
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// Swagger UI route
+// Swagger UI hiển thị file đã sinh tự động
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-// Tạo Supabase client
+// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
+app.set('supabase', supabase);
 
-/**
- * @swagger
- * /api/products:
- *   get:
- *     summary: Lấy danh sách sản phẩm
- *     tags:
- *       - Products
- *     responses:
- *       200:
- *         description: Trả về danh sách sản phẩm
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   name:
- *                     type: string
- *                   price:
- *                     type: number
- */
-app.get('/api/products', async (req, res) => {
-  const { data, error } = await supabase.from('products').select('*');
+// Router
+app.use('/api/taikhoannhanvien', require('./src/routes/taikhoannhanvien.route'));
+app.use('/api/nhanvien', require('./src/routes/nhanvien.route'));
 
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
+// ✨ Khởi tạo express-oas-generator (đặt sau khi khai báo route)
+//expressOasGenerator.init(app, {}); // hoặc .handleResponses(app, {})
 
+// Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`);
-  console.log(`📚 Swagger API docs at http://localhost:${PORT}/api-docs`);
+  console.log(`📚 Swagger docs at http://localhost:${PORT}/api-docs`);
 });
