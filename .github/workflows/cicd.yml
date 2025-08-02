@@ -1,0 +1,40 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./shopthoitrang-server
+
+      - name: Run tests
+        run: npm test
+        working-directory: ./shopthoitrang-server
+
+      - name: Build Docker image
+        run: docker build -t shopthoitrang-server ./shopthoitrang-server
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    steps:
+      - name: Deploy step
+        run: echo "Triển khai ứng dụng cho branch ${{ github.ref_name }}"
