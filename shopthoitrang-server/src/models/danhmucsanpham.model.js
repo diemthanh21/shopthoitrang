@@ -1,10 +1,7 @@
-// danhmucsanpham.model.js
 class DanhMucSanPham {
-  constructor({
-    MADANHMUC, TENDANHMUC
-  }) {
-    this.maDanhMuc = MADANHMUC;
-    this.tenDanhMuc = TENDANHMUC;
+  constructor({ madanhmuc, tendanhmuc }) {
+    this.maDanhMuc = madanhmuc;
+    this.tenDanhMuc = tendanhmuc;
   }
 
   toJSON() {

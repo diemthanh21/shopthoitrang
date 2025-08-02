@@ -1,29 +1,28 @@
-// nhanvien.model.js
 class NhanVien {
   constructor({
-    MANHANVIEN, HOTEN, EMAIL, SODIENTHOAI, NGAYSINH, 
-    DIACHI, MACHUCNANG, MAQUANLY
+    manhanvien, hoten, email, sodienthoai, ngaysinh, 
+    diachi, machucnang, maquanly
   }) {
-    this.maNhanVien = MANHANVIEN;
-    this.hoTen = HOTEN;
-    this.email = EMAIL;
-    this.soDienThoai = SODIENTHOAI;
-    this.ngaySinh = NGAYSINH;
-    this.diaChi = DIACHI;
-    this.maChucNang = MACHUCNANG;
-    this.maQuanLy = MAQUANLY;
+    this.maNhanVien = manhanvien;
+    this.hoTen = hoten;
+    this.email = email;
+    this.soDienThoai = sodienthoai;
+    this.ngaySinh = ngaysinh;
+    this.diaChi = diachi;
+    this.maChucNang = machucnang;
+    this.maQuanLy = maquanly;
   }
 
   toJSON() {
     return {
-      maNhanVien: this.maNhanVien,
-      hoTen: this.hoTen,
+      manhanvien: this.maNhanVien,
+      hoten: this.hoTen,
       email: this.email,
-      soDienThoai: this.soDienThoai,
-      ngaySinh: this.ngaySinh,
-      diaChi: this.diaChi,
-      maChucNang: this.maChucNang,
-      maQuanLy: this.maQuanLy
+      sodienthoai: this.soDienThoai,
+      ngaysinh: this.ngaySinh,
+      diachi: this.diaChi,
+      machucnang: this.maChucNang,
+      maquanly: this.maQuanLy
     };
   }
 }

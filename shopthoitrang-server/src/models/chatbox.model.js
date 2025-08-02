@@ -1,10 +1,27 @@
 class ChatBox {
-  constructor({ MACHATBOX, MAKHACHHANG, MANHANVIEN, NGAYTAO, TRANGTHAI }) {
-    this.maChatBox = MACHATBOX;
-    this.maKhachHang = MAKHACHHANG;
-    this.maNhanVien = MANHANVIEN;
-    this.ngayTao = NGAYTAO;
-    this.trangThai = TRANGTHAI;
+  constructor({
+    machatbox,
+    makhachhang,
+    manhanvien,
+    ngaytao,
+    trangthai
+  }) {
+    this.maChatBox = machatbox;
+    this.maKhachHang = makhachhang;
+    this.maNhanVien = manhanvien;
+    this.ngayTao = ngaytao;
+    this.trangThai = trangthai;
+  }
+
+  toJSON() {
+    return {
+      maChatBox: this.maChatBox,
+      maKhachHang: this.maKhachHang,
+      maNhanVien: this.maNhanVien,
+      ngayTao: this.ngayTao,
+      trangThai: this.trangThai
+    };
   }
 }
+
 module.exports = ChatBox;

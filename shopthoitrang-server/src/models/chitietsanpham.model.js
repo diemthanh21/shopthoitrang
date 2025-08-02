@@ -1,29 +1,28 @@
-// chitietsanpham.model.js
 class ChiTietSanPham {
   constructor({
-    MACHITIETSANPHAM, MASANPHAM, KICHTHUOC, MAUSAC, CHATLIEU,
-    MOTA, GIABAN, SOLUONGTON
+    machitietsanpham, masanpham, kichthuoc, mausac, chatlieu,
+    mota, giaban, soluongton
   }) {
-    this.maChiTietSanPham = MACHITIETSANPHAM;
-    this.maSanPham = MASANPHAM;
-    this.kichThuoc = KICHTHUOC;
-    this.mauSac = MAUSAC;
-    this.chatLieu = CHATLIEU;
-    this.moTa = MOTA;
-    this.giaBan = GIABAN;
-    this.soLuongTon = SOLUONGTON;
+    this.maChiTietSanPham = machitietsanpham;
+    this.maSanPham = masanpham;
+    this.kichThuoc = kichthuoc;
+    this.mauSac = mausac;
+    this.chatLieu = chatlieu;
+    this.moTa = mota;
+    this.giaBan = giaban;
+    this.soLuongTon = soluongton;
   }
 
   toJSON() {
     return {
-      maChiTietSanPham: this.maChiTietSanPham,
-      maSanPham: this.maSanPham,
-      kichThuoc: this.kichThuoc,
-      mauSac: this.mauSac,
-      chatLieu: this.chatLieu,
-      moTa: this.moTa,
-      giaBan: this.giaBan,
-      soLuongTon: this.soLuongTon
+      machitietsanpham: this.maChiTietSanPham,
+      masanpham: this.maSanPham,
+      kichthuoc: this.kichThuoc,
+      mausac: this.mauSac,
+      chatlieu: this.chatLieu,
+      mota: this.moTa,
+      giaban: this.giaBan,
+      soluongton: this.soLuongTon
     };
   }
 }

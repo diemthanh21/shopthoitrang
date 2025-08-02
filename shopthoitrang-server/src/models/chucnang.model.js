@@ -1,16 +1,13 @@
-// chucnang.model.js
 class ChucNang {
-  constructor({
-    MACHUCNANG, TENCHUCNANG
-  }) {
-    this.maChucNang = MACHUCNANG;
-    this.tenChucNang = TENCHUCNANG;
+  constructor({ machucnang, tenchucnang }) {
+    this.machucnang = machucnang;
+    this.tenchucnang = tenchucnang;
   }
 
   toJSON() {
     return {
-      maChucNang: this.maChucNang,
-      tenChucNang: this.tenChucNang
+      machucnang: this.machucnang,
+      tenchucnang: this.tenchucnang
     };
   }
 }

@@ -1,15 +1,18 @@
-// phieunhapkho.model.js
 class PhieuNhapKho {
   constructor({
-    MAPHIEUNHAP, MANHANVIEN, MANHACUNGCAP, NGAYNHAP,
-    THANHTIEN, GHICHU
+    maphieunhap,
+    manhanvien,
+    manhacungcap,
+    ngaynhap,
+    thanhtien,
+    ghichu
   }) {
-    this.maPhieuNhap = MAPHIEUNHAP;
-    this.maNhanVien = MANHANVIEN;
-    this.maNhaCungCap = MANHACUNGCAP;
-    this.ngayNhap = NGAYNHAP;
-    this.thanhTien = THANHTIEN;
-    this.ghiChu = GHICHU;
+    this.maPhieuNhap = maphieunhap;
+    this.maNhanVien = manhanvien;
+    this.maNhaCungCap = manhacungcap;
+    this.ngayNhap = ngaynhap;
+    this.thanhTien = thanhtien;
+    this.ghiChu = ghichu;
   }
 
   toJSON() {

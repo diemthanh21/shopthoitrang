@@ -1,12 +1,25 @@
 class HuyDonHang {
-  constructor({ MAHUYDON, MADONHANG, MAKHACHHANG, LYDO, NGAYYEUCAU, TRANGTHAI, GHICHU }) {
-    this.maHuyDon = MAHUYDON;
-    this.maDonHang = MADONHANG;
-    this.maKhachHang = MAKHACHHANG;
-    this.lyDo = LYDO;
-    this.ngayYeuCau = NGAYYEUCAU;
-    this.trangThai = TRANGTHAI;
-    this.ghiChu = GHICHU;
+  constructor({ mahuydon, madonhang, makhachhang, lydo, ngayyeucau, trangthai, ghichu }) {
+    this.maHuyDon = mahuydon;
+    this.maDonHang = madonhang;
+    this.maKhachHang = makhachhang;
+    this.lyDo = lydo;
+    this.ngayYeuCau = ngayyeucau;
+    this.trangThai = trangthai;
+    this.ghiChu = ghichu;
+  }
+
+  toJSON() {
+    return {
+      maHuyDon: this.maHuyDon,
+      maDonHang: this.maDonHang,
+      maKhachHang: this.maKhachHang,
+      lyDo: this.lyDo,
+      ngayYeuCau: this.ngayYeuCau,
+      trangThai: this.trangThai,
+      ghiChu: this.ghiChu
+    };
   }
 }
+
 module.exports = HuyDonHang;

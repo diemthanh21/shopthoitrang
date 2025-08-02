@@ -1,8 +1,17 @@
 class CTBanner {
-  constructor({ MABANNER, MANHANVIEN, THOIGIANDOI }) {
-    this.maBanner = MABANNER;
-    this.maNhanVien = MANHANVIEN;
-    this.thoiGianDoi = THOIGIANDOI;
+  constructor({ mabanner, manhanvien, thoigiandoi }) {
+    this.maBanner = mabanner;
+    this.maNhanVien = manhanvien;
+    this.thoiGianDoi = thoigiandoi;
+  }
+
+  toJSON() {
+    return {
+      maBanner: this.maBanner,
+      maNhanVien: this.maNhanVien,
+      thoiGianDoi: this.thoiGianDoi
+    };
   }
 }
+
 module.exports = CTBanner;

@@ -1,28 +1,28 @@
-// taikhoankhachhang.model.js
 class TaiKhoanKhachHang {
   constructor({
-    MAKHACHHANG, HOTEN, TENDANGNHAP, EMAIL, PASS, 
-    SODIENTHOAI, DANGHOATDONG, ANHDAIDIEN
+    makhachhang, hoten, tendangnhap, email, pass,
+    sodienthoai, danghoatdong, anhdaidien
   }) {
-    this.maKhachHang = MAKHACHHANG;
-    this.hoTen = HOTEN;
-    this.tenDangNhap = TENDANGNHAP;
-    this.email = EMAIL;
-    this.pass = PASS;
-    this.soDienThoai = SODIENTHOAI;
-    this.dangHoatDong = DANGHOATDONG;
-    this.anhDaiDien = ANHDAIDIEN;
+    this.maKhachHang = makhachhang;
+    this.hoTen = hoten;
+    this.tenDangNhap = tendangnhap;
+    this.email = email;
+    this.pass = pass;
+    this.soDienThoai = sodienthoai;
+    this.dangHoatDong = danghoatdong;
+    this.anhDaiDien = anhdaidien;
   }
 
   toJSON() {
     return {
-      maKhachHang: this.maKhachHang,
-      hoTen: this.hoTen,
-      tenDangNhap: this.tenDangNhap,
+      makhachhang: this.maKhachHang,
+      hoten: this.hoTen,
+      tendangnhap: this.tenDangNhap,
       email: this.email,
-      soDienThoai: this.soDienThoai,
-      dangHoatDong: this.dangHoatDong,
-      anhDaiDien: this.anhDaiDien
+      pass: this.pass,
+      sodienthoai: this.soDienThoai,
+      danghoatdong: this.dangHoatDong,
+      anhdaidien: this.anhDaiDien
     };
   }
 }

@@ -1,15 +1,14 @@
-// lichsutimkiem.model.js
 class LichSuTimKiem {
   constructor({
-    MALICHSU, MAKHACHHANG, MACHITIETSANPHAM, NOIDUNG, 
-    THOIGIANTK, MATUKHOA
+    malichsu, makhachhang, machitietsanpham, noidung, 
+    thoigiantk, matukhoa
   }) {
-    this.maLichSu = MALICHSU;
-    this.maKhachHang = MAKHACHHANG;
-    this.maChiTietSanPham = MACHITIETSANPHAM;
-    this.noiDung = NOIDUNG;
-    this.thoiGianTK = THOIGIANTK;
-    this.maTuKhoa = MATUKHOA;
+    this.maLichSu = malichsu;
+    this.maKhachHang = makhachhang;
+    this.maChiTietSanPham = machitietsanpham;
+    this.noiDung = noidung;
+    this.thoiGianTK = thoigiantk;
+    this.maTuKhoa = matukhoa;
   }
 
   toJSON() {
