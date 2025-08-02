@@ -1,18 +1,17 @@
-// magiamgia.model.js
 class MaGiamGia {
   constructor({
-    MAVOUCHER, MACODE, MADONHANG, MOTA, GIATRIGIAM,
-    SOLUONG, NGAYBATDAU, NGAYKETTHUC, MANHANVIEN
+    mavoucher, macode, madonhang, mota, giatrigiam,
+    soluong, ngaybatdau, ngayketthuc, manhanvien
   }) {
-    this.maVoucher = MAVOUCHER;
-    this.maCode = MACODE;
-    this.maDonHang = MADONHANG;
-    this.moTa = MOTA;
-    this.giaTriGiam = GIATRIGIAM;
-    this.soLuong = SOLUONG;
-    this.ngayBatDau = NGAYBATDAU;
-    this.ngayKetThuc = NGAYKETTHUC;
-    this.maNhanVien = MANHANVIEN;
+    this.maVoucher = mavoucher;
+    this.maCode = macode;
+    this.maDonHang = madonhang;
+    this.moTa = mota;
+    this.giaTriGiam = giatrigiam;
+    this.soLuong = soluong;
+    this.ngayBatDau = ngaybatdau;
+    this.ngayKetThuc = ngayketthuc;
+    this.maNhanVien = manhanvien;
   }
 
   toJSON() {

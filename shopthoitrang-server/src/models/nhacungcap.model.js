@@ -1,11 +1,12 @@
-// nhacungcap.model.js
 class NhaCungCap {
   constructor({
-    MANHACUNGCAP, TENNHACUNGCAP, THONGTINLIENHE
+    manhacungcap,
+    tennhacungcap,
+    thongtinlienhe
   }) {
-    this.maNhaCungCap = MANHACUNGCAP;
-    this.tenNhaCungCap = TENNHACUNGCAP;
-    this.thongTinLienHe = THONGTINLIENHE;
+    this.maNhaCungCap = manhacungcap;
+    this.tenNhaCungCap = tennhacungcap;
+    this.thongTinLienHe = thongtinlienhe;
   }
 
   toJSON() {

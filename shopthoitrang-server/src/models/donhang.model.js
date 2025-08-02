@@ -1,16 +1,15 @@
-// donhang.model.js
 class DonHang {
   constructor({
-    MADONHANG, MAKHACHHANG, NGAYDATHANG, THANHTIEN,
-    PHUONGTHUCTHANHTOAN, TRANGTHAITHANHTOAN, TRANGTHAIDONHANG
+    madonhang, makhachhang, ngaydathang, thanhtien,
+    phuongthucthanhtoan, trangthaithanhtoan, trangthaidonhang
   }) {
-    this.maDonHang = MADONHANG;
-    this.maKhachHang = MAKHACHHANG;
-    this.ngayDatHang = NGAYDATHANG;
-    this.thanhTien = THANHTIEN;
-    this.phuongThucThanhToan = PHUONGTHUCTHANHTOAN;
-    this.trangThaiThanhToan = TRANGTHAITHANHTOAN;
-    this.trangThaiDonHang = TRANGTHAIDONHANG;
+    this.maDonHang = madonhang;
+    this.maKhachHang = makhachhang;
+    this.ngayDatHang = ngaydathang;
+    this.thanhTien = thanhtien;
+    this.phuongThucThanhToan = phuongthucthanhtoan;
+    this.trangThaiThanhToan = trangthaithanhtoan;
+    this.trangThaiDonHang = trangthaidonhang;
   }
 
   toJSON() {

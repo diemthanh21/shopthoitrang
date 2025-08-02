@@ -1,18 +1,17 @@
-// hinhanhsanpham.model.js
 class HinhAnhSanPham {
   constructor({
-    MAHINHANH, MACHITIETSANPHAM, DUONGDANHINHANH
+    mahinhanh, machitietsanpham, duongdanhinhanh
   }) {
-    this.maHinhAnh = MAHINHANH;
-    this.maChiTietSanPham = MACHITIETSANPHAM;
-    this.duongDanHinhAnh = DUONGDANHINHANH;
+    this.maHinhAnh = mahinhanh;
+    this.maChiTietSanPham = machitietsanpham;
+    this.duongDanHinhAnh = duongdanhinhanh;
   }
 
   toJSON() {
     return {
-      maHinhAnh: this.maHinhAnh,
-      maChiTietSanPham: this.maChiTietSanPham,
-      duongDanHinhAnh: this.duongDanHinhAnh
+      mahinhanh: this.maHinhAnh,
+      machitietsanpham: this.maChiTietSanPham,
+      duongdanhinhanh: this.duongDanHinhAnh
     };
   }
 }

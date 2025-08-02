@@ -1,12 +1,11 @@
-// diachikhachhang.model.js
 class DiaChiKhachHang {
   constructor({
-    MADIACHI, MAKHACHHANG, DIACHI, MAPHUONGXA
+    madiachi, makhachhang, diachi, maphuongxa
   }) {
-    this.maDiaChi = MADIACHI;
-    this.maKhachHang = MAKHACHHANG;
-    this.diaChi = DIACHI;
-    this.maPhuongXa = MAPHUONGXA;
+    this.maDiaChi = madiachi;
+    this.maKhachHang = makhachhang;
+    this.diaChi = diachi;
+    this.maPhuongXa = maphuongxa;
   }
 
   toJSON() {

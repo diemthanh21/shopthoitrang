@@ -1,14 +1,16 @@
-// chitietdonhang.model.js
 class ChiTietDonHang {
   constructor({
-    MACHITIETDONHANG, MADONHANG, MACHITIETSANPHAM, 
-    SOLUONG, DONGIA
+    machitietdonhang,
+    madonhang,
+    machitietsanpham,
+    soluong,
+    dongia
   }) {
-    this.maChiTietDonHang = MACHITIETDONHANG;
-    this.maDonHang = MADONHANG;
-    this.maChiTietSanPham = MACHITIETSANPHAM;
-    this.soLuong = SOLUONG;
-    this.donGia = DONGIA;
+    this.maChiTietDonHang = machitietdonhang;
+    this.maDonHang = madonhang;
+    this.maChiTietSanPham = machitietsanpham;
+    this.soLuong = soluong;
+    this.donGia = dongia;
   }
 
   toJSON() {

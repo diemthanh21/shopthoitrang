@@ -1,20 +1,34 @@
-// models/khuyenmai.model.js
 class KhuyenMai {
   constructor({
-    MAKHUYENMAI, TENCHUONGTRINH, LOAIKHUYENMAI, MASANPHAM,
-    TYLEGIAM, MASANPHAMTANG, NGAYBATDAU, NGAYKETTHUC,
-    MOTA, MANHANVIEN
+    makhuyenmai, tenchuongtrinh, loaikhuyenmai, masanpham,
+    tylegiam, masanphamtang, ngaybatdau, ngayketthuc,
+    mota, manhanvien
   }) {
-    this.maKhuyenMai = MAKHUYENMAI;
-    this.tenChuongTrinh = TENCHUONGTRINH;
-    this.loaiKhuyenMai = LOAIKHUYENMAI;
-    this.maSanPham = MASANPHAM;
-    this.tyLeGiam = TYLEGIAM;
-    this.maSanPhamTang = MASANPHAMTANG;
-    this.ngayBatDau = NGAYBATDAU;
-    this.ngayKetThuc = NGAYKETTHUC;
-    this.moTa = MOTA;
-    this.maNhanVien = MANHANVIEN;
+    this.maKhuyenMai = makhuyenmai;
+    this.tenChuongTrinh = tenchuongtrinh;
+    this.loaiKhuyenMai = loaikhuyenmai;
+    this.maSanPham = masanpham;
+    this.tyLeGiam = tylegiam;
+    this.maSanPhamTang = masanphamtang;
+    this.ngayBatDau = ngaybatdau;
+    this.ngayKetThuc = ngayketthuc;
+    this.moTa = mota;
+    this.maNhanVien = manhanvien;
+  }
+
+  toJSON() {
+    return {
+      maKhuyenMai: this.maKhuyenMai,
+      tenChuongTrinh: this.tenChuongTrinh,
+      loaiKhuyenMai: this.loaiKhuyenMai,
+      maSanPham: this.maSanPham,
+      tyLeGiam: this.tyLeGiam,
+      maSanPhamTang: this.maSanPhamTang,
+      ngayBatDau: this.ngayBatDau,
+      ngayKetThuc: this.ngayKetThuc,
+      moTa: this.moTa,
+      maNhanVien: this.maNhanVien
+    };
   }
 }
 

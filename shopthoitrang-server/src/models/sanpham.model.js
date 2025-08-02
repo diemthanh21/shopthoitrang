@@ -1,13 +1,16 @@
-// sanpham.model.js
 class SanPham {
   constructor({
-    MASANPHAM, TENSANPHAM, MADANHMUC, MATHUONGHIEU, TRANGTHAI
+    masanpham,
+    tensanpham,
+    madanhmuc,
+    mathuonghieu,
+    trangthai
   }) {
-    this.maSanPham = MASANPHAM;
-    this.tenSanPham = TENSANPHAM;
-    this.maDanhMuc = MADANHMUC;
-    this.maThuongHieu = MATHUONGHIEU;
-    this.trangThai = TRANGTHAI;
+    this.maSanPham = masanpham;
+    this.tenSanPham = tensanpham;
+    this.maDanhMuc = madanhmuc;
+    this.maThuongHieu = mathuonghieu;
+    this.trangThai = trangthai;
   }
 
   toJSON() {
@@ -21,4 +24,4 @@ class SanPham {
   }
 }
 
-module.exports = SanPham;
+module.exports = SanPham; 
