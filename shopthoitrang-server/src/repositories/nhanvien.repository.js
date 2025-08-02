@@ -1,10 +1,9 @@
-// repository/nhanvien.repository.js
 const supabase = require('@supabase/supabase-js').createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY
 );
 
-const TABLE_NAME = 'nhanvien'; // tên bảng trong Supabase
+const TABLE_NAME = 'nhanvien'; // tên bảng chữ thường
 
 const NhanVienRepository = {
   async getAll() {
@@ -13,9 +12,9 @@ const NhanVienRepository = {
     return data;
   },
 
-  async getById(id) {
+  async getById(manhanvien) {
     const { data, error } = await supabase.from(TABLE_NAME)
-      .select('*').eq('MANHANVIEN', id).single();
+      .select('*').eq('manhanvien', manhanvien).single();
     if (error) throw new Error(error.message);
     return data;
   },
@@ -26,16 +25,16 @@ const NhanVienRepository = {
     return data;
   },
 
-  async update(id, nhanVienData) {
+  async update(manhanvien, nhanVienData) {
     const { data, error } = await supabase.from(TABLE_NAME)
-      .update(nhanVienData).eq('MANHANVIEN', id).select().single();
+      .update(nhanVienData).eq('manhanvien', manhanvien).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
 
-  async remove(id) {
+  async remove(manhanvien) {
     const { error } = await supabase.from(TABLE_NAME)
-      .delete().eq('MANHANVIEN', id);
+      .delete().eq('manhanvien', manhanvien);
     if (error) throw new Error(error.message);
     return true;
   }
