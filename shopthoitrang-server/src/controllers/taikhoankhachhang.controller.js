@@ -1,27 +1,24 @@
-const taiKhoanNhanVienService = require('../services/taikhoannhanvien.service');
+const taiKhoanKhachHangService = require('../services/taikhoankhachhang.service');
 const { generateToken } = require('../utils/jwt');
 
-const TaiKhoanNhanVienController = {
-  // 🔐 Đăng nhập
+const TaiKhoanKhachHangController = {
   async dangNhap(req, res) {
     try {
-      const { tenDangNhap, matKhau } = req.body;
+      const { tenDangNhap, pass } = req.body;
 
-      if (!tenDangNhap || !matKhau) {
+      if (!tenDangNhap || !pass) {
         return res.status(400).json({ message: 'Thiếu thông tin đăng nhập.' });
       }
 
-      const taiKhoan = await taiKhoanNhanVienService.dangNhap(tenDangNhap, matKhau);
+      const taiKhoan = await taiKhoanKhachHangService.dangNhap(tenDangNhap, pass);
       if (!taiKhoan) {
         return res.status(401).json({ message: 'Sai tên đăng nhập hoặc mật khẩu.' });
       }
 
-      const payload = {
-        maNhanVien: taiKhoan.maNhanVien,
-        tenDangNhap: taiKhoan.tenDangNhap,
-      };
-
-      const token = generateToken(payload);
+      const token = generateToken({
+        maKhachHang: taiKhoan.maKhachHang,
+        tenDangNhap: taiKhoan.tenDangNhap
+      });
 
       return res.json({
         message: 'Đăng nhập thành công',
@@ -33,89 +30,69 @@ const TaiKhoanNhanVienController = {
     }
   },
 
-  // ✅ Tạo tài khoản mới
   async taoMoi(req, res) {
     try {
-      const taiKhoanMoi = req.body;
-
-      const taoThanhCong = await taiKhoanNhanVienService.taoMoi(taiKhoanMoi);
-      if (!taoThanhCong) {
-        return res.status(400).json({ message: 'Không thể tạo tài khoản.' });
+      const taiKhoanMoi = await taiKhoanKhachHangService.taoMoi(req.body);
+      if (!taiKhoanMoi) {
+        return res.status(400).json({ message: 'Tạo tài khoản không thành công.' });
       }
-
       return res.status(201).json({
         message: 'Tạo tài khoản thành công',
-        user: taoThanhCong.toJSON()
+        user: taiKhoanMoi.toJSON()
       });
     } catch (error) {
       return res.status(500).json({ message: 'Lỗi máy chủ.', error: error.message });
     }
   },
 
-  // 📥 Lấy danh sách tất cả tài khoản
   async layTatCa(req, res) {
     try {
-      const danhSach = await taiKhoanNhanVienService.layTatCa();
-      return res.json(danhSach.map(item => item.toJSON()));
+      const danhSach = await taiKhoanKhachHangService.layTatCa();
+      return res.json(danhSach.map(tk => tk.toJSON()));
     } catch (error) {
       return res.status(500).json({ message: 'Lỗi máy chủ.', error: error.message });
     }
   },
 
-  // 🔍 Lấy theo mã nhân viên
   async layTheoMa(req, res) {
     try {
-      const { maNhanVien } = req.params;
-
-      const taiKhoan = await taiKhoanNhanVienService.layTheoMa(maNhanVien);
+      const { maKhachHang } = req.params;
+      const taiKhoan = await taiKhoanKhachHangService.layTheoMa(maKhachHang);
       if (!taiKhoan) {
         return res.status(404).json({ message: 'Không tìm thấy tài khoản.' });
       }
-
       return res.json(taiKhoan.toJSON());
     } catch (error) {
       return res.status(500).json({ message: 'Lỗi máy chủ.', error: error.message });
     }
   },
 
-  // ✏️ Cập nhật tài khoản
   async capNhat(req, res) {
     try {
-      const { maNhanVien } = req.params;
-      const thongTinCapNhat = req.body;
-
-      const capNhatThanhCong = await taiKhoanNhanVienService.capNhat(maNhanVien, thongTinCapNhat);
-      if (!capNhatThanhCong) {
+      const { maKhachHang } = req.params;
+      const capNhat = await taiKhoanKhachHangService.capNhat(maKhachHang, req.body);
+      if (!capNhat) {
         return res.status(400).json({ message: 'Không thể cập nhật tài khoản.' });
       }
-
-      return res.json({
-        message: 'Cập nhật thành công',
-        user: capNhatThanhCong.toJSON()
-      });
+      return res.json({ message: 'Cập nhật thành công', user: capNhat.toJSON() });
     } catch (error) {
       return res.status(500).json({ message: 'Lỗi máy chủ.', error: error.message });
     }
   },
 
-  // 🗑️ Xoá mềm tài khoản
   async xoa(req, res) {
     try {
-      const { maNhanVien } = req.params;
-
-      const xoaThanhCong = await taiKhoanNhanVienService.xoa(maNhanVien);
-      if (!xoaThanhCong) {
+      const { maKhachHang } = req.params;
+      const ketQua = await taiKhoanKhachHangService.xoa(maKhachHang);
+      if (!ketQua) {
         return res.status(400).json({ message: 'Không thể xoá tài khoản.' });
       }
-
-      return res.json({
-        message: 'Xoá tài khoản thành công',
-        user: xoaThanhCong.toJSON()
-      });
+      return res.json({ message: 'Đã xoá tài khoản', user: ketQua.toJSON() });
     } catch (error) {
       return res.status(500).json({ message: 'Lỗi máy chủ.', error: error.message });
     }
   }
 };
 
-module.exports = TaiKhoanNhanVienController;
+module.exports = TaiKhoanKhachHangController;
+
