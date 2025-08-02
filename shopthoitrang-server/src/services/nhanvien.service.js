@@ -4,7 +4,7 @@ const NhanVien = require('../models/nhanvien.model');
 
 class NhanVienService {
   async getAll() {
-    const data = await NhanVienRepository.findAll();
+    const data = await NhanVienRepository.getAll();
     return data.map(row => new NhanVien(row));
   }
 
