@@ -2,50 +2,43 @@ const { createClient } = require('@supabase/supabase-js');
 const DanhMucSanPham = require('../models/danhmucsanpham.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'danhmucsanpham';
 
 const DanhMucSanPhamRepository = {
   async getAll() {
-    const { data, error } = await supabase.from('danhmucsanpham').select('*');
-    if (error) return [];
-    return data.map(row => new DanhMucSanPham(row));
+    const { data, error } = await supabase.from(TABLE).select('*').order('madanhmuc', { ascending: true });
+    if (error) throw error;
+    return data.map((r) => new DanhMucSanPham(r));
   },
 
-  async getById(madanhmuc) {
-    const { data, error } = await supabase
-      .from('danhmucsanpham')
-      .select('*')
-      .eq('madanhmuc', madanhmuc)
-      .single();
-    if (error || !data) return null;
+  async getById(id) {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('madanhmuc', id).maybeSingle();
+    if (error) throw error;
+    return data ? new DanhMucSanPham(data) : null;
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new DanhMucSanPham(data);
   },
 
-  async create(data) {
-    const { data: created, error } = await supabase
-      .from('danhmucsanpham')
-      .insert([data])
-      .single();
-    if (error) return null;
-    return new DanhMucSanPham(created);
-  },
-
-  async update(madanhmuc, fields) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('danhmucsanpham')
+      .from(TABLE)
       .update(fields)
-      .eq('madanhmuc', madanhmuc)
-      .single();
-    if (error || !data) return null;
-    return new DanhMucSanPham(data);
+      .eq('madanhmuc', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new DanhMucSanPham(data) : null;
   },
 
-  async delete(madanhmuc) {
-    const { error } = await supabase
-      .from('danhmucsanpham')
-      .delete()
-      .eq('madanhmuc', madanhmuc);
-    return !error;
-  }
+  async remove(id) {
+    const { data, error } = await supabase.from(TABLE).delete().eq('madanhmuc', id).select('*').maybeSingle();
+    if (error) throw error;
+    return data ? new DanhMucSanPham(data) : null;
+  },
 };
 
 module.exports = DanhMucSanPhamRepository;

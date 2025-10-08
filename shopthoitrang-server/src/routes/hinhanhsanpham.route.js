@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/hinhanhsanpham.controller');
+const ctrl = require('../controllers/hinhanhsanpham.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
  *   - name: Hình ảnh sản phẩm
- *     description: Quản lý hình ảnh theo chi tiết sản phẩm
+ *     description: Quản lý hình ảnh của sản phẩm
  */
 
 router.use(authenticateToken);
@@ -22,51 +22,49 @@ router.use(authenticateToken);
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/hinhanhsanpham/{maHinhAnh}:
+ * /api/hinhanhsanpham/{id}:
  *   get:
- *     summary: Lấy hình ảnh theo mã
+ *     summary: Lấy hình ảnh sản phẩm theo ID
  *     tags: [Hình ảnh sản phẩm]
  *     parameters:
  *       - in: path
- *         name: maHinhAnh
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maHinhAnh', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
- * /api/hinhanhsanpham/chitiet/{maChiTietSanPham}:
+ * /api/hinhanhsanpham/sanpham/{machitietsanpham}:
  *   get:
- *     summary: Lấy hình ảnh theo mã chi tiết sản phẩm
+ *     summary: Lấy danh sách hình ảnh theo mã chi tiết sản phẩm
  *     tags: [Hình ảnh sản phẩm]
  *     parameters:
  *       - in: path
- *         name: maChiTietSanPham
+ *         name: machitietsanpham
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/chitiet/:maChiTietSanPham', controller.getByChiTietSanPham);
+router.get('/sanpham/:machitietsanpham', ctrl.getByProductDetail);
 
 /**
  * @swagger
  * /api/hinhanhsanpham:
  *   post:
- *     summary: Thêm hình ảnh mới
+ *     summary: Thêm hình ảnh sản phẩm mới
  *     tags: [Hình ảnh sản phẩm]
  *     requestBody:
  *       required: true
@@ -74,62 +72,61 @@ router.get('/chitiet/:maChiTietSanPham', controller.getByChiTietSanPham);
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [machitietsanpham, duongdanhinhanh]
  *             properties:
- *               MAHINHANH:
- *                 type: string
- *               MACHITIETSANPHAM:
- *                 type: string
- *               DUONGDANHINHANH:
- *                 type: string
+ *               machitietsanpham: { type: integer }
+ *               duongdanhinhanh: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
+ *       400:
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/hinhanhsanpham/{maHinhAnh}:
+ * /api/hinhanhsanpham/{id}:
  *   put:
- *     summary: Cập nhật hình ảnh
+ *     summary: Cập nhật hình ảnh sản phẩm
  *     tags: [Hình ảnh sản phẩm]
  *     parameters:
  *       - in: path
- *         name: maHinhAnh
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               DUONGDANHINHANH:
- *                 type: string
+ *               duongdanhinhanh: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maHinhAnh', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/hinhanhsanpham/{maHinhAnh}:
+ * /api/hinhanhsanpham/{id}:
  *   delete:
- *     summary: Xoá hình ảnh
+ *     summary: Xoá hình ảnh sản phẩm
  *     tags: [Hình ảnh sản phẩm]
  *     parameters:
  *       - in: path
- *         name: maHinhAnh
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maHinhAnh', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

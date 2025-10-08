@@ -1,25 +1,19 @@
 class ChiTietDonHang {
-  constructor({
-    machitietdonhang,
-    madonhang,
-    machitietsanpham,
-    soluong,
-    dongia
-  }) {
-    this.maChiTietDonHang = machitietdonhang;
-    this.maDonHang = madonhang;
-    this.maChiTietSanPham = machitietsanpham;
-    this.soLuong = soluong;
-    this.donGia = dongia;
+  constructor({ machitietdonhang, madonhang, machitietsanpham, soluong, dongia }) {
+    this.machitietdonhang = machitietdonhang;
+    this.madonhang = madonhang;
+    this.machitietsanpham = machitietsanpham;
+    this.soluong = soluong;
+    this.dongia = dongia;
   }
 
   toJSON() {
     return {
-      maChiTietDonHang: this.maChiTietDonHang,
-      maDonHang: this.maDonHang,
-      maChiTietSanPham: this.maChiTietSanPham,
-      soLuong: this.soLuong,
-      donGia: this.donGia
+      machitietdonhang: this.machitietdonhang,
+      madonhang: this.madonhang,
+      machitietsanpham: this.machitietsanpham,
+      soluong: this.soluong,
+      dongia: this.dongia
     };
   }
 }

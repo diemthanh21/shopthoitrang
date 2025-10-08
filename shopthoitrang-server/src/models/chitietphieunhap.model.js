@@ -6,20 +6,20 @@ class ChiTietPhieuNhap {
     soluong,
     dongianhap
   }) {
-    this.maChiTietNhap = machitietnhap;
-    this.maPhieuNhap = maphieunhap;
-    this.maChiTietSanPham = machitietsanpham;
-    this.soLuong = soluong;
-    this.donGiaNhap = dongianhap;
+    this.machitietnhap = machitietnhap;
+    this.maphieunhap = maphieunhap;
+    this.machitietsanpham = machitietsanpham;
+    this.soluong = soluong;
+    this.dongianhap = dongianhap;
   }
 
   toJSON() {
     return {
-      maChiTietNhap: this.maChiTietNhap,
-      maPhieuNhap: this.maPhieuNhap,
-      maChiTietSanPham: this.maChiTietSanPham,
-      soLuong: this.soLuong,
-      donGiaNhap: this.donGiaNhap
+      machitietnhap: this.machitietnhap,
+      maphieunhap: this.maphieunhap,
+      machitietsanpham: this.machitietsanpham,
+      soluong: this.soluong,
+      dongianhap: this.dongianhap
     };
   }
 }

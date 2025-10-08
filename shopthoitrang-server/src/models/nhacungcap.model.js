@@ -11,9 +11,9 @@ class NhaCungCap {
 
   toJSON() {
     return {
-      maNhaCungCap: this.maNhaCungCap,
-      tenNhaCungCap: this.tenNhaCungCap,
-      thongTinLienHe: this.thongTinLienHe
+      manhacungcap: this.maNhaCungCap,
+      tennhacungcap: this.tenNhaCungCap,
+      thongtinlienhe: this.thongTinLienHe
     };
   }
 }

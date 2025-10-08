@@ -1,27 +1,24 @@
 class DonHang {
   constructor({
-    madonhang, makhachhang, ngaydathang, thanhtien,
-    phuongthucthanhtoan, trangthaithanhtoan, trangthaidonhang
+    madonhang,
+    makhachhang,
+    ngaydathang,
+    thanhtien,
+    phuongthucthanhtoan,
+    trangthaithanhtoan,
+    trangthaidonhang
   }) {
-    this.maDonHang = madonhang;
-    this.maKhachHang = makhachhang;
-    this.ngayDatHang = ngaydathang;
-    this.thanhTien = thanhtien;
-    this.phuongThucThanhToan = phuongthucthanhtoan;
-    this.trangThaiThanhToan = trangthaithanhtoan;
-    this.trangThaiDonHang = trangthaidonhang;
+    this.madonhang = madonhang;
+    this.makhachhang = makhachhang;
+    this.ngaydathang = ngaydathang;
+    this.thanhtien = thanhtien;
+    this.phuongthucthanhtoan = phuongthucthanhtoan;
+    this.trangthaithanhtoan = trangthaithanhtoan;
+    this.trangthaidonhang = trangthaidonhang;
   }
 
   toJSON() {
-    return {
-      maDonHang: this.maDonHang,
-      maKhachHang: this.maKhachHang,
-      ngayDatHang: this.ngayDatHang,
-      thanhTien: this.thanhTien,
-      phuongThucThanhToan: this.phuongThucThanhToan,
-      trangThaiThanhToan: this.trangThaiThanhToan,
-      trangThaiDonHang: this.trangThaiDonHang
-    };
+    return { ...this };
   }
 }
 

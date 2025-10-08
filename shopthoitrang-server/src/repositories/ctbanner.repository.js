@@ -1,44 +1,63 @@
 const { createClient } = require('@supabase/supabase-js');
 const CTBanner = require('../models/ctbanner.model');
-
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'ctbanner';
 
 const CTBannerRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('ctbanner').select('*');
-    if (error) return [];
-    return data.map(row => new CTBanner(row));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.mabanner) query = query.eq('mabanner', filters.mabanner);
+    if (filters.manhanvien) query = query.eq('manhanvien', filters.manhanvien);
+
+    const { data, error } = await query.order('thoigiandoi', { ascending: false });
+    if (error) throw error;
+    return data.map((r) => new CTBanner(r));
   },
 
-  async getByMaBanner(mabanner) {
+  async getById(mabanner, manhanvien) {
     const { data, error } = await supabase
-      .from('ctbanner')
+      .from(TABLE)
       .select('*')
-      .eq('mabanner', mabanner);
+      .eq('mabanner', mabanner)
+      .eq('manhanvien', manhanvien)
+      .maybeSingle();
 
-    if (error) return [];
-    return data.map(row => new CTBanner(row));
+    if (error) throw error;
+    return data ? new CTBanner(data) : null;
   },
 
-  async create(data) {
-    const { data: created, error } = await supabase
-      .from('ctbanner')
-      .insert([data])
-      .single();
-
-    if (error) return null;
-    return new CTBanner(created);
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
+    return new CTBanner(data);
   },
 
-  async delete(mabanner, manhanvien) {
-    const { error } = await supabase
-      .from('ctbanner')
+  async update(mabanner, manhanvien, fields) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update(fields)
+      .eq('mabanner', mabanner)
+      .eq('manhanvien', manhanvien)
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new CTBanner(data) : null;
+  },
+
+  async remove(mabanner, manhanvien) {
+    const { data, error } = await supabase
+      .from(TABLE)
       .delete()
       .eq('mabanner', mabanner)
-      .eq('manhanvien', manhanvien);
+      .eq('manhanvien', manhanvien)
+      .select('*')
+      .maybeSingle();
 
-    return !error;
-  }
+    if (error) throw error;
+    return data ? new CTBanner(data) : null;
+  },
 };
 
 module.exports = CTBannerRepository;

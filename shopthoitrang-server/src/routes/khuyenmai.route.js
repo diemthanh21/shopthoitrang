@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/khuyenmai.controller');
+const ctrl = require('../controllers/khuyenmai.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
-
-router.use(authenticateToken);
 
 /**
  * @swagger
@@ -12,61 +10,55 @@ router.use(authenticateToken);
  *     description: Quản lý chương trình khuyến mãi
  */
 
+router.use(authenticateToken);
+
 /**
  * @swagger
  * /api/khuyenmai:
  *   get:
- *     summary: Lấy tất cả chương trình khuyến mãi
+ *     summary: Lấy danh sách khuyến mãi
  *     tags: [Khuyến mãi]
+ *     parameters:
+ *       - in: query
+ *         name: masanpham
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: manhanvien
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: active
+ *         schema: { type: string, enum: [ "true", "false" ] }
+ *         description: Lọc theo trạng thái còn hiệu lực (theo ngày)
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/khuyenmai/{maKhuyenMai}:
+ * /api/khuyenmai/{id}:
  *   get:
- *     summary: Lấy thông tin khuyến mãi theo mã
+ *     summary: Lấy chi tiết khuyến mãi theo ID
  *     tags: [Khuyến mãi]
  *     parameters:
  *       - in: path
- *         name: maKhuyenMai
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maKhuyenMai', controller.getById);
-
-/**
- * @swagger
- * /api/khuyenmai/sanpham/{maSanPham}:
- *   get:
- *     summary: Lấy khuyến mãi theo mã sản phẩm
- *     tags: [Khuyến mãi]
- *     parameters:
- *       - in: path
- *         name: maSanPham
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Thành công
- */
-router.get('/sanpham/:maSanPham', controller.getByMaSanPham);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
  * /api/khuyenmai:
  *   post:
- *     summary: Thêm chương trình khuyến mãi
+ *     summary: Tạo khuyến mãi mới
  *     tags: [Khuyến mãi]
  *     requestBody:
  *       required: true
@@ -74,91 +66,76 @@ router.get('/sanpham/:maSanPham', controller.getByMaSanPham);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - tenChuongTrinh
- *               - loaiKhuyenMai
+ *             required: [tenchuongtrinh, loaikhuyenmai, ngaybatdau, ngayketthuc, manhanvien]
  *             properties:
- *               tenChuongTrinh:
- *                 type: string
- *               loaiKhuyenMai:
- *                 type: string
- *               maSanPham:
- *                 type: string
- *               tyLeGiam:
- *                 type: number
- *               maSanPhamTang:
- *                 type: string
- *               ngayBatDau:
- *                 type: string
- *                 format: date
- *               ngayKetThuc:
- *                 type: string
- *                 format: date
- *               moTa:
- *                 type: string
- *               maNhanVien:
- *                 type: string
+ *               tenchuongtrinh: { type: string }
+ *               loaikhuyenmai: { type: string, example: "PERCENT" }
+ *               masanpham: { type: integer, nullable: true }
+ *               tylegiam: { type: number, example: 10, description: "Phần trăm giảm (0,100]" }
+ *               masanphamtang: { type: integer, nullable: true }
+ *               ngaybatdau: { type: string, format: date }
+ *               ngayketthuc: { type: string, format: date }
+ *               mota: { type: string }
+ *               manhanvien: { type: integer }
  *     responses:
  *       201:
  *         description: Tạo thành công
  *       400:
- *         description: Lỗi tạo khuyến mãi
+ *         description: Dữ liệu không hợp lệ
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/khuyenmai/{maKhuyenMai}:
+ * /api/khuyenmai/{id}:
  *   put:
- *     summary: Cập nhật thông tin khuyến mãi
+ *     summary: Cập nhật khuyến mãi
  *     tags: [Khuyến mãi]
  *     parameters:
  *       - in: path
- *         name: maKhuyenMai
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tenChuongTrinh:
- *                 type: string
- *               loaiKhuyenMai:
- *                 type: string
- *               tyLeGiam:
- *                 type: number
- *               ngayKetThuc:
- *                 type: string
- *                 format: date
+ *               tenchuongtrinh: { type: string }
+ *               loaikhuyenmai: { type: string }
+ *               masanpham: { type: integer, nullable: true }
+ *               tylegiam: { type: number }
+ *               masanphamtang: { type: integer, nullable: true }
+ *               ngaybatdau: { type: string, format: date }
+ *               ngayketthuc: { type: string, format: date }
+ *               mota: { type: string }
+ *               manhanvien: { type: integer }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maKhuyenMai', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/khuyenmai/{maKhuyenMai}:
+ * /api/khuyenmai/{id}:
  *   delete:
- *     summary: Xoá chương trình khuyến mãi
+ *     summary: Xoá khuyến mãi
  *     tags: [Khuyến mãi]
  *     parameters:
  *       - in: path
- *         name: maKhuyenMai
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maKhuyenMai', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

@@ -15,13 +15,13 @@ class SanPham {
 
   toJSON() {
     return {
-      maSanPham: this.maSanPham,
-      tenSanPham: this.tenSanPham,
-      maDanhMuc: this.maDanhMuc,
-      maThuongHieu: this.maThuongHieu,
-      trangThai: this.trangThai
+      masanpham: this.maSanPham,
+      tensanpham: this.tenSanPham,
+      madanhmuc: this.maDanhMuc,
+      mathuonghieu: this.maThuongHieu,
+      trangthai: this.trangThai
     };
   }
 }
 
-module.exports = SanPham; 
+module.exports = SanPham;

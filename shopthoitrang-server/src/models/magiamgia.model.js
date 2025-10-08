@@ -1,7 +1,14 @@
 class MaGiamGia {
   constructor({
-    mavoucher, macode, madonhang, mota, giatrigiam,
-    soluong, ngaybatdau, ngayketthuc, manhanvien
+    mavoucher,
+    macode,
+    madonhang,
+    mota,
+    giatrigiam,
+    soluong,
+    ngaybatdau,
+    ngayketthuc,
+    manhanvien
   }) {
     this.maVoucher = mavoucher;
     this.maCode = macode;
@@ -16,15 +23,15 @@ class MaGiamGia {
 
   toJSON() {
     return {
-      maVoucher: this.maVoucher,
-      maCode: this.maCode,
-      maDonHang: this.maDonHang,
-      moTa: this.moTa,
-      giaTriGiam: this.giaTriGiam,
-      soLuong: this.soLuong,
-      ngayBatDau: this.ngayBatDau,
-      ngayKetThuc: this.ngayKetThuc,
-      maNhanVien: this.maNhanVien
+      mavoucher: this.maVoucher,
+      macode: this.maCode,
+      madonhang: this.maDonHang,
+      mota: this.moTa,
+      giatrigiam: this.giaTriGiam,
+      soluong: this.soLuong,
+      ngaybatdau: this.ngayBatDau,
+      ngayketthuc: this.ngayKetThuc,
+      manhanvien: this.maNhanVien
     };
   }
 }

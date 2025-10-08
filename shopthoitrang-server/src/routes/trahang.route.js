@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/trahang.controller');
+const ctrl = require('../controllers/trahang.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
@@ -16,49 +16,46 @@ router.use(authenticateToken);
  * @swagger
  * /api/trahang:
  *   get:
- *     summary: Lấy tất cả yêu cầu trả hàng
- *     tags: [Trả hàng]
- *     responses:
- *       200:
- *         description: Danh sách trả hàng
- */
-router.get('/', controller.getAll);
-
-/**
- * @swagger
- * /api/trahang/donhang/{maDonHang}:
- *   get:
- *     summary: Lấy yêu cầu trả hàng theo mã đơn hàng
+ *     summary: Lấy danh sách yêu cầu trả hàng (hỗ trợ lọc)
  *     tags: [Trả hàng]
  *     parameters:
- *       - in: path
- *         name: maDonHang
- *         required: true
- *         schema:
- *           type: integer
+ *       - in: query
+ *         name: makhachhang
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: madonhang
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: trangthai
+ *         schema: { type: string, example: "CHỜ DUYỆT" }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date-time }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/donhang/:maDonHang', controller.getByDonHang);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/trahang/{ma}:
+ * /api/trahang/{id}:
  *   get:
- *     summary: Lấy yêu cầu trả hàng theo mã
+ *     summary: Lấy chi tiết yêu cầu trả hàng theo ID
  *     tags: [Trả hàng]
  *     parameters:
  *       - in: path
- *         name: ma
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
- *       200:
- *         description: Thành công
+ *       200: { description: Thành công }
+ *       404: { description: Không tìm thấy }
  */
-router.get('/:ma', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
@@ -72,82 +69,68 @@ router.get('/:ma', controller.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - madonhang
- *               - makhachhang
- *               - machitietsanpham
- *               - soluong
- *               - lydo
+ *             required: [madonhang, makhachhang, machitietsanpham, soluong, lydo]
  *             properties:
- *               madonhang:
- *                 type: integer
- *               makhachhang:
- *                 type: integer
- *               machitietsanpham:
- *                 type: integer
- *               soluong:
- *                 type: integer
- *               lydo:
- *                 type: string
- *               hinhanhloi:
- *                 type: string
- *               ngayyeucau:
- *                 type: string
- *               trangthai:
- *                 type: string
- *               ghichu:
- *                 type: string
+ *               madonhang: { type: integer }
+ *               makhachhang: { type: integer }
+ *               machitietsanpham: { type: integer }
+ *               soluong: { type: integer, minimum: 1 }
+ *               lydo: { type: string }
+ *               hinhanhloi: { type: string }
+ *               ngayyeucau: { type: string, format: date-time }
+ *               trangthai: { type: string, example: "CHỜ DUYỆT" }
+ *               ghichu: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/trahang/{ma}:
+ * /api/trahang/{id}:
  *   put:
- *     summary: Cập nhật yêu cầu trả hàng
+ *     summary: "Cập nhật yêu cầu trả hàng (VD: trạng thái, ghi chú)"
  *     tags: [Trả hàng]
  *     parameters:
  *       - in: path
- *         name: ma
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               trangthai:
- *                 type: string
- *               ghichu:
- *                 type: string
+ *               soluong: { type: integer, minimum: 1 }
+ *               lydo: { type: string }
+ *               hinhanhloi: { type: string }
+ *               trangthai: { type: string, example: "ĐÃ CHẤP NHẬN" }
+ *               ghichu: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:ma', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/trahang/{ma}:
+ * /api/trahang/{id}:
  *   delete:
  *     summary: Xoá yêu cầu trả hàng
  *     tags: [Trả hàng]
  *     parameters:
  *       - in: path
- *         name: ma
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
- *       200:
- *         description: Xoá thành công
+ *       200: { description: Xoá thành công }
+ *       404: { description: Không tìm thấy }
  */
-router.delete('/:ma', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

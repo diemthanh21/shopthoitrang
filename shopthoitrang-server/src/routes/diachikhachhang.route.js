@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/diachikhachhang.controller');
+const ctrl = require('../controllers/diachikhachhang.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
- *   - name: DiaChiKhachHang
- *     description: Quản lý địa chỉ khách hàng
+ *   - name: Địa chỉ khách hàng
+ *     description: Quản lý địa chỉ của khách hàng
  */
 
 router.use(authenticateToken);
@@ -16,54 +16,117 @@ router.use(authenticateToken);
  * @swagger
  * /api/diachikhachhang:
  *   get:
- *     summary: Lấy danh sách địa chỉ khách hàng
- *     tags: [DiaChiKhachHang]
+ *     summary: Lấy danh sách tất cả địa chỉ khách hàng
+ *     tags: [Địa chỉ khách hàng]
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
  * /api/diachikhachhang/{id}:
  *   get:
  *     summary: Lấy địa chỉ theo ID
- *     tags: [DiaChiKhachHang]
+ *     tags: [Địa chỉ khách hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.get('/:id', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
- * /api/diachikhachhang/khachhang/{maKH}:
+ * /api/diachikhachhang/khachhang/{makhachhang}:
  *   get:
- *     summary: Lấy địa chỉ theo mã khách hàng
- *     tags: [DiaChiKhachHang]
+ *     summary: Lấy danh sách địa chỉ theo khách hàng
+ *     tags: [Địa chỉ khách hàng]
+ *     parameters:
+ *       - in: path
+ *         name: makhachhang
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
-router.get('/khachhang/:maKH', controller.findByKhachHang);
+router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
 
 /**
  * @swagger
  * /api/diachikhachhang:
  *   post:
- *     summary: Tạo mới địa chỉ khách hàng
- *     tags: [DiaChiKhachHang]
+ *     summary: Thêm địa chỉ mới
+ *     tags: [Địa chỉ khách hàng]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [makhachhang, diachi]
+ *             properties:
+ *               makhachhang: { type: integer }
+ *               diachi: { type: string }
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
  * /api/diachikhachhang/{id}:
  *   put:
- *     summary: Cập nhật địa chỉ khách hàng
- *     tags: [DiaChiKhachHang]
+ *     summary: Cập nhật địa chỉ
+ *     tags: [Địa chỉ khách hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               diachi: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:id', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
  * /api/diachikhachhang/{id}:
  *   delete:
  *     summary: Xoá địa chỉ khách hàng
- *     tags: [DiaChiKhachHang]
+ *     tags: [Địa chỉ khách hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:id', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

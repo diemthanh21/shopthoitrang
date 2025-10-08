@@ -16,7 +16,7 @@ router.use(authenticateToken);
  * @swagger
  * /api/chitietphieunhap:
  *   get:
- *     summary: Lấy danh sách tất cả chi tiết phiếu nhập
+ *     summary: Lấy danh sách chi tiết phiếu nhập
  *     tags: [Chi tiết phiếu nhập]
  *     responses:
  *       200:
@@ -26,56 +26,94 @@ router.get('/', controller.getAll);
 
 /**
  * @swagger
- * /api/chitietphieunhap/{maChiTietNhap}:
+ * /api/chitietphieunhap/{id}:
  *   get:
- *     summary: Lấy chi tiết theo mã
+ *     summary: Lấy chi tiết phiếu nhập theo mã
  *     tags: [Chi tiết phiếu nhập]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.get('/:maChiTietNhap', controller.getById);
-
-/**
- * @swagger
- * /api/chitietphieunhap/phieunhap/{maPhieuNhap}:
- *   get:
- *     summary: Lấy danh sách theo mã phiếu nhập
- *     tags: [Chi tiết phiếu nhập]
- */
-router.get('/phieunhap/:maPhieuNhap', controller.findByPhieuNhap);
-
-/**
- * @swagger
- * /api/chitietphieunhap/chitietsanpham/{maChiTietSanPham}:
- *   get:
- *     summary: Lấy danh sách theo mã chi tiết sản phẩm
- *     tags: [Chi tiết phiếu nhập]
- */
-router.get('/chitietsanpham/:maChiTietSanPham', controller.findByChiTietSanPham);
+router.get('/:id', controller.getById);
 
 /**
  * @swagger
  * /api/chitietphieunhap:
  *   post:
- *     summary: Tạo mới
+ *     summary: Thêm chi tiết phiếu nhập mới
  *     tags: [Chi tiết phiếu nhập]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [maphieunhap, machitietsanpham, soluong, dongianhap]
+ *             properties:
+ *               maphieunhap: { type: integer }
+ *               machitietsanpham: { type: integer }
+ *               soluong: { type: integer }
+ *               dongianhap: { type: number }
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thất bại
  */
 router.post('/', controller.create);
 
 /**
  * @swagger
- * /api/chitietphieunhap/{maChiTietNhap}:
+ * /api/chitietphieunhap/{id}:
  *   put:
- *     summary: Cập nhật
+ *     summary: Cập nhật chi tiết phiếu nhập
  *     tags: [Chi tiết phiếu nhập]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               soluong: { type: integer }
+ *               dongianhap: { type: number }
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maChiTietNhap', controller.update);
+router.put('/:id', controller.update);
 
 /**
  * @swagger
- * /api/chitietphieunhap/{maChiTietNhap}:
+ * /api/chitietphieunhap/{id}:
  *   delete:
- *     summary: Xoá
+ *     summary: Xoá chi tiết phiếu nhập
  *     tags: [Chi tiết phiếu nhập]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maChiTietNhap', controller.delete);
+router.delete('/:id', controller.delete);
 
 module.exports = router;

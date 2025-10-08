@@ -1,13 +1,19 @@
 class TaiKhoanKhachHang {
   constructor({
-    makhachhang, hoten, tendangnhap, email, pass,
-    sodienthoai, danghoatdong, anhdaidien
+    makhachhang,
+    hoten,
+    tendangnhap,
+    email,
+    pass,
+    sodienthoai,
+    danghoatdong,
+    anhdaidien
   }) {
     this.maKhachHang = makhachhang;
     this.hoTen = hoten;
     this.tenDangNhap = tendangnhap;
     this.email = email;
-    this.pass = pass;
+    this.matKhau = pass;
     this.soDienThoai = sodienthoai;
     this.dangHoatDong = danghoatdong;
     this.anhDaiDien = anhdaidien;
@@ -19,7 +25,6 @@ class TaiKhoanKhachHang {
       hoten: this.hoTen,
       tendangnhap: this.tenDangNhap,
       email: this.email,
-      pass: this.pass,
       sodienthoai: this.soDienThoai,
       danghoatdong: this.dangHoatDong,
       anhdaidien: this.anhDaiDien

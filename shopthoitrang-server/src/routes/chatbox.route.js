@@ -6,8 +6,8 @@ const authenticateToken = require('../middlewares/auth.middleware');
 /**
  * @swagger
  * tags:
- *   - name: ChatBox
- *     description: Quản lý hộp thoại trò chuyện
+ *   - name: Chatbox
+ *     description: Quản lý hội thoại giữa khách hàng và nhân viên
  */
 
 router.use(authenticateToken);
@@ -17,7 +17,10 @@ router.use(authenticateToken);
  * /api/chatbox:
  *   get:
  *     summary: Lấy danh sách tất cả chatbox
- *     tags: [ChatBox]
+ *     tags: [Chatbox]
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
 router.get('/', controller.getAll);
 
@@ -25,35 +28,47 @@ router.get('/', controller.getAll);
  * @swagger
  * /api/chatbox/{id}:
  *   get:
- *     summary: Lấy chatbox theo mã
- *     tags: [ChatBox]
+ *     summary: Lấy thông tin chatbox theo mã
+ *     tags: [Chatbox]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
 router.get('/:id', controller.getById);
 
 /**
  * @swagger
- * /api/chatbox/khachhang/{maKhachHang}:
- *   get:
- *     summary: Tìm theo mã khách hàng
- *     tags: [ChatBox]
- */
-router.get('/khachhang/:maKhachHang', controller.findByKhachHang);
-
-/**
- * @swagger
- * /api/chatbox/nhanvien/{maNhanVien}:
- *   get:
- *     summary: Tìm theo mã nhân viên
- *     tags: [ChatBox]
- */
-router.get('/nhanvien/:maNhanVien', controller.findByNhanVien);
-
-/**
- * @swagger
  * /api/chatbox:
  *   post:
- *     summary: Tạo mới chatbox
- *     tags: [ChatBox]
+ *     summary: Tạo chatbox mới
+ *     tags: [Chatbox]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [makhachhang, manhanvien]
+ *             properties:
+ *               makhachhang:
+ *                 type: integer
+ *               manhanvien:
+ *                 type: integer
+ *               trangthai:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thất bại
  */
 router.post('/', controller.create);
 
@@ -62,7 +77,27 @@ router.post('/', controller.create);
  * /api/chatbox/{id}:
  *   put:
  *     summary: Cập nhật chatbox
- *     tags: [ChatBox]
+ *     tags: [Chatbox]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               trangthai:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       400:
+ *         description: Cập nhật thất bại
  */
 router.put('/:id', controller.update);
 
@@ -71,7 +106,18 @@ router.put('/:id', controller.update);
  * /api/chatbox/{id}:
  *   delete:
  *     summary: Xoá chatbox
- *     tags: [ChatBox]
+ *     tags: [Chatbox]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       400:
+ *         description: Xoá thất bại
  */
 router.delete('/:id', controller.delete);
 

@@ -1,72 +1,91 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/lichsutimkiem.controller');
+const ctrl = require('../controllers/lichsutimkiem.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
-
-router.use(authenticateToken);
 
 /**
  * @swagger
  * tags:
  *   - name: Lịch sử tìm kiếm
- *     description: Quản lý lịch sử tìm kiếm của khách hàng
+ *     description: Quản lý lịch sử từ khoá khách hàng đã tìm
  */
+
+router.use(authenticateToken);
 
 /**
  * @swagger
  * /api/lichsutimkiem:
  *   get:
- *     summary: Lấy tất cả lịch sử tìm kiếm
+ *     summary: Lấy danh sách lịch sử tìm kiếm (hỗ trợ lọc)
  *     tags: [Lịch sử tìm kiếm]
+ *     parameters:
+ *       - in: query
+ *         name: makhachhang
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: machitietsanpham
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: from
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: "ISO datetime bắt đầu (VD: 2025-01-01T00:00:00.000Z)"
+ *       - in: query
+ *         name: to
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: "ISO datetime kết thúc"
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/lichsutimkiem/{maLichSu}:
+ * /api/lichsutimkiem/{id}:
  *   get:
- *     summary: Lấy lịch sử tìm kiếm theo mã
+ *     summary: Lấy lịch sử tìm kiếm theo ID
  *     tags: [Lịch sử tìm kiếm]
  *     parameters:
  *       - in: path
- *         name: maLichSu
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maLichSu', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
- * /api/lichsutimkiem/khachhang/{maKhachHang}:
+ * /api/lichsutimkiem/khachhang/{makhachhang}:
  *   get:
- *     summary: Lấy lịch sử tìm kiếm theo khách hàng
+ *     summary: Lấy tất cả lịch sử tìm kiếm theo khách hàng
  *     tags: [Lịch sử tìm kiếm]
  *     parameters:
  *       - in: path
- *         name: maKhachHang
+ *         name: makhachhang
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/khachhang/:maKhachHang', controller.getByKhachHang);
+router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
 
 /**
  * @swagger
  * /api/lichsutimkiem:
  *   post:
- *     summary: Thêm lịch sử tìm kiếm mới
+ *     summary: Tạo bản ghi lịch sử tìm kiếm mới
  *     tags: [Lịch sử tìm kiếm]
  *     requestBody:
  *       required: true
@@ -74,77 +93,65 @@ router.get('/khachhang/:maKhachHang', controller.getByKhachHang);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - maKhachHang
- *               - noiDung
+ *             required: [makhachhang, noidung]
  *             properties:
- *               maKhachHang:
- *                 type: string
- *               maChiTietSanPham:
- *                 type: string
- *               noiDung:
- *                 type: string
- *               thoiGianTK:
- *                 type: string
- *                 format: date-time
- *               maTuKhoa:
- *                 type: string
+ *               makhachhang: { type: integer }
+ *               machitietsanpham: { type: integer, nullable: true }
+ *               noidung: { type: string }
+ *               thoigiantk: { type: string, format: date-time }
  *     responses:
  *       201:
  *         description: Tạo thành công
  *       400:
- *         description: Tạo thất bại
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/lichsutimkiem/{maLichSu}:
+ * /api/lichsutimkiem/{id}:
  *   put:
  *     summary: Cập nhật lịch sử tìm kiếm
  *     tags: [Lịch sử tìm kiếm]
  *     parameters:
  *       - in: path
- *         name: maLichSu
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               noiDung:
- *                 type: string
- *               maTuKhoa:
- *                 type: string
+ *               machitietsanpham: { type: integer, nullable: true }
+ *               noidung: { type: string }
+ *               thoigiantk: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Lỗi cập nhật
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maLichSu', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/lichsutimkiem/{maLichSu}:
+ * /api/lichsutimkiem/{id}:
  *   delete:
  *     summary: Xoá lịch sử tìm kiếm
  *     tags: [Lịch sử tìm kiếm]
  *     parameters:
  *       - in: path
- *         name: maLichSu
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maLichSu', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

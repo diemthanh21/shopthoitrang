@@ -9,10 +9,6 @@ class HuyDonHangService {
     return await repo.getById(ma);
   }
 
-  async layTheoMaDonHang(madonhang) {
-    return await repo.getByMaDonHang(madonhang);
-  }
-
   async taoMoi(data) {
     return await repo.create(data);
   }

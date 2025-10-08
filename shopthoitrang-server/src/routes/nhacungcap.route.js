@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/nhacungcap.controller');
+const ctrl = require('../controllers/nhacungcap.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
  *   - name: Nhà cung cấp
- *     description: Quản lý nhà cung cấp
+ *     description: Quản lý thông tin nhà cung cấp
  */
 
 router.use(authenticateToken);
@@ -16,57 +16,43 @@ router.use(authenticateToken);
  * @swagger
  * /api/nhacungcap:
  *   get:
- *     summary: Lấy tất cả nhà cung cấp
+ *     summary: Lấy danh sách nhà cung cấp
  *     tags: [Nhà cung cấp]
+ *     parameters:
+ *       - in: query
+ *         name: tennhacungcap
+ *         schema: { type: string }
+ *         description: Tìm theo tên nhà cung cấp
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/nhacungcap/timkiem:
+ * /api/nhacungcap/{id}:
  *   get:
- *     summary: Tìm nhà cung cấp theo tên
- *     tags: [Nhà cung cấp]
- *     parameters:
- *       - in: query
- *         name: ten
- *         schema:
- *           type: string
- *         required: false
- *     responses:
- *       200:
- *         description: Danh sách nhà cung cấp
- */
-router.get('/timkiem', controller.search);
-
-/**
- * @swagger
- * /api/nhacungcap/{maNhaCungCap}:
- *   get:
- *     summary: Lấy nhà cung cấp theo mã
+ *     summary: Lấy chi tiết nhà cung cấp theo ID
  *     tags: [Nhà cung cấp]
  *     parameters:
  *       - in: path
- *         name: maNhaCungCap
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maNhaCungCap', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
  * /api/nhacungcap:
  *   post:
- *     summary: Tạo mới nhà cung cấp
+ *     summary: Tạo nhà cung cấp mới
  *     tags: [Nhà cung cấp]
  *     requestBody:
  *       required: true
@@ -74,70 +60,62 @@ router.get('/:maNhaCungCap', controller.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [manhacungcap, tennhacungcap]
+ *             required: [tennhacungcap]
  *             properties:
- *               manhacungcap:
- *                 type: string
- *               tennhacungcap:
- *                 type: string
- *               thongtinlienhe:
- *                 type: string
+ *               tennhacungcap: { type: string }
+ *               thongtinlienhe: { type: string, nullable: true }
  *     responses:
  *       201:
  *         description: Tạo thành công
  *       400:
- *         description: Tạo thất bại
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/nhacungcap/{maNhaCungCap}:
+ * /api/nhacungcap/{id}:
  *   put:
- *     summary: Cập nhật nhà cung cấp
+ *     summary: Cập nhật thông tin nhà cung cấp
  *     tags: [Nhà cung cấp]
  *     parameters:
  *       - in: path
- *         name: maNhaCungCap
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tennhacungcap:
- *                 type: string
- *               thongtinlienhe:
- *                 type: string
+ *               tennhacungcap: { type: string }
+ *               thongtinlienhe: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Cập nhật thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maNhaCungCap', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/nhacungcap/{maNhaCungCap}:
+ * /api/nhacungcap/{id}:
  *   delete:
  *     summary: Xoá nhà cung cấp
  *     tags: [Nhà cung cấp]
  *     parameters:
  *       - in: path
- *         name: maNhaCungCap
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maNhaCungCap', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

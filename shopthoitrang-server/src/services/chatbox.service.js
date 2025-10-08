@@ -1,31 +1,26 @@
 const repo = require('../repositories/chatbox.repository');
 
 class ChatBoxService {
-  async getAll() {
+  async layTatCa() {
     return await repo.getAll();
   }
 
-  async getById(ma) {
+  async layTheoMa(ma) {
     return await repo.getById(ma);
   }
 
-  async findByKhachHang(maKH) {
-    return await repo.findByKhachHang(maKH);
-  }
-
-  async findByNhanVien(maNV) {
-    return await repo.findByNhanVien(maNV);
-  }
-
-  async create(data) {
+  async taoMoi(data) {
+    if (!data.makhachhang || !data.manhanvien) {
+      throw new Error('Thiếu thông tin bắt buộc: makhachhang, manhanvien');
+    }
     return await repo.create(data);
   }
 
-  async update(ma, data) {
+  async capNhat(ma, data) {
     return await repo.update(ma, data);
   }
 
-  async delete(ma) {
+  async xoa(ma) {
     return await repo.delete(ma);
   }
 }

@@ -1,61 +1,74 @@
 const { createClient } = require('@supabase/supabase-js');
 const LichSuTimKiem = require('../models/lichsutimkiem.model');
+
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'lichsutimkiem';
 
-const repo = {
-  async getAll() {
-    const { data, error } = await supabase.from('lichsutimkiem').select('*');
-    if (error) return [];
-    return data.map(row => new LichSuTimKiem(row));
+const LichSuTimKiemRepository = {
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.makhachhang) query = query.eq('makhachhang', filters.makhachhang);
+    if (filters.machitietsanpham) query = query.eq('machitietsanpham', filters.machitietsanpham);
+    if (filters.from) query = query.gte('thoigiantk', filters.from);          // ISO string
+    if (filters.to) query = query.lte('thoigiantk', filters.to);              // ISO string
+
+    const { data, error } = await query.order('thoigiantk', { ascending: false });
+    if (error) throw error;
+    return data.map(r => new LichSuTimKiem(r));
+    },
+
+  async getById(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('malichsu', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new LichSuTimKiem(data) : null;
   },
 
-  async getById(ma) {
+  async getByCustomer(makhachhang) {
     const { data, error } = await supabase
-      .from('lichsutimkiem')
+      .from(TABLE)
       .select('*')
-      .eq('malichsu', ma)
-      .single();
-    if (error || !data) return null;
+      .eq('makhachhang', makhachhang)
+      .order('thoigiantk', { ascending: false });
+
+    if (error) throw error;
+    return data.map(r => new LichSuTimKiem(r));
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new LichSuTimKiem(data);
   },
 
-  async getByKhachHang(maKH) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('lichsutimkiem')
-      .select('*')
-      .eq('makhachhang', maKH);
-    if (error) return [];
-    return data.map(row => new LichSuTimKiem(row));
-  },
-
-  async create(data) {
-    const { data: inserted, error } = await supabase
-      .from('lichsutimkiem')
-      .insert([data])
-      .single();
-    if (error) return null;
-    return new LichSuTimKiem(inserted);
-  },
-
-  async update(ma, fields) {
-    const { data, error } = await supabase
-      .from('lichsutimkiem')
+      .from(TABLE)
       .update(fields)
-      .eq('malichsu', ma)
-      .single();
-    if (error || !data) return null;
-    return new LichSuTimKiem(data);
+      .eq('malichsu', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new LichSuTimKiem(data) : null;
   },
 
-  async delete(ma) {
+  async remove(id) {
     const { data, error } = await supabase
-      .from('lichsutimkiem')
+      .from(TABLE)
       .delete()
-      .eq('malichsu', ma)
-      .single();
-    if (error || !data) return null;
-    return new LichSuTimKiem(data);
-  }
+      .eq('malichsu', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new LichSuTimKiem(data) : null;
+  },
 };
 
-module.exports = repo;
+module.exports = LichSuTimKiemRepository;

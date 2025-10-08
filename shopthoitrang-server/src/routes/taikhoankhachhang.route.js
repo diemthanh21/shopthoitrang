@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/taikhoankhachhang.controller');
+const ctrl = require('../controllers/taikhoankhachhang.controller');
+const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
@@ -9,32 +10,48 @@ const controller = require('../controllers/taikhoankhachhang.controller');
  *     description: Quản lý tài khoản khách hàng
  */
 
+router.use(authenticateToken);
+
 /**
  * @swagger
- * /api/taikhoankhachhang/login:
- *   post:
- *     summary: Đăng nhập tài khoản khách hàng
+ * /api/taikhoankhachhang:
+ *   get:
+ *     summary: Lấy danh sách tài khoản khách hàng
  *     tags: [Tài khoản khách hàng]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               tenDangNhap:
- *                 type: string
- *               pass:
- *                 type: string
+ *     parameters:
+ *       - in: query
+ *         name: hoten
+ *         schema: { type: string }
+ *       - in: query
+ *         name: email
+ *         schema: { type: string }
+ *       - in: query
+ *         name: danghoatdong
+ *         schema: { type: boolean }
  *     responses:
  *       200:
- *         description: Đăng nhập thành công
- *       400:
- *         description: Thiếu thông tin đăng nhập
- *       401:
- *         description: Sai tên đăng nhập hoặc mật khẩu
+ *         description: Thành công
  */
-router.post('/login', controller.dangNhap);
+router.get('/', ctrl.getAll);
+
+/**
+ * @swagger
+ * /api/taikhoankhachhang/{id}:
+ *   get:
+ *     summary: Lấy thông tin chi tiết tài khoản khách hàng
+ *     tags: [Tài khoản khách hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
+ */
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
@@ -48,124 +65,69 @@ router.post('/login', controller.dangNhap);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - MAKHACHHANG
- *               - TENDANGNHAP
- *               - PASS
+ *             required: [hoten, tendangnhap, pass]
  *             properties:
- *               MAKHACHHANG:
- *                 type: string
- *               HOTEN:
- *                 type: string
- *               TENDANGNHAP:
- *                 type: string
- *               EMAIL:
- *                 type: string
- *               PASS:
- *                 type: string
- *               SODIENTHOAI:
- *                 type: string
- *               DANGHOATDONG:
- *                 type: boolean
- *               ANHDAIDIEN:
- *                 type: string
+ *               hoten: { type: string }
+ *               tendangnhap: { type: string }
+ *               pass: { type: string }
+ *               email: { type: string }
+ *               sodienthoai: { type: string }
+ *               anhdaidien: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
  *       400:
- *         description: Không thể tạo tài khoản
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.taoMoi);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/taikhoankhachhang:
- *   get:
- *     summary: Lấy danh sách tất cả tài khoản khách hàng
- *     tags: [Tài khoản khách hàng]
- *     responses:
- *       200:
- *         description: Thành công
- */
-router.get('/', controller.layTatCa);
-
-/**
- * @swagger
- * /api/taikhoankhachhang/{maKhachHang}:
- *   get:
- *     summary: Lấy thông tin tài khoản khách hàng theo mã
- *     tags: [Tài khoản khách hàng]
- *     parameters:
- *       - in: path
- *         name: maKhachHang
- *         required: true
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Thành công
- *       404:
- *         description: Không tìm thấy tài khoản
- */
-router.get('/:maKhachHang', controller.layTheoMa);
-
-/**
- * @swagger
- * /api/taikhoankhachhang/{maKhachHang}:
+ * /api/taikhoankhachhang/{id}:
  *   put:
- *     summary: Cập nhật thông tin tài khoản khách hàng
+ *     summary: Cập nhật thông tin khách hàng
  *     tags: [Tài khoản khách hàng]
  *     parameters:
  *       - in: path
- *         name: maKhachHang
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               HOTEN:
- *                 type: string
- *               EMAIL:
- *                 type: string
- *               PASS:
- *                 type: string
- *               SODIENTHOAI:
- *                 type: string
- *               DANGHOATDONG:
- *                 type: boolean
- *               ANHDAIDIEN:
- *                 type: string
+ *               hoten: { type: string }
+ *               email: { type: string }
+ *               sodienthoai: { type: string }
+ *               anhdaidien: { type: string }
+ *               pass: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Không thể cập nhật
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maKhachHang', controller.capNhat);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/taikhoankhachhang/{maKhachHang}:
+ * /api/taikhoankhachhang/{id}:
  *   delete:
- *     summary: Xoá (mềm) tài khoản khách hàng
+ *     summary: Xoá tài khoản khách hàng
  *     tags: [Tài khoản khách hàng]
  *     parameters:
  *       - in: path
- *         name: maKhachHang
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Đã xoá tài khoản
- *       400:
- *         description: Không thể xoá
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maKhachHang', controller.xoa);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/doihang.controller');
+const ctrl = require('../controllers/doihang.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
- *   - name: DoiHang
- *     description: Quản lý đổi hàng
+ *   - name: Đổi hàng
+ *     description: Quản lý yêu cầu đổi hàng của khách hàng
  */
 
 router.use(authenticateToken);
@@ -16,63 +16,124 @@ router.use(authenticateToken);
  * @swagger
  * /api/doihang:
  *   get:
- *     summary: Lấy tất cả đơn đổi hàng
- *     tags: [DoiHang]
+ *     summary: Lấy danh sách tất cả yêu cầu đổi hàng
+ *     tags: [Đổi hàng]
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
  * /api/doihang/{id}:
  *   get:
- *     summary: Lấy đơn đổi hàng theo mã
- *     tags: [DoiHang]
+ *     summary: Lấy yêu cầu đổi hàng theo ID
+ *     tags: [Đổi hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.get('/:id', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
- * /api/doihang/donhang/{maDonHang}:
+ * /api/doihang/khachhang/{makhachhang}:
  *   get:
- *     summary: Tìm đổi hàng theo mã đơn hàng
- *     tags: [DoiHang]
+ *     summary: Lấy danh sách đổi hàng theo khách hàng
+ *     tags: [Đổi hàng]
+ *     parameters:
+ *       - in: path
+ *         name: makhachhang
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
-router.get('/donhang/:maDonHang', controller.findByDonHang);
-
-/**
- * @swagger
- * /api/doihang/khachhang/{maKH}:
- *   get:
- *     summary: Tìm đổi hàng theo mã khách hàng
- *     tags: [DoiHang]
- */
-router.get('/khachhang/:maKH', controller.findByKhachHang);
+router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
 
 /**
  * @swagger
  * /api/doihang:
  *   post:
- *     summary: Tạo yêu cầu đổi hàng
- *     tags: [DoiHang]
+ *     summary: Tạo yêu cầu đổi hàng mới
+ *     tags: [Đổi hàng]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [madonhang, makhachhang, machitietsanphamcu, machitietsanphamoi, soluong, lydo, trangthai]
+ *             properties:
+ *               madonhang: { type: integer }
+ *               makhachhang: { type: integer }
+ *               machitietsanphamcu: { type: integer }
+ *               machitietsanphamoi: { type: integer }
+ *               soluong: { type: integer }
+ *               lydo: { type: string }
+ *               trangthai: { type: string }
+ *               ghichu: { type: string }
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
  * /api/doihang/{id}:
  *   put:
- *     summary: Cập nhật thông tin đổi hàng
- *     tags: [DoiHang]
+ *     summary: Cập nhật yêu cầu đổi hàng
+ *     tags: [Đổi hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               trangthai: { type: string }
+ *               ghichu: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:id', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
  * /api/doihang/{id}:
  *   delete:
  *     summary: Xoá yêu cầu đổi hàng
- *     tags: [DoiHang]
+ *     tags: [Đổi hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:id', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

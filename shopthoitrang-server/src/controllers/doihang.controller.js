@@ -2,43 +2,58 @@ const service = require('../services/doihang.service');
 
 const DoiHangController = {
   async getAll(req, res) {
-    const list = await service.getAll();
-    res.json(list.map(i => i.toJSON()));
+    try {
+      const data = await service.list();
+      res.json(data.map(r => r.toJSON()));
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
   },
 
   async getById(req, res) {
-    const item = await service.getById(req.params.id);
-    if (!item) return res.status(404).json({ message: 'Không tìm thấy' });
-    res.json(item.toJSON());
+    try {
+      const item = await service.get(req.params.id);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 404).json({ message: err.message });
+    }
   },
 
-  async findByDonHang(req, res) {
-    const list = await service.findByDonHang(req.params.maDonHang);
-    res.json(list.map(i => i.toJSON()));
-  },
-
-  async findByKhachHang(req, res) {
-    const list = await service.findByKhachHang(req.params.maKH);
-    res.json(list.map(i => i.toJSON()));
+  async getByCustomer(req, res) {
+    try {
+      const data = await service.getByCustomer(req.params.makhachhang);
+      res.json(data.map(r => r.toJSON()));
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
   },
 
   async create(req, res) {
-    const item = await service.create(req.body);
-    if (!item) return res.status(400).json({ message: 'Tạo thất bại' });
-    res.status(201).json(item.toJSON());
+    try {
+      const item = await service.create(req.body);
+      res.status(201).json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
   },
 
   async update(req, res) {
-    const item = await service.update(req.params.id, req.body);
-    if (!item) return res.status(400).json({ message: 'Cập nhật thất bại' });
-    res.json(item.toJSON());
+    try {
+      const item = await service.update(req.params.id, req.body);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
   },
 
   async delete(req, res) {
-    const ok = await service.delete(req.params.id);
-    if (!ok) return res.status(400).json({ message: 'Xoá thất bại' });
-    res.json({ message: 'Xoá thành công' });
-  }
+    try {
+      const result = await service.delete(req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  },
 };
 
 module.exports = DoiHangController;

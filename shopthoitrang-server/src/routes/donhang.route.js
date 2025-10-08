@@ -1,17 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/donhang.controller');
+const ctrl = require('../controllers/donhang.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
-
-// 🔐 Áp dụng middleware xác thực cho tất cả route
-router.use(authenticateToken);
 
 /**
  * @swagger
  * tags:
  *   - name: Đơn hàng
- *     description: Quản lý đơn hàng
+ *     description: Quản lý đơn hàng của khách hàng
  */
+
+router.use(authenticateToken);
 
 /**
  * @swagger
@@ -23,51 +22,49 @@ router.use(authenticateToken);
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/donhang/{maDonHang}:
+ * /api/donhang/{id}:
  *   get:
- *     summary: Lấy thông tin đơn hàng theo mã
+ *     summary: Lấy đơn hàng theo ID
  *     tags: [Đơn hàng]
  *     parameters:
  *       - in: path
- *         name: maDonHang
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maDonHang', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
- * /api/donhang/khachhang/{maKhachHang}:
+ * /api/donhang/khachhang/{makhachhang}:
  *   get:
- *     summary: Lấy đơn hàng theo mã khách hàng
+ *     summary: Lấy danh sách đơn hàng theo khách hàng
  *     tags: [Đơn hàng]
  *     parameters:
  *       - in: path
- *         name: maKhachHang
+ *         name: makhachhang
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/khachhang/:maKhachHang', controller.getByMaKhachHang);
+router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
 
 /**
  * @swagger
  * /api/donhang:
  *   post:
- *     summary: Tạo mới đơn hàng
+ *     summary: Tạo đơn hàng mới
  *     tags: [Đơn hàng]
  *     requestBody:
  *       required: true
@@ -75,84 +72,66 @@ router.get('/khachhang/:maKhachHang', controller.getByMaKhachHang);
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - maKhachHang
- *               - ngayDatHang
- *               - thanhTien
+ *             required: [makhachhang, phuongthucthanhtoan]
  *             properties:
- *               maKhachHang:
- *                 type: string
- *               ngayDatHang:
- *                 type: string
- *                 format: date
- *               thanhTien:
- *                 type: number
- *               phuongThucThanhToan:
- *                 type: string
- *               trangThaiThanhToan:
- *                 type: string
- *               trangThaiDonHang:
- *                 type: string
+ *               makhachhang: { type: integer }
+ *               thanhtien: { type: number }
+ *               phuongthucthanhtoan: { type: string }
+ *               trangthaithanhtoan: { type: string }
+ *               trangthaidonhang: { type: string }
  *     responses:
  *       201:
- *         description: Tạo đơn hàng thành công
+ *         description: Tạo thành công
  *       400:
- *         description: Lỗi tạo đơn hàng
+ *         description: Thiếu dữ liệu
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/donhang/{maDonHang}:
+ * /api/donhang/{id}:
  *   put:
  *     summary: Cập nhật đơn hàng
  *     tags: [Đơn hàng]
  *     parameters:
  *       - in: path
- *         name: maDonHang
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               thanhTien:
- *                 type: number
- *               phuongThucThanhToan:
- *                 type: string
- *               trangThaiThanhToan:
- *                 type: string
- *               trangThaiDonHang:
- *                 type: string
+ *               trangthaithanhtoan: { type: string }
+ *               trangthaidonhang: { type: string }
+ *               thanhtien: { type: number }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Cập nhật thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maDonHang', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/donhang/{maDonHang}:
+ * /api/donhang/{id}:
  *   delete:
- *     summary: Xoá đơn hàng theo mã
+ *     summary: Xoá đơn hàng
  *     tags: [Đơn hàng]
  *     parameters:
  *       - in: path
- *         name: maDonHang
+ *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maDonHang', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

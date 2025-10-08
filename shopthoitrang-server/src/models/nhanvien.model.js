@@ -1,7 +1,13 @@
 class NhanVien {
   constructor({
-    manhanvien, hoten, email, sodienthoai, ngaysinh, 
-    diachi, machucnang, maquanly
+    manhanvien,
+    hoten,
+    email,
+    sodienthoai,
+    ngaysinh,
+    diachi,
+    machucnang,
+    maquanly
   }) {
     this.maNhanVien = manhanvien;
     this.hoTen = hoten;

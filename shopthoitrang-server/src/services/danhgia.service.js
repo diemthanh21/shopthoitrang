@@ -1,36 +1,56 @@
 const repo = require('../repositories/danhgia.repository');
 
 class DanhGiaService {
-  async getAll() {
-    return await repo.getAll();
+  async list(filters) {
+    return repo.getAll(filters);
   }
 
-  async getById(id) {
-    return await repo.getById(id);
+  async get(id) {
+    const item = await repo.getById(id);
+    if (!item) {
+      const e = new Error('Không tìm thấy đánh giá');
+      e.status = 404;
+      throw e;
+    }
+    return item;
   }
 
-  async findBySanPham(maSP) {
-    return await repo.findBySanPham(maSP);
+  async create(body) {
+    if (!body.masanpham || !body.makhachhang || !body.diemdanhgia) {
+      const e = new Error('Thiếu thông tin bắt buộc: masanpham, makhachhang, diemdanhgia');
+      e.status = 400;
+      throw e;
+    }
+
+    const diemdanhgia = Number(body.diemdanhgia);
+    if (diemdanhgia < 1 || diemdanhgia > 5) {
+      const e = new Error('Điểm đánh giá phải trong khoảng 1-5');
+      e.status = 400;
+      throw e;
+    }
+
+    body.ngaydanhgia = body.ngaydanhgia || new Date().toISOString();
+    return repo.create(body);
   }
 
-  async findByKhachHang(maKH) {
-    return await repo.findByKhachHang(maKH);
-  }
-
-  async findByChiTietDonHang(maCTDH) {
-    return await repo.findByChiTietDonHang(maCTDH);
-  }
-
-  async create(data) {
-    return await repo.create(data);
-  }
-
-  async update(id, data) {
-    return await repo.update(id, data);
+  async update(id, body) {
+    const updated = await repo.update(id, body);
+    if (!updated) {
+      const e = new Error('Không tìm thấy đánh giá để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+    return updated;
   }
 
   async delete(id) {
-    return await repo.delete(id);
+    const deleted = await repo.remove(id);
+    if (!deleted) {
+      const e = new Error('Không tìm thấy đánh giá để xoá');
+      e.status = 404;
+      throw e;
+    }
+    return { message: 'Đã xoá đánh giá thành công' };
   }
 }
 

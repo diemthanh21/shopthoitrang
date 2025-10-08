@@ -1,46 +1,69 @@
-const TaiKhoanNhanVienRepository = require('../repositories/taikhoannhanvien.repository');
-const TaiKhoanNhanVien = require('../models/taikhoannhanvien.model');
+const repo = require('../repositories/taikhoannhanvien.repository');
+const bcrypt = require('bcryptjs');
 
 class TaiKhoanNhanVienService {
-  // 🔐 Đăng nhập
-  async dangNhap(tenDangNhap, matKhau) {
-    const data = await TaiKhoanNhanVienRepository.findByCredentials(tenDangNhap, matKhau);
-    if (!data) return null;
-    return new TaiKhoanNhanVien(data);
+  async list() {
+    return repo.getAll();
   }
 
-  // ✅ Tạo tài khoản mới
-  async taoMoi(taiKhoanData) {
-    const data = await TaiKhoanNhanVienRepository.create(taiKhoanData);
-    if (!data) return null;
-    return new TaiKhoanNhanVien(data);
+  async get(id) {
+    const item = await repo.getById(id);
+    if (!item) {
+      const e = new Error('Không tìm thấy tài khoản nhân viên');
+      e.status = 404;
+      throw e;
+    }
+    return item;
   }
 
-  // 📥 Lấy toàn bộ tài khoản
-  async layTatCa() {
-    const list = await TaiKhoanNhanVienRepository.getAll();
-    return list;
+  async create(body) {
+    if (!body.manhanvien || !body.tendangnhap || !body.matkhau) {
+      const e = new Error('Thiếu thông tin bắt buộc (manhanvien, tendangnhap, matkhau)');
+      e.status = 400;
+      throw e;
+    }
+
+    const existing = await repo.getByUsername(body.tendangnhap);
+    if (existing) {
+      const e = new Error('Tên đăng nhập đã tồn tại');
+      e.status = 400;
+      throw e;
+    }
+
+    const hashedPassword = await bcrypt.hash(body.matkhau, 10);
+    const payload = {
+      manhanvien: body.manhanvien,
+      tendangnhap: body.tendangnhap,
+      matkhau: hashedPassword,
+      danghoatdong: body.danghoatdong ?? true
+    };
+
+    return repo.create(payload);
   }
 
-  // 🔍 Lấy theo mã nhân viên
-  async layTheoMa(maNhanVien) {
-    const data = await TaiKhoanNhanVienRepository.getById(maNhanVien);
-    if (!data) return null;
-    return new TaiKhoanNhanVien(data);
+  async update(id, body) {
+    if (body.matkhau) {
+      body.matkhau = await bcrypt.hash(body.matkhau, 10);
+    }
+
+    const updated = await repo.update(id, body);
+    if (!updated) {
+      const e = new Error('Không tìm thấy tài khoản để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+
+    return updated;
   }
 
-  // ✏️ Cập nhật thông tin tài khoản
-  async capNhat(maNhanVien, thongTinCapNhat) {
-    const data = await TaiKhoanNhanVienRepository.update(maNhanVien, thongTinCapNhat);
-    if (!data) return null;
-    return new TaiKhoanNhanVien(data);
-  }
-
-  // 🗑️ Xoá mềm tài khoản
-  async xoa(maNhanVien) {
-    const data = await TaiKhoanNhanVienRepository.delete(maNhanVien);
-    if (!data) return null;
-    return new TaiKhoanNhanVien(data);
+  async delete(id) {
+    const deleted = await repo.remove(id);
+    if (!deleted) {
+      const e = new Error('Không tìm thấy tài khoản để xoá');
+      e.status = 404;
+      throw e;
+    }
+    return { message: 'Đã xoá tài khoản nhân viên thành công' };
   }
 }
 

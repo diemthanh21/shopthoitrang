@@ -1,34 +1,52 @@
 const service = require('../services/chucnang.service');
 
 const ChucNangController = {
-  async getAll(req, res) {
-    const list = await service.layTatCa();
-    res.json(list.map(e => e.toJSON()));
+  async getAll(req, res, next) {
+    try {
+      const list = await service.layTatCa();
+      res.json(list.map(e => e.toJSON()));
+    } catch (err) {
+      next(err);
+    }
   },
 
-  async getById(req, res) {
-    const ma = req.params.id;
-    const item = await service.layTheoMa(ma);
-    if (!item) return res.status(404).json({ message: 'Không tìm thấy' });
-    res.json(item.toJSON());
+  async getById(req, res, next) {
+    try {
+      const ma = Number(req.params.id);
+      const item = await service.layTheoMa(ma);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 404).json({ message: err.message || 'Không tìm thấy' });
+    }
   },
 
-  async create(req, res) {
-    const item = await service.taoMoi(req.body);
-    if (!item) return res.status(400).json({ message: 'Tạo thất bại' });
-    res.status(201).json(item.toJSON());
+  async create(req, res, next) {
+    try {
+      const item = await service.taoMoi(req.body);
+      res.status(201).json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Tạo thất bại' });
+    }
   },
 
-  async update(req, res) {
-    const item = await service.capNhat(req.params.id, req.body);
-    if (!item) return res.status(400).json({ message: 'Cập nhật thất bại' });
-    res.json(item.toJSON());
+  async update(req, res, next) {
+    try {
+      const ma = Number(req.params.id);
+      const item = await service.capNhat(ma, req.body);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Cập nhật thất bại' });
+    }
   },
 
-  async delete(req, res) {
-    const item = await service.xoa(req.params.id);
-    if (!item) return res.status(400).json({ message: 'Xoá thất bại' });
-    res.json(item.toJSON());
+  async delete(req, res, next) {
+    try {
+      const ma = Number(req.params.id);
+      const result = await service.xoa(ma);
+      res.json(result);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Xoá thất bại' });
+    }
   }
 };
 

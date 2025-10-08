@@ -17,12 +17,12 @@ class PhieuNhapKho {
 
   toJSON() {
     return {
-      maPhieuNhap: this.maPhieuNhap,
-      maNhanVien: this.maNhanVien,
-      maNhaCungCap: this.maNhaCungCap,
-      ngayNhap: this.ngayNhap,
-      thanhTien: this.thanhTien,
-      ghiChu: this.ghiChu
+      maphieunhap: this.maPhieuNhap,
+      manhanvien: this.maNhanVien,
+      manhacungcap: this.maNhaCungCap,
+      ngaynhap: this.ngayNhap,
+      thanhtien: this.thanhTien,
+      ghichu: this.ghiChu
     };
   }
 }

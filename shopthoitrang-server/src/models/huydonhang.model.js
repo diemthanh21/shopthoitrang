@@ -1,5 +1,13 @@
 class HuyDonHang {
-  constructor({ mahuydon, madonhang, makhachhang, lydo, ngayyeucau, trangthai, ghichu }) {
+  constructor({
+    mahuydon,
+    madonhang,
+    makhachhang,
+    lydo,
+    ngayyeucau,
+    trangthai,
+    ghichu
+  }) {
     this.maHuyDon = mahuydon;
     this.maDonHang = madonhang;
     this.maKhachHang = makhachhang;
@@ -11,13 +19,13 @@ class HuyDonHang {
 
   toJSON() {
     return {
-      maHuyDon: this.maHuyDon,
-      maDonHang: this.maDonHang,
-      maKhachHang: this.maKhachHang,
-      lyDo: this.lyDo,
-      ngayYeuCau: this.ngayYeuCau,
-      trangThai: this.trangThai,
-      ghiChu: this.ghiChu
+      mahuydon: this.maHuyDon,
+      madonhang: this.maDonHang,
+      makhachhang: this.maKhachHang,
+      lydo: this.lyDo,
+      ngayyeucau: this.ngayYeuCau,
+      trangthai: this.trangThai,
+      ghichu: this.ghiChu
     };
   }
 }

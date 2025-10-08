@@ -2,74 +2,61 @@ const { createClient } = require('@supabase/supabase-js');
 const DanhGia = require('../models/danhgia.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'danhgia';
 
 const DanhGiaRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('danhgia').select('*');
-    if (error) return [];
-    return data.map(row => new DanhGia(row));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.masanpham) query = query.eq('masanpham', filters.masanpham);
+    if (filters.makhachhang) query = query.eq('makhachhang', filters.makhachhang);
+    if (filters.diemdanhgia) query = query.eq('diemdanhgia', filters.diemdanhgia);
+
+    const { data, error } = await query.order('ngaydanhgia', { ascending: false });
+    if (error) throw error;
+    return data.map((r) => new DanhGia(r));
   },
 
   async getById(id) {
     const { data, error } = await supabase
-      .from('danhgia')
+      .from(TABLE)
       .select('*')
       .eq('madanhgia', id)
-      .single();
-    if (error || !data) return null;
-    return new DanhGia(data);
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new DanhGia(data) : null;
   },
 
-  async findBySanPham(maSP) {
-    const { data, error } = await supabase
-      .from('danhgia')
-      .select('*')
-      .eq('masanpham', maSP);
-    if (error) return [];
-    return data.map(row => new DanhGia(row));
-  },
-
-  async findByKhachHang(maKH) {
-    const { data, error } = await supabase
-      .from('danhgia')
-      .select('*')
-      .eq('makhachhang', maKH);
-    if (error) return [];
-    return data.map(row => new DanhGia(row));
-  },
-
-  async findByChiTietDonHang(maCTDH) {
-    const { data, error } = await supabase
-      .from('danhgia')
-      .select('*')
-      .eq('machitietdonhang', maCTDH);
-    if (error) return [];
-    return data.map(row => new DanhGia(row));
-  },
-
-  async create(obj) {
-    const { data, error } = await supabase.from('danhgia').insert([obj]).single();
-    if (error) return null;
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new DanhGia(data);
   },
 
   async update(id, fields) {
     const { data, error } = await supabase
-      .from('danhgia')
+      .from(TABLE)
       .update(fields)
       .eq('madanhgia', id)
-      .single();
-    if (error || !data) return null;
-    return new DanhGia(data);
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new DanhGia(data) : null;
   },
 
-  async delete(id) {
-    const { error } = await supabase
-      .from('danhgia')
+  async remove(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
       .delete()
-      .eq('madanhgia', id);
-    return !error;
-  }
+      .eq('madanhgia', id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? new DanhGia(data) : null;
+  },
 };
 
 module.exports = DanhGiaRepository;

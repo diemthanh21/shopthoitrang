@@ -1,13 +1,13 @@
 class DanhMucSanPham {
   constructor({ madanhmuc, tendanhmuc }) {
-    this.maDanhMuc = madanhmuc;
-    this.tenDanhMuc = tendanhmuc;
+    this.madanhmuc = madanhmuc;
+    this.tendanhmuc = tendanhmuc;
   }
 
   toJSON() {
     return {
-      maDanhMuc: this.maDanhMuc,
-      tenDanhMuc: this.tenDanhMuc
+      madanhmuc: this.madanhmuc,
+      tendanhmuc: this.tendanhmuc,
     };
   }
 }

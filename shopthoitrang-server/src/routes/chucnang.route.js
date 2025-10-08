@@ -10,6 +10,35 @@ const authenticateToken = require('../middlewares/auth.middleware');
  *     description: Quản lý chức năng hệ thống
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     ChucNang:
+ *       type: object
+ *       properties:
+ *         machucnang:
+ *           type: integer
+ *           example: 1
+ *         tenchucnang:
+ *           type: string
+ *           example: Quản lý đơn hàng
+ *     NewChucNang:
+ *       type: object
+ *       required:
+ *         - tenchucnang
+ *       properties:
+ *         tenchucnang:
+ *           type: string
+ *           example: Quản lý kho
+ *     UpdateChucNang:
+ *       type: object
+ *       properties:
+ *         tenchucnang:
+ *           type: string
+ *           example: Quản lý kho (cập nhật)
+ */
+
 router.use(authenticateToken);
 
 /**
@@ -21,6 +50,12 @@ router.use(authenticateToken);
  *     responses:
  *       200:
  *         description: Thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ChucNang'
  */
 router.get('/', controller.getAll);
 
@@ -35,10 +70,14 @@ router.get('/', controller.getAll);
  *         name: id
  *         required: true
  *         schema:
- *           type: string
+ *           type: integer
  *     responses:
  *       200:
  *         description: Thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ChucNang'
  *       404:
  *         description: Không tìm thấy
  */
@@ -55,15 +94,14 @@ router.get('/:id', controller.getById);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               machucnang:
- *                 type: string
- *               tenchucnang:
- *                 type: string
+ *             $ref: '#/components/schemas/NewChucNang'
  *     responses:
  *       201:
  *         description: Tạo thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ChucNang'
  *       400:
  *         description: Thất bại
  */
@@ -80,19 +118,20 @@ router.post('/', controller.create);
  *         name: id
  *         required: true
  *         schema:
- *           type: string
+ *           type: integer
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               tenchucnang:
- *                 type: string
+ *             $ref: '#/components/schemas/UpdateChucNang'
  *     responses:
  *       200:
  *         description: Cập nhật thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ChucNang'
  *       400:
  *         description: Cập nhật thất bại
  */
@@ -109,12 +148,12 @@ router.put('/:id', controller.update);
  *         name: id
  *         required: true
  *         schema:
- *           type: string
+ *           type: integer
  *     responses:
- *       200:
+ *       204:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
 router.delete('/:id', controller.delete);
 

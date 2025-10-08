@@ -2,70 +2,79 @@ const { createClient } = require('@supabase/supabase-js');
 const ChiTietSanPham = require('../models/chitietsanpham.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'chitietsanpham';
 
 const ChiTietSanPhamRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('chitietsanpham').select('*');
-    if (error) return [];
-    return data.map(row => new ChiTietSanPham(row));
+  async getAll({
+    masanpham,
+    search,
+    minPrice,
+    maxPrice,
+    limit = 50,
+    offset = 0,
+    orderBy = 'machitietsanpham',
+    orderDir = 'asc',
+  } = {}) {
+    let q = supabase.from(TABLE).select('*', { count: 'exact' });
+
+    if (masanpham) q = q.eq('masanpham', Number(masanpham));
+    if (search && search.trim()) {
+      q = q.or(
+        `kichthuoc.ilike.%${search}%,mausac.ilike.%${search}%,chatlieu.ilike.%${search}%,mota.ilike.%${search}%`
+      );
+    }
+    if (minPrice !== undefined) q = q.gte('giaban', Number(minPrice));
+    if (maxPrice !== undefined) q = q.lte('giaban', Number(maxPrice));
+
+    q = q
+      .order(orderBy, { ascending: (orderDir || 'asc').toLowerCase() !== 'desc' })
+      .range(offset, offset + limit - 1);
+
+    const { data, error, count } = await q;
+    if (error) throw error;
+    return {
+      items: (data || []).map((r) => new ChiTietSanPham(r)),
+      total: count ?? 0,
+    };
   },
 
-  async getById(machitietsanpham) {
+  async getById(id) {
     const { data, error } = await supabase
-      .from('chitietsanpham')
+      .from(TABLE)
       .select('*')
-      .eq('machitietsanpham', machitietsanpham)
-      .single();
-    if (error || !data) return null;
+      .eq('machitietsanpham', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new ChiTietSanPham(data) : null;
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new ChiTietSanPham(data);
   },
 
-  async getByMaSanPham(masanpham) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('chitietsanpham')
-      .select('*')
-      .eq('masanpham', masanpham);
-    if (error) return [];
-    return data.map(row => new ChiTietSanPham(row));
-  },
-
-  async create(ctsp) {
-    const { data, error } = await supabase
-      .from('chitietsanpham')
-      .insert([ctsp])
-      .single();
-    if (error) return null;
-    return new ChiTietSanPham(data);
-  },
-
-  async update(machitietsanpham, fields) {
-    const { data, error } = await supabase
-      .from('chitietsanpham')
+      .from(TABLE)
       .update(fields)
-      .eq('machitietsanpham', machitietsanpham)
-      .single();
-    if (error || !data) return null;
-    return new ChiTietSanPham(data);
-  },
-
-  async delete(machitietsanpham) {
-    const { data, error } = await supabase
-      .from('chitietsanpham')
-      .delete()
-      .eq('machitietsanpham', machitietsanpham)
-      .single();
-    if (error || !data) return null;
-    return new ChiTietSanPham(data);
-  },
-
-  async searchByKeyword(keyword) {
-    const { data, error } = await supabase
-      .from('chitietsanpham')
+      .eq('machitietsanpham', id)
       .select('*')
-      .ilike('mota', `%${keyword}%`);
-    if (error) return [];
-    return data.map(row => new ChiTietSanPham(row));
-  }
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new ChiTietSanPham(data) : null;
+  },
+
+  async remove(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('machitietsanpham', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new ChiTietSanPham(data) : null;
+  },
 };
 
 module.exports = ChiTietSanPhamRepository;

@@ -1,14 +1,18 @@
 class NoiDungChat {
   constructor({
-    machat, machatbox, nguoigui, noidung, thoigiangui, daxem, ghichu
+    machat,
+    machatbox,
+    nguoigui,
+    noidung,
+    thoigiangui,
+    daxem
   }) {
     this.maChat = machat;
     this.maChatBox = machatbox;
-    this.nguoiGui = nguoigui;
+    this.nguoiGui = nguoigui;           // 'KH' | 'NV'
     this.noiDung = noidung;
-    this.thoiGianGui = thoigiangui;
-    this.daXem = daxem;
-    this.ghiChu = ghichu;
+    this.thoiGianGui = thoigiangui;     // ISO datetime
+    this.daXem = daxem;                 // boolean
   }
 
   toJSON() {
@@ -18,8 +22,7 @@ class NoiDungChat {
       nguoigui: this.nguoiGui,
       noidung: this.noiDung,
       thoigiangui: this.thoiGianGui,
-      daxem: this.daXem,
-      ghichu: this.ghiChu
+      daxem: this.daXem
     };
   }
 }

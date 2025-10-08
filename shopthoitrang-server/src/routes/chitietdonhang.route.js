@@ -6,7 +6,7 @@ const authenticateToken = require('../middlewares/auth.middleware');
 /**
  * @swagger
  * tags:
- *   - name: ChiTietDonHang
+ *   - name: Chi tiết đơn hàng
  *     description: Quản lý chi tiết đơn hàng
  */
 
@@ -16,8 +16,11 @@ router.use(authenticateToken);
  * @swagger
  * /api/chitietdonhang:
  *   get:
- *     summary: Lấy tất cả chi tiết đơn hàng
- *     tags: [ChiTietDonHang]
+ *     summary: Lấy danh sách chi tiết đơn hàng
+ *     tags: [Chi tiết đơn hàng]
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
 router.get('/', controller.getAll);
 
@@ -25,35 +28,45 @@ router.get('/', controller.getAll);
  * @swagger
  * /api/chitietdonhang/{id}:
  *   get:
- *     summary: Lấy theo mã chi tiết đơn hàng
- *     tags: [ChiTietDonHang]
+ *     summary: Lấy chi tiết đơn hàng theo mã
+ *     tags: [Chi tiết đơn hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
 router.get('/:id', controller.getById);
 
 /**
  * @swagger
- * /api/chitietdonhang/donhang/{maDonHang}:
- *   get:
- *     summary: Tìm theo mã đơn hàng
- *     tags: [ChiTietDonHang]
- */
-router.get('/donhang/:maDonHang', controller.findByDonHang);
-
-/**
- * @swagger
- * /api/chitietdonhang/chitietsanpham/{maCTSP}:
- *   get:
- *     summary: Tìm theo mã chi tiết sản phẩm
- *     tags: [ChiTietDonHang]
- */
-router.get('/chitietsanpham/:maCTSP', controller.findByChiTietSanPham);
-
-/**
- * @swagger
  * /api/chitietdonhang:
  *   post:
- *     summary: Tạo mới chi tiết đơn hàng
- *     tags: [ChiTietDonHang]
+ *     summary: Thêm chi tiết đơn hàng mới
+ *     tags: [Chi tiết đơn hàng]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [madonhang, machitietsanpham, soluong, dongia]
+ *             properties:
+ *               madonhang: { type: integer }
+ *               machitietsanpham: { type: integer }
+ *               soluong: { type: integer }
+ *               dongia: { type: number }
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thất bại
  */
 router.post('/', controller.create);
 
@@ -62,7 +75,26 @@ router.post('/', controller.create);
  * /api/chitietdonhang/{id}:
  *   put:
  *     summary: Cập nhật chi tiết đơn hàng
- *     tags: [ChiTietDonHang]
+ *     tags: [Chi tiết đơn hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               soluong: { type: integer }
+ *               dongia: { type: number }
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
 router.put('/:id', controller.update);
 
@@ -71,7 +103,17 @@ router.put('/:id', controller.update);
  * /api/chitietdonhang/{id}:
  *   delete:
  *     summary: Xoá chi tiết đơn hàng
- *     tags: [ChiTietDonHang]
+ *     tags: [Chi tiết đơn hàng]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
 router.delete('/:id', controller.delete);
 

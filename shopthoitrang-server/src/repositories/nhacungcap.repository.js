@@ -2,58 +2,56 @@ const { createClient } = require('@supabase/supabase-js');
 const NhaCungCap = require('../models/nhacungcap.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'nhacungcap';
 
 const NhaCungCapRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('nhacungcap').select('*');
-    if (error) return [];
-    return data.map(row => new NhaCungCap(row));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.tennhacungcap)
+      query = query.ilike('tennhacungcap', `%${filters.tennhacungcap}%`);
+
+    const { data, error } = await query.order('manhacungcap', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new NhaCungCap(r));
   },
 
-  async getById(ma) {
+  async getById(id) {
     const { data, error } = await supabase
-      .from('nhacungcap')
+      .from(TABLE)
       .select('*')
-      .eq('manhacungcap', ma)
-      .single();
-    if (error || !data) return null;
+      .eq('manhacungcap', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhaCungCap(data) : null;
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new NhaCungCap(data);
   },
 
-  async findByName(name) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('nhacungcap')
-      .select('*')
-      .ilike('tennhacungcap', `%${name}%`);
-    if (error) return [];
-    return data.map(row => new NhaCungCap(row));
-  },
-
-  async create(data) {
-    const { data: created, error } = await supabase
-      .from('nhacungcap')
-      .insert([data])
-      .single();
-    if (error) return null;
-    return new NhaCungCap(created);
-  },
-
-  async update(ma, fields) {
-    const { data, error } = await supabase
-      .from('nhacungcap')
+      .from(TABLE)
       .update(fields)
-      .eq('manhacungcap', ma)
-      .single();
-    if (error || !data) return null;
-    return new NhaCungCap(data);
+      .eq('manhacungcap', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhaCungCap(data) : null;
   },
 
-  async delete(ma) {
-    const { error } = await supabase
-      .from('nhacungcap')
+  async remove(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
       .delete()
-      .eq('manhacungcap', ma);
-    return !error;
+      .eq('manhacungcap', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhaCungCap(data) : null;
   }
 };
 

@@ -2,42 +2,70 @@ const { createClient } = require('@supabase/supabase-js');
 const NoiDungChat = require('../models/noidungchat.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'noidungchat';
 
 const NoiDungChatRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('noidungchat').select('*');
-    if (error) return [];
-    return data.map(row => new NoiDungChat(row));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.machatbox) query = query.eq('machatbox', filters.machatbox);
+    if (filters.nguoigui) query = query.eq('nguoigui', filters.nguoigui);
+    if (filters.daxem === 'true') query = query.eq('daxem', true);
+    if (filters.daxem === 'false') query = query.eq('daxem', false);
+    if (filters.from) query = query.gte('thoigiangui', filters.from); // ISO
+    if (filters.to) query = query.lte('thoigiangui', filters.to);
+
+    const { data, error } = await query.order('thoigiangui', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new NoiDungChat(r));
   },
 
-  async getById(maChat) {
-    const { data, error } = await supabase.from('noidungchat').select('*').eq('machat', maChat).single();
-    if (error || !data) return null;
+  async getById(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('machat', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NoiDungChat(data) : null;
+  },
+
+  async getByChatBox(machatbox) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('machatbox', machatbox)
+      .order('thoigiangui', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new NoiDungChat(r));
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new NoiDungChat(data);
   },
 
-  async getByChatBox(maChatBox) {
-    const { data, error } = await supabase.from('noidungchat').select('*').eq('machatbox', maChatBox);
-    if (error) return [];
-    return data.map(row => new NoiDungChat(row));
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update(fields)
+      .eq('machat', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NoiDungChat(data) : null;
   },
 
-  async create(obj) {
-    const { data, error } = await supabase.from('noidungchat').insert([obj]).single();
-    if (error) return null;
-    return new NoiDungChat(data);
-  },
-
-  async update(maChat, fields) {
-    const { data, error } = await supabase.from('noidungchat').update(fields).eq('machat', maChat).single();
-    if (error || !data) return null;
-    return new NoiDungChat(data);
-  },
-
-  async delete(maChat) {
-    const { data, error } = await supabase.from('noidungchat').delete().eq('machat', maChat).single();
-    if (error || !data) return null;
-    return new NoiDungChat(data);
+  async remove(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('machat', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NoiDungChat(data) : null;
   }
 };
 
