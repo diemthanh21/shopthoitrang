@@ -1,44 +1,75 @@
-const { createClient } = require('@supabase/supabase-js');
-const TraHang = require('../models/trahang.model');
+const repo = require('../repositories/trahang.repository');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-const TraHangRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('trahang').select('*');
-    if (error) return [];
-    return data.map(row => new TraHang(row));
-  },
-
-  async getById(ma) {
-    const { data, error } = await supabase.from('trahang').select('*').eq('matrahang', ma).single();
-    if (error || !data) return null;
-    return new TraHang(data);
-  },
-
-  async getByDonHang(maDonHang) {
-    const { data, error } = await supabase.from('trahang').select('*').eq('madonhang', maDonHang);
-    if (error) return [];
-    return data.map(row => new TraHang(row));
-  },
-
-  async create(obj) {
-    const { data, error } = await supabase.from('trahang').insert([obj]).single();
-    if (error) return null;
-    return new TraHang(data);
-  },
-
-  async update(ma, fields) {
-    const { data, error } = await supabase.from('trahang').update(fields).eq('matrahang', ma).single();
-    if (error || !data) return null;
-    return new TraHang(data);
-  },
-
-  async delete(ma) {
-    const { data, error } = await supabase.from('trahang').delete().eq('matrahang', ma).single();
-    if (error || !data) return null;
-    return new TraHang(data);
+class TraHangService {
+  async list(filters) {
+    return repo.getAll(filters);
   }
-};
 
-module.exports = TraHangRepository;
+  async get(id) {
+    const item = await repo.getById(id);
+    if (!item) {
+      const e = new Error('Không tìm thấy yêu cầu trả hàng');
+      e.status = 404;
+      throw e;
+    }
+    return item;
+  }
+
+  async create(body) {
+    const required = ['madonhang', 'makhachhang', 'machitietsanpham', 'soluong', 'lydo'];
+    for (const f of required) {
+      if (body[f] === undefined || body[f] === null || body[f] === '') {
+        const e = new Error(`Thiếu thông tin bắt buộc: ${f}`);
+        e.status = 400;
+        throw e;
+      }
+    }
+    if (Number(body.soluong) <= 0) {
+      const e = new Error('soluong phải > 0');
+      e.status = 400;
+      throw e;
+    }
+
+    const payload = {
+      madonhang: body.madonhang,
+      makhachhang: body.makhachhang,
+      machitietsanpham: body.machitietsanpham,
+      soluong: body.soluong,
+      lydo: body.lydo,
+      hinhanhloi: body.hinhanhloi ?? null,
+      ngayyeucau: body.ngayyeucau ?? new Date().toISOString(),
+      trangthai: body.trangthai ?? 'CHỜ DUYỆT',
+      ghichu: body.ghichu ?? null
+    };
+
+    return repo.create(payload);
+  }
+
+  async update(id, body) {
+    if (body.soluong !== undefined && Number(body.soluong) <= 0) {
+      const e = new Error('soluong phải > 0');
+      e.status = 400;
+      throw e;
+    }
+
+    const updated = await repo.update(id, body);
+    if (!updated) {
+      const e = new Error('Không tìm thấy yêu cầu để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+    return updated;
+  }
+
+  async delete(id) {
+    const deleted = await repo.remove(id);
+    if (!deleted) {
+      const e = new Error('Không tìm thấy yêu cầu để xoá');
+      e.status = 404;
+      throw e;
+    }
+    return { message: 'Đã xoá yêu cầu trả hàng thành công' };
+  }
+}
+
+module.exports = new TraHangService();

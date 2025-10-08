@@ -1,25 +1,19 @@
 class ChatBox {
-  constructor({
-    machatbox,
-    makhachhang,
-    manhanvien,
-    ngaytao,
-    trangthai
-  }) {
-    this.maChatBox = machatbox;
-    this.maKhachHang = makhachhang;
-    this.maNhanVien = manhanvien;
-    this.ngayTao = ngaytao;
-    this.trangThai = trangthai;
+  constructor({ machatbox, makhachhang, manhanvien, ngaytao, trangthai }) {
+    this.machatbox = machatbox;
+    this.makhachhang = makhachhang;
+    this.manhanvien = manhanvien;
+    this.ngaytao = ngaytao;
+    this.trangthai = trangthai || 'Đang hoạt động';
   }
 
   toJSON() {
     return {
-      maChatBox: this.maChatBox,
-      maKhachHang: this.maKhachHang,
-      maNhanVien: this.maNhanVien,
-      ngayTao: this.ngayTao,
-      trangThai: this.trangThai
+      machatbox: this.machatbox,
+      makhachhang: this.makhachhang,
+      manhanvien: this.manhanvien,
+      ngaytao: this.ngaytao,
+      trangthai: this.trangthai,
     };
   }
 }

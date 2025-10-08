@@ -1,8 +1,15 @@
 class KhuyenMai {
   constructor({
-    makhuyenmai, tenchuongtrinh, loaikhuyenmai, masanpham,
-    tylegiam, masanphamtang, ngaybatdau, ngayketthuc,
-    mota, manhanvien
+    makhuyenmai,
+    tenchuongtrinh,
+    loaikhuyenmai,
+    masanpham,
+    tylegiam,
+    masanphamtang,
+    ngaybatdau,
+    ngayketthuc,
+    mota,
+    manhanvien
   }) {
     this.maKhuyenMai = makhuyenmai;
     this.tenChuongTrinh = tenchuongtrinh;
@@ -18,16 +25,16 @@ class KhuyenMai {
 
   toJSON() {
     return {
-      maKhuyenMai: this.maKhuyenMai,
-      tenChuongTrinh: this.tenChuongTrinh,
-      loaiKhuyenMai: this.loaiKhuyenMai,
-      maSanPham: this.maSanPham,
-      tyLeGiam: this.tyLeGiam,
-      maSanPhamTang: this.maSanPhamTang,
-      ngayBatDau: this.ngayBatDau,
-      ngayKetThuc: this.ngayKetThuc,
-      moTa: this.moTa,
-      maNhanVien: this.maNhanVien
+      makhuyenmai: this.maKhuyenMai,
+      tenchuongtrinh: this.tenChuongTrinh,
+      loaikhuyenmai: this.loaiKhuyenMai,
+      masanpham: this.maSanPham,
+      tylegiam: this.tyLeGiam,
+      masanphamtang: this.maSanPhamTang,
+      ngaybatdau: this.ngayBatDau,
+      ngayketthuc: this.ngayKetThuc,
+      mota: this.moTa,
+      manhanvien: this.maNhanVien
     };
   }
 }

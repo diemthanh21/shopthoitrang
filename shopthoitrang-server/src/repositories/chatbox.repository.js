@@ -2,67 +2,37 @@ const { createClient } = require('@supabase/supabase-js');
 const ChatBox = require('../models/chatbox.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'chatbox';
 
 const ChatBoxRepository = {
   async getAll() {
-    const { data, error } = await supabase.from('chatbox').select('*');
-    if (error) return [];
+    const { data, error } = await supabase.from(TABLE).select('*').order('machatbox', { ascending: true });
+    if (error) throw error;
     return data.map(row => new ChatBox(row));
   },
 
-  async getById(ma) {
-    const { data, error } = await supabase
-      .from('chatbox')
-      .select('*')
-      .eq('machatbox', ma)
-      .single();
+  async getById(id) {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('machatbox', id).single();
     if (error || !data) return null;
     return new ChatBox(data);
   },
 
-  async findByKhachHang(maKH) {
-    const { data, error } = await supabase
-      .from('chatbox')
-      .select('*')
-      .eq('makhachhang', maKH);
-    if (error) return [];
-    return data.map(row => new ChatBox(row));
-  },
-
-  async findByNhanVien(maNV) {
-    const { data, error } = await supabase
-      .from('chatbox')
-      .select('*')
-      .eq('manhanvien', maNV);
-    if (error) return [];
-    return data.map(row => new ChatBox(row));
-  },
-
-  async create(obj) {
-    const { data, error } = await supabase
-      .from('chatbox')
-      .insert([obj])
-      .single();
-    if (error) return null;
+  async create(entity) {
+    const { data, error } = await supabase.from(TABLE).insert([entity]).select().single();
+    if (error) throw error;
     return new ChatBox(data);
   },
 
-  async update(ma, fields) {
-    const { data, error } = await supabase
-      .from('chatbox')
-      .update(fields)
-      .eq('machatbox', ma)
-      .single();
+  async update(id, fields) {
+    const { data, error } = await supabase.from(TABLE).update(fields).eq('machatbox', id).select().single();
     if (error || !data) return null;
     return new ChatBox(data);
   },
 
-  async delete(ma) {
-    const { error } = await supabase
-      .from('chatbox')
-      .delete()
-      .eq('machatbox', ma);
-    return !error;
+  async delete(id) {
+    const { data, error } = await supabase.from(TABLE).delete().eq('machatbox', id).select().single();
+    if (error || !data) return null;
+    return new ChatBox(data);
   }
 };
 

@@ -1,33 +1,30 @@
 class DoiHang {
   constructor({
-    madoihang, madonhang, makhachhang, machitietsanphamcu,
-    machitietsanphammoi, soluong, lydo, ngayyeucau, trangthai, ghichu
+    madoihang,
+    madonhang,
+    makhachhang,
+    machitietsanphamcu,
+    machitietsanphamoi,
+    soluong,
+    lydo,
+    ngayyeucau,
+    trangthai,
+    ghichu
   }) {
-    this.maDoiHang = madoihang;
-    this.maDonHang = madonhang;
-    this.maKhachHang = makhachhang;
-    this.maChiTietSanPhamCu = machitietsanphamcu;
-    this.maChiTietSanPhamMoi = machitietsanphammoi;
-    this.soLuong = soluong;
-    this.lyDo = lydo;
-    this.ngayYeuCau = ngayyeucau;
-    this.trangThai = trangthai;
-    this.ghiChu = ghichu;
+    this.madoihang = madoihang;
+    this.madonhang = madonhang;
+    this.makhachhang = makhachhang;
+    this.machitietsanphamcu = machitietsanphamcu;
+    this.machitietsanphamoi = machitietsanphamoi;
+    this.soluong = soluong;
+    this.lydo = lydo;
+    this.ngayyeucau = ngayyeucau;
+    this.trangthai = trangthai;
+    this.ghichu = ghichu;
   }
 
   toJSON() {
-    return {
-      maDoiHang: this.maDoiHang,
-      maDonHang: this.maDonHang,
-      maKhachHang: this.maKhachHang,
-      maChiTietSanPhamCu: this.maChiTietSanPhamCu,
-      maChiTietSanPhamMoi: this.maChiTietSanPhamMoi,
-      soLuong: this.soLuong,
-      lyDo: this.lyDo,
-      ngayYeuCau: this.ngayYeuCau,
-      trangThai: this.trangThai,
-      ghiChu: this.ghiChu
-    };
+    return { ...this };
   }
 }
 

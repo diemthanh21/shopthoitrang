@@ -2,88 +2,44 @@ const { createClient } = require('@supabase/supabase-js');
 const SanPham = require('../models/sanpham.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'sanpham';
 
 const SanPhamRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('sanpham').select('*');
-    if (error) return [];
-    return data.map(item => new SanPham(item));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.tensanpham) query = query.ilike('tensanpham', `%${filters.tensanpham}%`);
+    if (filters.madanhmuc) query = query.eq('madanhmuc', filters.madanhmuc);
+    if (filters.mathuonghieu) query = query.eq('mathuonghieu', filters.mathuonghieu);
+    if (filters.trangthai) query = query.eq('trangthai', filters.trangthai);
+
+    const { data, error } = await query.order('masanpham', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new SanPham(r));
   },
 
-  async getById(masanpham) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .select('*')
-      .eq('masanpham', masanpham)
-      .single();
+  async getById(id) {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('masanpham', id).maybeSingle();
+    if (error) throw error;
+    return data ? new SanPham(data) : null;
+  },
 
-    if (error || !data) return null;
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new SanPham(data);
   },
 
-  async create(sanPhamData) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .insert([sanPhamData])
-      .single();
-
-    if (error || !data) return null;
-    return new SanPham(data);
+  async update(id, fields) {
+    const { data, error } = await supabase.from(TABLE).update(fields).eq('masanpham', id).select('*').maybeSingle();
+    if (error) throw error;
+    return data ? new SanPham(data) : null;
   },
 
-  async update(masanpham, fields) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .update(fields)
-      .eq('masanpham', masanpham)
-      .single();
-
-    if (error || !data) return null;
-    return new SanPham(data);
-  },
-
-  async delete(masanpham) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .delete()
-      .eq('masanpham', masanpham)
-      .single();
-
-    if (error || !data) return null;
-    return new SanPham(data);
-  },
-
-  // 🔍 Tìm theo danh mục
-  async findByDanhMuc(madanhmuc) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .select('*')
-      .eq('madanhmuc', madanhmuc);
-
-    if (error) return [];
-    return data.map(item => new SanPham(item));
-  },
-
-  // 🔍 Tìm theo thương hiệu
-  async findByThuongHieu(mathuonghieu) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .select('*')
-      .eq('mathuonghieu', mathuonghieu);
-
-    if (error) return [];
-    return data.map(item => new SanPham(item));
-  },
-
-  // 🔍 Tìm theo trạng thái
-  async findByTrangThai(trangthai) {
-    const { data, error } = await supabase
-      .from('sanpham')
-      .select('*')
-      .eq('trangthai', trangthai);
-
-    if (error) return [];
-    return data.map(item => new SanPham(item));
+  async remove(id) {
+    const { data, error } = await supabase.from(TABLE).delete().eq('masanpham', id).select('*').maybeSingle();
+    if (error) throw error;
+    return data ? new SanPham(data) : null;
   }
 };
 

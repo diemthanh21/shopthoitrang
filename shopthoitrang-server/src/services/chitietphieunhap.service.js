@@ -1,31 +1,32 @@
 const repo = require('../repositories/chitietphieunhap.repository');
 
 class ChiTietPhieuNhapService {
-  async getAll() {
+  async layTatCa() {
     return await repo.getAll();
   }
 
-  async getById(ma) {
+  async layTheoMa(ma) {
     return await repo.getById(ma);
   }
 
-  async findByPhieuNhap(maPN) {
-    return await repo.findByPhieuNhap(maPN);
-  }
+  async taoMoi(data) {
+    if (!data.maphieunhap || !data.machitietsanpham || !data.soluong || !data.dongianhap) {
+      throw new Error('Thiếu thông tin bắt buộc: maphieunhap, machitietsanpham, soluong, dongianhap');
+    }
 
-  async findByChiTietSanPham(maCTSP) {
-    return await repo.findByChiTietSanPham(maCTSP);
-  }
+    if (data.soluong <= 0) throw new Error('Số lượng phải lớn hơn 0');
 
-  async create(data) {
     return await repo.create(data);
   }
 
-  async update(ma, data) {
+  async capNhat(ma, data) {
+    if (data.soluong && data.soluong <= 0) {
+      throw new Error('Số lượng phải lớn hơn 0');
+    }
     return await repo.update(ma, data);
   }
 
-  async delete(ma) {
+  async xoa(ma) {
     return await repo.delete(ma);
   }
 }

@@ -1,32 +1,68 @@
-const TaiKhoanKhachHangRepository = require('../repositories/taikhoankhachhang.repository');
-const TaiKhoanKhachHang = require('../models/taikhoankhachhang.model');
+const repo = require('../repositories/taikhoankhachhang.repository');
+const bcrypt = require('bcryptjs');
 
 class TaiKhoanKhachHangService {
-  async dangNhap(tenDangNhap, pass) {
-    const data = await TaiKhoanKhachHangRepository.findByCredentials(tenDangNhap, pass);
-    if (!data) return null;
-    return data;
+  async list(filters) {
+    return repo.getAll(filters);
   }
 
-  async taoMoi(taiKhoanData) {
-    const data = await TaiKhoanKhachHangRepository.create(taiKhoanData);
-    return data;
+  async get(id) {
+    const item = await repo.getById(id);
+    if (!item) {
+      const e = new Error('Không tìm thấy khách hàng');
+      e.status = 404;
+      throw e;
+    }
+    return item;
   }
 
-  async layTatCa() {
-    return await TaiKhoanKhachHangRepository.getAll();
+  async create(body) {
+    const required = ['hoten', 'tendangnhap', 'pass'];
+    for (const f of required) {
+      if (!body[f]) {
+        const e = new Error(`Thiếu thông tin bắt buộc: ${f}`);
+        e.status = 400;
+        throw e;
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(body.pass, 10);
+
+    const payload = {
+      hoten: body.hoten,
+      tendangnhap: body.tendangnhap,
+      email: body.email ?? null,
+      pass: hashedPassword,
+      sodienthoai: body.sodienthoai ?? null,
+      danghoatdong: body.danghoatdong ?? true,
+      anhdaidien: body.anhdaidien ?? null
+    };
+
+    return repo.create(payload);
   }
 
-  async layTheoMa(maKhachHang) {
-    return await TaiKhoanKhachHangRepository.getById(maKhachHang);
+  async update(id, body) {
+    if (body.pass) {
+      body.pass = await bcrypt.hash(body.pass, 10);
+    }
+
+    const updated = await repo.update(id, body);
+    if (!updated) {
+      const e = new Error('Không tìm thấy khách hàng để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+    return updated;
   }
 
-  async capNhat(maKhachHang, thongTinCapNhat) {
-    return await TaiKhoanKhachHangRepository.update(maKhachHang, thongTinCapNhat);
-  }
-
-  async xoa(maKhachHang) {
-    return await TaiKhoanKhachHangRepository.delete(maKhachHang);
+  async delete(id) {
+    const deleted = await repo.remove(id);
+    if (!deleted) {
+      const e = new Error('Không tìm thấy khách hàng để xoá');
+      e.status = 404;
+      throw e;
+    }
+    return { message: 'Đã xoá tài khoản khách hàng thành công' };
   }
 }
 

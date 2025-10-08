@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/magiamgia.controller');
+const ctrl = require('../controllers/magiamgia.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
  *   - name: Mã giảm giá
- *     description: Quản lý mã voucher
+ *     description: Quản lý voucher và mã giảm giá
  */
 
 router.use(authenticateToken);
@@ -18,37 +18,45 @@ router.use(authenticateToken);
  *   get:
  *     summary: Lấy danh sách mã giảm giá
  *     tags: [Mã giảm giá]
+ *     parameters:
+ *       - in: query
+ *         name: macode
+ *         schema: { type: string }
+ *         description: Tìm kiếm theo mã
+ *       - in: query
+ *         name: active
+ *         schema: { type: string, enum: ["true", "false"] }
+ *         description: Lọc theo trạng thái còn hiệu lực
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/magiamgia/{maVoucher}:
+ * /api/magiamgia/{id}:
  *   get:
- *     summary: Lấy mã giảm giá theo mã
+ *     summary: Lấy thông tin mã giảm giá theo ID
  *     tags: [Mã giảm giá]
  *     parameters:
  *       - in: path
- *         name: maVoucher
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:maVoucher', controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
  * /api/magiamgia:
  *   post:
- *     summary: Tạo mới mã giảm giá
+ *     summary: Tạo mã giảm giá mới
  *     tags: [Mã giảm giá]
  *     requestBody:
  *       required: true
@@ -56,82 +64,73 @@ router.get('/:maVoucher', controller.getById);
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [macode, giatrigiam, soluong, ngaybatdau, ngayketthuc, manhanvien]
  *             properties:
- *               macode:
- *                 type: string
- *               madonhang:
- *                 type: integer
- *               mota:
- *                 type: string
- *               giatrigiam:
- *                 type: number
- *               soluong:
- *                 type: integer
- *               ngaybatdau:
- *                 type: string
- *               ngayketthuc:
- *                 type: string
- *               manhanvien:
- *                 type: integer
+ *               macode: { type: string }
+ *               madonhang: { type: integer, nullable: true }
+ *               mota: { type: string }
+ *               giatrigiam: { type: number, example: 10.0 }
+ *               soluong: { type: integer, example: 50 }
+ *               ngaybatdau: { type: string, format: date }
+ *               ngayketthuc: { type: string, format: date }
+ *               manhanvien: { type: integer }
  *     responses:
  *       201:
  *         description: Tạo thành công
  *       400:
- *         description: Lỗi
+ *         description: Dữ liệu không hợp lệ
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/magiamgia/{maVoucher}:
+ * /api/magiamgia/{id}:
  *   put:
  *     summary: Cập nhật mã giảm giá
  *     tags: [Mã giảm giá]
  *     parameters:
  *       - in: path
- *         name: maVoucher
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               mota:
- *                 type: string
- *               giatrigiam:
- *                 type: number
- *               soluong:
- *                 type: integer
+ *               macode: { type: string }
+ *               mota: { type: string }
+ *               giatrigiam: { type: number }
+ *               soluong: { type: integer }
+ *               ngaybatdau: { type: string, format: date }
+ *               ngayketthuc: { type: string, format: date }
+ *               manhanvien: { type: integer }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
- *       400:
- *         description: Cập nhật thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:maVoucher', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
- * /api/magiamgia/{maVoucher}:
+ * /api/magiamgia/{id}:
  *   delete:
  *     summary: Xoá mã giảm giá
  *     tags: [Mã giảm giá]
  *     parameters:
  *       - in: path
- *         name: maVoucher
+ *         name: id
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Xoá thành công
- *       400:
- *         description: Xoá thất bại
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maVoucher', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

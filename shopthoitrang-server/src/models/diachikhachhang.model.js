@@ -1,19 +1,15 @@
 class DiaChiKhachHang {
-  constructor({
-    madiachi, makhachhang, diachi, maphuongxa
-  }) {
-    this.maDiaChi = madiachi;
-    this.maKhachHang = makhachhang;
-    this.diaChi = diachi;
-    this.maPhuongXa = maphuongxa;
+  constructor({ madiachi, makhachhang, diachi }) {
+    this.madiachi = madiachi;
+    this.makhachhang = makhachhang;
+    this.diachi = diachi;
   }
 
   toJSON() {
     return {
-      maDiaChi: this.maDiaChi,
-      maKhachHang: this.maKhachHang,
-      diaChi: this.diaChi,
-      maPhuongXa: this.maPhuongXa
+      madiachi: this.madiachi,
+      makhachhang: this.makhachhang,
+      diachi: this.diachi,
     };
   }
 }

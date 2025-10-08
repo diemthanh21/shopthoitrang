@@ -1,48 +1,49 @@
-const sanPhamService = require('../services/sanpham.service');
+const service = require('../services/sanpham.service');
 
 const SanPhamController = {
   async getAll(req, res) {
-    const list = await sanPhamService.layTatCa();
-    res.json(list.map(sp => sp.toJSON()));
+    try {
+      const data = await service.list(req.query);
+      res.json(data.map(r => r.toJSON()));
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
   },
 
   async getById(req, res) {
-    const sp = await sanPhamService.layTheoMa(req.params.maSanPham);
-    if (!sp) return res.status(404).json({ message: 'Không tìm thấy sản phẩm.' });
-    res.json(sp.toJSON());
+    try {
+      const item = await service.get(req.params.id);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 404).json({ message: err.message });
+    }
   },
 
   async create(req, res) {
-    const sp = await sanPhamService.taoMoi(req.body);
-    if (!sp) return res.status(400).json({ message: 'Không thể tạo sản phẩm.' });
-    res.status(201).json(sp.toJSON());
+    try {
+      const item = await service.create(req.body);
+      res.status(201).json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
   },
 
   async update(req, res) {
-    const sp = await sanPhamService.capNhat(req.params.maSanPham, req.body);
-    if (!sp) return res.status(400).json({ message: 'Không thể cập nhật.' });
-    res.json(sp.toJSON());
+    try {
+      const item = await service.update(req.params.id, req.body);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
   },
 
   async delete(req, res) {
-    const sp = await sanPhamService.xoa(req.params.maSanPham);
-    if (!sp) return res.status(400).json({ message: 'Không thể xoá.' });
-    res.json({ message: 'Đã xoá.', data: sp.toJSON() });
-  },
-
-  async findByDanhMuc(req, res) {
-    const result = await sanPhamService.timTheoDanhMuc(req.params.maDanhMuc);
-    res.json(result.map(sp => sp.toJSON()));
-  },
-
-  async findByThuongHieu(req, res) {
-    const result = await sanPhamService.timTheoThuongHieu(req.params.maThuongHieu);
-    res.json(result.map(sp => sp.toJSON()));
-  },
-
-  async findByTrangThai(req, res) {
-    const result = await sanPhamService.timTheoTrangThai(req.params.trangThai);
-    res.json(result.map(sp => sp.toJSON()));
+    try {
+      const result = await service.delete(req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
   }
 };
 

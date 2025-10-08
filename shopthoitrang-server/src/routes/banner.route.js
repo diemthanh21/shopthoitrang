@@ -1,48 +1,87 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/banner.controller');
+const ctrl = require('../controllers/banner.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
+const { requireEmployee } = require('../middlewares/role.middleware');
 
 /**
  * @swagger
  * tags:
  *   - name: Banner
- *     description: Quản lý banner trong hệ thống
+ *     description: Quản lý banner hiển thị
  */
 
-router.use(authenticateToken);
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Banner:
+ *       type: object
+ *       properties:
+ *         mabanner: { type: integer, example: 1 }
+ *         duongdananh: { type: string, example: "https://cdn.example.com/banners/sale-10-10.jpg" }
+ *         mota: { type: string, example: "Siêu sale 10.10" }
+ *         lienket: { type: string, example: "https://example.com/sale-10-10" }
+ *         thutuhienthi: { type: integer, example: 1 }
+ *         danghoatdong: { type: boolean, example: true }
+ *     NewBanner:
+ *       type: object
+ *       required: [duongdananh]
+ *       properties:
+ *         duongdananh: { type: string }
+ *         mota: { type: string }
+ *         lienket: { type: string }
+ *         thutuhienthi: { type: integer }
+ *         danghoatdong: { type: boolean }
+ */
+
+// ========== PUBLIC ROUTES ==========
 
 /**
  * @swagger
  * /api/banner:
  *   get:
- *     summary: Lấy danh sách banner
+ *     summary: Danh sách banner
  *     tags: [Banner]
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
+ *         name: active
+ *         schema: { type: boolean }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 50 }
+ *       - in: query
+ *         name: offset
+ *         schema: { type: integer, default: 0 }
  *     responses:
  *       200:
- *         description: Thành công
+ *         description: OK
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
  * /api/banner/{id}:
  *   get:
- *     summary: Lấy banner theo mã
+ *     summary: Lấy banner theo ID
  *     tags: [Banner]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Thành công
+ *         description: Found
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:id', controller.getById);
+router.get('/:id', ctrl.getById);
+
+// ========== PROTECTED ROUTES ==========
 
 /**
  * @swagger
@@ -50,31 +89,28 @@ router.get('/:id', controller.getById);
  *   post:
  *     summary: Tạo banner mới
  *     tags: [Banner]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [MABANNER, DUONGDANANH]
+ *             required: [duongdananh]
  *             properties:
- *               MABANNER:
- *                 type: string
- *               DUONGDANANH:
- *                 type: string
- *               MOTA:
- *                 type: string
- *               LIENKET:
- *                 type: string
- *               THUTUHIENTHI:
- *                 type: integer
- *               DANGHOATDONG:
- *                 type: boolean
+ *               duongdananh: { type: string }
+ *               mota: { type: string }
+ *               lienket: { type: string }
+ *               thutuhienthi: { type: integer }
+ *               danghoatdong: { type: boolean }
  *     responses:
  *       201:
- *         description: Thành công
+ *         description: Created
+ *       400:
+ *         description: Bad request
  */
-router.post('/', controller.create);
+router.post('/', authenticateToken, requireEmployee, ctrl.create);
 
 /**
  * @swagger
@@ -82,12 +118,13 @@ router.post('/', controller.create);
  *   put:
  *     summary: Cập nhật banner
  *     tags: [Banner]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -95,21 +132,18 @@ router.post('/', controller.create);
  *           schema:
  *             type: object
  *             properties:
- *               DUONGDANANH:
- *                 type: string
- *               MOTA:
- *                 type: string
- *               LIENKET:
- *                 type: string
- *               THUTUHIENTHI:
- *                 type: integer
- *               DANGHOATDONG:
- *                 type: boolean
+ *               duongdananh: { type: string }
+ *               mota: { type: string }
+ *               lienket: { type: string }
+ *               thutuhienthi: { type: integer }
+ *               danghoatdong: { type: boolean }
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: Updated
+ *       404:
+ *         description: Not found
  */
-router.put('/:id', controller.update);
+router.put('/:id', authenticateToken, requireEmployee, ctrl.update);
 
 /**
  * @swagger
@@ -117,34 +151,19 @@ router.put('/:id', controller.update);
  *   delete:
  *     summary: Xoá banner
  *     tags: [Banner]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Xoá thành công
+ *         description: Deleted
+ *       404:
+ *         description: Not found
  */
-router.delete('/:id', controller.delete);
-
-/**
- * @swagger
- * /api/banner/trangthai/{status}:
- *   get:
- *     summary: Tìm banner theo trạng thái hoạt động
- *     tags: [Banner]
- *     parameters:
- *       - in: path
- *         name: status
- *         required: true
- *         schema:
- *           type: boolean
- *     responses:
- *       200:
- *         description: Danh sách banner
- */
-router.get('/trangthai/:status', controller.searchByStatus);
+router.delete('/:id', authenticateToken, requireEmployee, ctrl.delete);
 
 module.exports = router;

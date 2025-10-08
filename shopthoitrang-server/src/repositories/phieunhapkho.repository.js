@@ -2,76 +2,44 @@ const { createClient } = require('@supabase/supabase-js');
 const PhieuNhapKho = require('../models/phieunhapkho.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'phieunhapkho';
 
 const PhieuNhapKhoRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from('phieunhapkho').select('*');
-    if (error) return [];
-    return data.map(row => new PhieuNhapKho(row));
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.manhanvien) query = query.eq('manhanvien', filters.manhanvien);
+    if (filters.manhacungcap) query = query.eq('manhacungcap', filters.manhacungcap);
+    if (filters.from) query = query.gte('ngaynhap', filters.from);
+    if (filters.to) query = query.lte('ngaynhap', filters.to);
+
+    const { data, error } = await query.order('ngaynhap', { ascending: false });
+    if (error) throw error;
+    return data.map(r => new PhieuNhapKho(r));
   },
 
-  async getById(ma) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .select('*')
-      .eq('maphieunhap', ma)
-      .single();
-    if (error || !data) return null;
+  async getById(id) {
+    const { data, error } = await supabase.from(TABLE).select('*').eq('maphieunhap', id).maybeSingle();
+    if (error) throw error;
+    return data ? new PhieuNhapKho(data) : null;
+  },
+
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new PhieuNhapKho(data);
   },
 
-  async findByNhanVien(maNV) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .select('*')
-      .eq('manhanvien', maNV);
-    if (error) return [];
-    return data.map(row => new PhieuNhapKho(row));
+  async update(id, fields) {
+    const { data, error } = await supabase.from(TABLE).update(fields).eq('maphieunhap', id).select('*').maybeSingle();
+    if (error) throw error;
+    return data ? new PhieuNhapKho(data) : null;
   },
 
-  async findByNhaCungCap(maNCC) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .select('*')
-      .eq('manhacungcap', maNCC);
-    if (error) return [];
-    return data.map(row => new PhieuNhapKho(row));
-  },
-
-  async findByNgayNhap(date) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .select('*')
-      .eq('ngaynhap', date);
-    if (error) return [];
-    return data.map(row => new PhieuNhapKho(row));
-  },
-
-  async create(obj) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .insert([obj])
-      .single();
-    if (error) return null;
-    return new PhieuNhapKho(data);
-  },
-
-  async update(ma, fields) {
-    const { data, error } = await supabase
-      .from('phieunhapkho')
-      .update(fields)
-      .eq('maphieunhap', ma)
-      .single();
-    if (error || !data) return null;
-    return new PhieuNhapKho(data);
-  },
-
-  async delete(ma) {
-    const { error } = await supabase
-      .from('phieunhapkho')
-      .delete()
-      .eq('maphieunhap', ma);
-    return !error;
+  async remove(id) {
+    const { data, error } = await supabase.from(TABLE).delete().eq('maphieunhap', id).select('*').maybeSingle();
+    if (error) throw error;
+    return data ? new PhieuNhapKho(data) : null;
   }
 };
 

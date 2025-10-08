@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/danhgia.controller');
+const ctrl = require('../controllers/danhgia.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
- *   - name: DanhGia
- *     description: Quản lý đánh giá sản phẩm
+ *   - name: Đánh giá
+ *     description: Quản lý đánh giá sản phẩm của khách hàng
  */
 
 router.use(authenticateToken);
@@ -16,72 +16,117 @@ router.use(authenticateToken);
  * @swagger
  * /api/danhgia:
  *   get:
- *     summary: Lấy tất cả đánh giá
- *     tags: [DanhGia]
+ *     summary: Lấy danh sách đánh giá
+ *     tags: [Đánh giá]
+ *     parameters:
+ *       - in: query
+ *         name: masanpham
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: makhachhang
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: diemdanhgia
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
  * /api/danhgia/{id}:
  *   get:
- *     summary: Lấy theo mã đánh giá
- *     tags: [DanhGia]
+ *     summary: Lấy thông tin đánh giá theo ID
+ *     tags: [Đánh giá]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.get('/:id', controller.getById);
-
-/**
- * @swagger
- * /api/danhgia/sanpham/{maSP}:
- *   get:
- *     summary: Tìm đánh giá theo mã sản phẩm
- *     tags: [DanhGia]
- */
-router.get('/sanpham/:maSP', controller.findBySanPham);
-
-/**
- * @swagger
- * /api/danhgia/khachhang/{maKH}:
- *   get:
- *     summary: Tìm đánh giá theo khách hàng
- *     tags: [DanhGia]
- */
-router.get('/khachhang/:maKH', controller.findByKhachHang);
-
-/**
- * @swagger
- * /api/danhgia/chitietdonhang/{maCTDH}:
- *   get:
- *     summary: Tìm đánh giá theo mã chi tiết đơn hàng
- *     tags: [DanhGia]
- */
-router.get('/chitietdonhang/:maCTDH', controller.findByChiTietDonHang);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
  * /api/danhgia:
  *   post:
  *     summary: Tạo đánh giá mới
- *     tags: [DanhGia]
+ *     tags: [Đánh giá]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [masanpham, makhachhang, diemdanhgia]
+ *             properties:
+ *               masanpham: { type: integer }
+ *               makhachhang: { type: integer }
+ *               diemdanhgia: { type: integer, minimum: 1, maximum: 5 }
+ *               binhluan: { type: string }
+ *               hinhanh: { type: string }
+ *               phanhoitushop: { type: string }
+ *     responses:
+ *       201:
+ *         description: Tạo thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
  * /api/danhgia/{id}:
  *   put:
  *     summary: Cập nhật đánh giá
- *     tags: [DanhGia]
+ *     tags: [Đánh giá]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               diemdanhgia: { type: integer }
+ *               binhluan: { type: string }
+ *               phanhoitushop: { type: string }
+ *               hinhanh: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:id', controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
  * /api/danhgia/{id}:
  *   delete:
  *     summary: Xoá đánh giá
- *     tags: [DanhGia]
+ *     tags: [Đánh giá]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:id', controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

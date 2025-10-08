@@ -2,66 +2,64 @@ const { createClient } = require('@supabase/supabase-js');
 const HinhAnhSanPham = require('../models/hinhanhsanpham.model');
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'hinhanhsanpham';
 
 const HinhAnhSanPhamRepository = {
   async getAll() {
-    const { data, error } = await supabase.from('hinhanhsanpham').select('*');
-    if (error) return [];
-    return data.map(row => new HinhAnhSanPham(row));
-  },
-
-  async getById(mahinhanh) {
     const { data, error } = await supabase
-      .from('hinhanhsanpham')
+      .from(TABLE)
       .select('*')
-      .eq('mahinhanh', mahinhanh)
-      .single();
-
-    if (error || !data) return null;
-    return new HinhAnhSanPham(data);
+      .order('mahinhanh', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new HinhAnhSanPham(r));
   },
 
-  async getByMaChiTietSanPham(machitietsanpham) {
+  async getById(id) {
     const { data, error } = await supabase
-      .from('hinhanhsanpham')
+      .from(TABLE)
+      .select('*')
+      .eq('mahinhanh', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new HinhAnhSanPham(data) : null;
+  },
+
+  async getByProductDetail(machitietsanpham) {
+    const { data, error } = await supabase
+      .from(TABLE)
       .select('*')
       .eq('machitietsanpham', machitietsanpham);
-
-    if (error) return [];
-    return data.map(row => new HinhAnhSanPham(row));
+    if (error) throw error;
+    return data.map(r => new HinhAnhSanPham(r));
   },
 
-  async create(hinhAnh) {
-    const { data, error } = await supabase
-      .from('hinhanhsanpham')
-      .insert([hinhAnh])
-      .single();
-
-    if (error) return null;
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new HinhAnhSanPham(data);
   },
 
-  async update(mahinhanh, fields) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('hinhanhsanpham')
+      .from(TABLE)
       .update(fields)
-      .eq('mahinhanh', mahinhanh)
-      .single();
-
-    if (error || !data) return null;
-    return new HinhAnhSanPham(data);
+      .eq('mahinhanh', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new HinhAnhSanPham(data) : null;
   },
 
-  async delete(mahinhanh) {
+  async remove(id) {
     const { data, error } = await supabase
-      .from('hinhanhsanpham')
+      .from(TABLE)
       .delete()
-      .eq('mahinhanh', mahinhanh)
-      .single();
-
-    if (error || !data) return null;
-    return new HinhAnhSanPham(data);
-  }
+      .eq('mahinhanh', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new HinhAnhSanPham(data) : null;
+  },
 };
 
 module.exports = HinhAnhSanPhamRepository;

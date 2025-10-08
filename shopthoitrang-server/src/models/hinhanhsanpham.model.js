@@ -1,6 +1,8 @@
 class HinhAnhSanPham {
   constructor({
-    mahinhanh, machitietsanpham, duongdanhinhanh
+    mahinhanh,
+    machitietsanpham,
+    duongdanhinhanh
   }) {
     this.maHinhAnh = mahinhanh;
     this.maChiTietSanPham = machitietsanpham;

@@ -1,81 +1,58 @@
 const { createClient } = require('@supabase/supabase-js');
 const TaiKhoanKhachHang = require('../models/taikhoankhachhang.model');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'taikhoankhachhang';
 
 const TaiKhoanKhachHangRepository = {
-  // 🔐 Đăng nhập
-  async findByCredentials(tendangnhap, pass) {
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.hoten) query = query.ilike('hoten', `%${filters.hoten}%`);
+    if (filters.email) query = query.ilike('email', `%${filters.email}%`);
+    if (filters.danghoatdong !== undefined) query = query.eq('danghoatdong', filters.danghoatdong);
+
+    const { data, error } = await query.order('makhachhang', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new TaiKhoanKhachHang(r));
+  },
+
+  async getById(id) {
     const { data, error } = await supabase
-      .from('taikhoankhachhang')
+      .from(TABLE)
       .select('*')
-      .eq('tendangnhap', tendangnhap)
-      .eq('pass', pass)
-      .eq('danghoatdong', true)
-      .single();
+      .eq('makhachhang', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TaiKhoanKhachHang(data) : null;
+  },
 
-    if (error || !data) return null;
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
     return new TaiKhoanKhachHang(data);
   },
 
-  // ✅ Tạo mới (Đăng ký)
-  async create(taiKhoan) {
+  async update(id, fields) {
     const { data, error } = await supabase
-      .from('taikhoankhachhang')
-      .insert([taiKhoan])
-      .single();
-
-    if (error) return null;
-    return new TaiKhoanKhachHang(data);
-  },
-
-  // 📥 Lấy toàn bộ
-  async getAll() {
-    const { data, error } = await supabase
-      .from('taikhoankhachhang')
-      .select('*');
-
-    if (error) return [];
-    return data.map(row => new TaiKhoanKhachHang(row));
-  },
-
-  // 🔍 Lấy theo ID
-  async getById(makhachhang) {
-    const { data, error } = await supabase
-      .from('taikhoankhachhang')
+      .from(TABLE)
+      .update(fields)
+      .eq('makhachhang', id)
       .select('*')
-      .eq('makhachhang', makhachhang)
-      .single();
-
-    if (error || !data) return null;
-    return new TaiKhoanKhachHang(data);
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TaiKhoanKhachHang(data) : null;
   },
 
-  // ✏️ Cập nhật
-  async update(makhachhang, updatedFields) {
+  async remove(id) {
     const { data, error } = await supabase
-      .from('taikhoankhachhang')
-      .update(updatedFields)
-      .eq('makhachhang', makhachhang)
-      .single();
-
-    if (error || !data) return null;
-    return new TaiKhoanKhachHang(data);
-  },
-
-  // 🗑️ Xoá (mềm)
-  async delete(makhachhang) {
-    const { data, error } = await supabase
-      .from('taikhoankhachhang')
-      .update({ danghoatdong: false }) // xoá mềm
-      .eq('makhachhang', makhachhang)
-      .single();
-
-    if (error || !data) return null;
-    return new TaiKhoanKhachHang(data);
+      .from(TABLE)
+      .delete()
+      .eq('makhachhang', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TaiKhoanKhachHang(data) : null;
   }
 };
 

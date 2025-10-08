@@ -1,15 +1,15 @@
 class CTBanner {
   constructor({ mabanner, manhanvien, thoigiandoi }) {
-    this.maBanner = mabanner;
-    this.maNhanVien = manhanvien;
-    this.thoiGianDoi = thoigiandoi;
+    this.mabanner = mabanner;
+    this.manhanvien = manhanvien;
+    this.thoigiandoi = thoigiandoi;
   }
 
   toJSON() {
     return {
-      maBanner: this.maBanner,
-      maNhanVien: this.maNhanVien,
-      thoiGianDoi: this.thoiGianDoi
+      mabanner: this.mabanner,
+      manhanvien: this.manhanvien,
+      thoigiandoi: this.thoigiandoi,
     };
   }
 }

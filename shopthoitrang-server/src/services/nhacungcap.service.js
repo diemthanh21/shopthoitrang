@@ -1,28 +1,53 @@
 const repo = require('../repositories/nhacungcap.repository');
 
 class NhaCungCapService {
-  async getAll() {
-    return await repo.getAll();
+  async list(filters) {
+    return repo.getAll(filters);
   }
 
-  async getById(ma) {
-    return await repo.getById(ma);
+  async get(id) {
+    const item = await repo.getById(id);
+    if (!item) {
+      const e = new Error('Không tìm thấy nhà cung cấp');
+      e.status = 404;
+      throw e;
+    }
+    return item;
   }
 
-  async findByName(name) {
-    return await repo.findByName(name);
+  async create(body) {
+    if (!body.tennhacungcap) {
+      const e = new Error('Thiếu thông tin bắt buộc: tennhacungcap');
+      e.status = 400;
+      throw e;
+    }
+
+    const payload = {
+      tennhacungcap: body.tennhacungcap,
+      thongtinlienhe: body.thongtinlienhe ?? null
+    };
+
+    return repo.create(payload);
   }
 
-  async create(data) {
-    return await repo.create(data);
+  async update(id, body) {
+    const updated = await repo.update(id, body);
+    if (!updated) {
+      const e = new Error('Không tìm thấy nhà cung cấp để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+    return updated;
   }
 
-  async update(ma, data) {
-    return await repo.update(ma, data);
-  }
-
-  async delete(ma) {
-    return await repo.delete(ma);
+  async delete(id) {
+    const deleted = await repo.remove(id);
+    if (!deleted) {
+      const e = new Error('Không tìm thấy nhà cung cấp để xoá');
+      e.status = 404;
+      throw e;
+    }
+    return { message: 'Đã xoá nhà cung cấp thành công' };
   }
 }
 

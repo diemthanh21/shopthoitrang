@@ -1,43 +1,63 @@
-const supabase = require('@supabase/supabase-js').createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const { createClient } = require('@supabase/supabase-js');
+const NhanVien = require('../models/nhanvien.model');
 
-const TABLE_NAME = 'nhanvien'; // tên bảng chữ thường
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const TABLE = 'nhanvien';
 
 const NhanVienRepository = {
-  async getAll() {
-    const { data, error } = await supabase.from(TABLE_NAME).select('*');
-    if (error) throw new Error(error.message);
-    return data;
+  async getAll(filters = {}) {
+    let query = supabase.from(TABLE).select('*');
+
+    if (filters.machucnang) query = query.eq('machucnang', filters.machucnang);
+    if (filters.maquanly) query = query.eq('maquanly', filters.maquanly);
+    if (filters.q) {
+      // tìm kiếm đơn giản theo tên / email / sđt
+      const q = `%${filters.q}%`;
+      query = query.or(`hoten.ilike.${q},email.ilike.${q},sodienthoai.ilike.${q}`);
+    }
+
+    const { data, error } = await query.order('manhanvien', { ascending: true });
+    if (error) throw error;
+    return data.map(r => new NhanVien(r));
   },
 
-  async getById(manhanvien) {
-    const { data, error } = await supabase.from(TABLE_NAME)
-      .select('*').eq('manhanvien', manhanvien).single();
-    if (error) throw new Error(error.message);
-    return data;
+  async getById(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('manhanvien', id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhanVien(data) : null;
   },
 
-  async create(nhanVienData) {
-    const { data, error } = await supabase.from(TABLE_NAME).insert(nhanVienData).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+  async create(payload) {
+    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    if (error) throw error;
+    return new NhanVien(data);
   },
 
-  async update(manhanvien, nhanVienData) {
-    const { data, error } = await supabase.from(TABLE_NAME)
-      .update(nhanVienData).eq('manhanvien', manhanvien).select().single();
-    if (error) throw new Error(error.message);
-    return data;
+  async update(id, fields) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update(fields)
+      .eq('manhanvien', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhanVien(data) : null;
   },
 
-  async remove(manhanvien) {
-    const { error } = await supabase.from(TABLE_NAME)
-      .delete().eq('manhanvien', manhanvien);
-    if (error) throw new Error(error.message);
-    return true;
-  }
+  async remove(id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('manhanvien', id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new NhanVien(data) : null;
+  },
 };
 
 module.exports = NhanVienRepository;

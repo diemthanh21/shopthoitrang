@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/ctbanner.controller');
+const ctrl = require('../controllers/ctbanner.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
- *   - name: Chi tiết banner
- *     description: Quản lý chi tiết nhân viên cập nhật banner
+ *   - name: Chi tiết Banner
+ *     description: Quản lý lịch sử thay đổi banner (nhân viên chỉnh sửa, thời gian tự động)
  */
 
 router.use(authenticateToken);
@@ -16,87 +16,157 @@ router.use(authenticateToken);
  * @swagger
  * /api/ctbanner:
  *   get:
- *     summary: Lấy tất cả lịch sử thay đổi banner
- *     tags: [Chi tiết banner]
+ *     summary: Lấy danh sách chi tiết banner
+ *     tags: [Chi tiết Banner]
+ *     parameters:
+ *       - in: query
+ *         name: mabanner
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: manhanvien
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
- * /api/ctbanner/{maBanner}:
+ * /api/ctbanner/{mabanner}/{manhanvien}:
  *   get:
- *     summary: Lấy chi tiết theo mã banner
- *     tags: [Chi tiết banner]
+ *     summary: Lấy chi tiết banner theo mã banner và nhân viên
+ *     tags: [Chi tiết Banner]
  *     parameters:
  *       - in: path
- *         name: maBanner
- *         schema:
- *           type: string
+ *         name: mabanner
  *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: manhanvien
+ *         required: true
+ *         schema: { type: integer }
  *     responses:
  *       200:
  *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.get('/:maBanner', controller.getByMaBanner);
+router.get('/:mabanner/:manhanvien', ctrl.getById);
 
 /**
  * @swagger
  * /api/ctbanner:
  *   post:
- *     summary: Thêm lịch sử thay đổi banner
- *     tags: [Chi tiết banner]
+ *     summary: "Tạo chi tiết banner mới (thoigiandoi tự động = giờ VN hiện tại)"
+ *     tags: [Chi tiết Banner]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required:
- *               - mabanner
- *               - manhanvien
- *               - thoigiandoi
+ *             required: [mabanner, manhanvien]
  *             properties:
- *               mabanner:
- *                 type: string
- *               manhanvien:
+ *               mabanner: 
  *                 type: integer
- *               thoigiandoi:
- *                 type: string
- *                 format: date-time
+ *                 example: 1
+ *                 description: Mã banner
+ *               manhanvien: 
+ *                 type: integer
+ *                 example: 2
+ *                 description: Mã nhân viên
+ *           example:
+ *             mabanner: 1
+ *             manhanvien: 2
  *     responses:
  *       201:
- *         description: Đã tạo thành công
+ *         description: "Tạo thành công (thoigiandoi được set tự động)"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 mabanner: { type: integer }
+ *                 manhanvien: { type: integer }
+ *                 thoigiandoi: { type: string, format: date-time, description: "Tự động = giờ VN hiện tại" }
  *       400:
- *         description: Tạo thất bại
+ *         description: Thiếu thông tin bắt buộc
+ *       401:
+ *         description: Chưa đăng nhập
  */
-router.post('/', controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
- * /api/ctbanner/{maBanner}/{maNhanVien}:
- *   delete:
- *     summary: Xoá lịch sử banner theo mã banner và nhân viên
- *     tags: [Chi tiết banner]
+ * /api/ctbanner/{mabanner}/{manhanvien}:
+ *   put:
+ *     summary: "Cập nhật chi tiết banner (KHÔNG cho phép sửa thoigiandoi)"
+ *     tags: [Chi tiết Banner]
+ *     security:
+ *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: maBanner
+ *         name: mabanner
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *       - in: path
- *         name: maNhanVien
+ *         name: manhanvien
  *         required: true
- *         schema:
- *           type: integer
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               mabanner: 
+ *                 type: integer
+ *                 description: "Mã banner mới (nếu muốn đổi)"
+ *               manhanvien: 
+ *                 type: integer
+ *                 description: "Mã nhân viên mới (nếu muốn đổi)"
+ *             description: "Lưu ý: thoigiandoi KHÔNG được phép cập nhật"
  *     responses:
  *       200:
- *         description: Đã xoá
+ *         description: Cập nhật thành công
  *       400:
- *         description: Xoá thất bại
+ *         description: Dữ liệu không hợp lệ
+ *       401:
+ *         description: Chưa đăng nhập
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:maBanner/:maNhanVien', controller.delete);
+router.put('/:mabanner/:manhanvien', ctrl.update);
+
+/**
+ * @swagger
+ * /api/ctbanner/{mabanner}/{manhanvien}:
+ *   delete:
+ *     summary: Xoá bản ghi chi tiết banner
+ *     tags: [Chi tiết Banner]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: mabanner
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: manhanvien
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Xoá thành công
+ *       401:
+ *         description: Chưa đăng nhập
+ *       404:
+ *         description: Không tìm thấy
+ */
+router.delete('/:mabanner/:manhanvien', ctrl.delete);
 
 module.exports = router;

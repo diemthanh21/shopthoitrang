@@ -1,130 +1,137 @@
-// routes/nhanvien.route.js
 const express = require('express');
 const router = express.Router();
-const controller = require('../controllers/nhanvien.controller');
+const ctrl = require('../controllers/nhanvien.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
+
+/**
+ * @swagger
+ * tags:
+ *   - name: Nhân viên
+ *     description: Quản lý thông tin nhân viên
+ */
+
+router.use(authenticateToken);
 
 /**
  * @swagger
  * /api/nhanvien:
  *   get:
- *     summary: Lấy danh sách nhân viên
- *     tags:
- *       - Nhân viên
- *     security:
- *       - bearerAuth: []
+ *     summary: Lấy danh sách nhân viên (hỗ trợ lọc)
+ *     tags: [Nhân viên]
+ *     parameters:
+ *       - in: query
+ *         name: machucnang
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: maquanly
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: q
+ *         schema: { type: string }
+ *         description: Tìm theo tên/email/số điện thoại (ilike)
  *     responses:
  *       200:
- *         description: Danh sách nhân viên
+ *         description: Thành công
  */
-router.get('/', authenticateToken, controller.getAll);
+router.get('/', ctrl.getAll);
 
 /**
  * @swagger
  * /api/nhanvien/{id}:
  *   get:
  *     summary: Lấy thông tin nhân viên theo ID
- *     tags:
- *       - Nhân viên
- *     security:
- *       - bearerAuth: []
+ *     tags: [Nhân viên]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Thông tin nhân viên
+ *         description: Thành công
  *       404:
- *         description: Không tìm thấy nhân viên
+ *         description: Không tìm thấy
  */
-router.get('/:id', authenticateToken, controller.getById);
+router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
  * /api/nhanvien:
  *   post:
- *     summary: Thêm mới nhân viên
- *     tags:
- *       - Nhân viên
- *     security:
- *       - bearerAuth: []
+ *     summary: Tạo nhân viên mới
+ *     tags: [Nhân viên]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [hoten, machucnang]
  *             properties:
- *               ten:
- *                 type: string
- *               tuoi:
- *                 type: integer
- *             
+ *               hoten: { type: string }
+ *               email: { type: string }
+ *               sodienthoai: { type: string }
+ *               ngaysinh: { type: string, format: date-time }
+ *               diachi: { type: string }
+ *               machucnang: { type: integer }
+ *               maquanly: { type: integer, nullable: true }
  *     responses:
  *       201:
- *         description: Tạo nhân viên thành công
+ *         description: Tạo thành công
+ *       400:
+ *         description: Thiếu dữ liệu
  */
-router.post('/', authenticateToken, controller.create);
+router.post('/', ctrl.create);
 
 /**
  * @swagger
  * /api/nhanvien/{id}:
  *   put:
  *     summary: Cập nhật thông tin nhân viên
- *     tags:
- *       - Nhân viên
- *     security:
- *       - bearerAuth: []
+ *     tags: [Nhân viên]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               ten:
- *                 type: string
- *               tuoi:
- *                 type: integer
- *              
+ *               hoten: { type: string }
+ *               email: { type: string }
+ *               sodienthoai: { type: string }
+ *               ngaysinh: { type: string, format: date-time }
+ *               diachi: { type: string }
+ *               machucnang: { type: integer }
+ *               maquanly: { type: integer, nullable: true }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
  *       404:
- *         description: Không tìm thấy nhân viên
+ *         description: Không tìm thấy
  */
-router.put('/:id', authenticateToken, controller.update);
+router.put('/:id', ctrl.update);
 
 /**
  * @swagger
  * /api/nhanvien/{id}:
  *   delete:
- *     summary: Xóa nhân viên
- *     tags:
- *       - Nhân viên
- *     security:
- *       - bearerAuth: []
+ *     summary: Xoá nhân viên
+ *     tags: [Nhân viên]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Xóa thành công
+ *         description: Xoá thành công
  *       404:
- *         description: Không tìm thấy nhân viên
+ *         description: Không tìm thấy
  */
-router.delete('/:id', authenticateToken, controller.delete);
+router.delete('/:id', ctrl.delete);
 
 module.exports = router;

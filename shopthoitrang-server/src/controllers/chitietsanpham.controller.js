@@ -1,44 +1,58 @@
 const service = require('../services/chitietsanpham.service');
 
 const ChiTietSanPhamController = {
-  async getAll(req, res) {
-    const data = await service.layTatCa();
-    res.json(data);
+  async getAll(req, res, next) {
+    try {
+      const { masanpham, search, minPrice, maxPrice, limit, offset, orderBy, orderDir } = req.query;
+      const { items, total } = await service.list({
+        masanpham,
+        search,
+        minPrice,
+        maxPrice,
+        limit: limit ? Number(limit) : 50,
+        offset: offset ? Number(offset) : 0,
+        orderBy,
+        orderDir,
+      });
+      res.json({ items: items.map((i) => i.toJSON()), total });
+    } catch (err) { next(err); }
   },
 
   async getById(req, res) {
-    const data = await service.layTheoMa(req.params.id);
-    if (!data) return res.status(404).json({ message: 'Không tìm thấy' });
-    res.json(data);
-  },
-
-  async getBySanPham(req, res) {
-    const data = await service.layTheoMaSanPham(req.params.maSanPham);
-    res.json(data);
+    try {
+      const item = await service.get(req.params.id);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 404).json({ message: err.message || 'Không tìm thấy' });
+    }
   },
 
   async create(req, res) {
-    const data = await service.taoMoi(req.body);
-    if (!data) return res.status(400).json({ message: 'Không thể tạo' });
-    res.status(201).json(data);
+    try {
+      const item = await service.create(req.body);
+      res.status(201).json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Tạo thất bại' });
+    }
   },
 
   async update(req, res) {
-    const data = await service.capNhat(req.params.id, req.body);
-    if (!data) return res.status(400).json({ message: 'Không thể cập nhật' });
-    res.json(data);
+    try {
+      const item = await service.update(req.params.id, req.body);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Cập nhật thất bại' });
+    }
   },
 
   async delete(req, res) {
-    const data = await service.xoa(req.params.id);
-    if (!data) return res.status(400).json({ message: 'Không thể xoá' });
-    res.json(data);
+    try {
+      const result = await service.remove(req.params.id);
+      res.json(result);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Xoá thất bại' });
+    }
   },
-
-  async searchByKeyword(req, res) {
-    const data = await service.timKiemTheoTuKhoa(req.params.keyword);
-    res.json(data);
-  }
 };
 
 module.exports = ChiTietSanPhamController;
