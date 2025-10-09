@@ -10,6 +10,8 @@ import BannerPage from './pages/BannerPage';
 import PhanCongCaPage from './pages/PhanCongCaPage';
 import KhuyenMaiPage from './pages/KhuyenMaiPage';
 import DonHangPage from './pages/DonHangPage';
+import KhachHangPage from './pages/KhachHangPage';
+import TheThanhVienPage from './pages/TheThanhVienPage';
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
             <Route path="phancongca" element={<PhanCongCaPage />} />
             <Route path="khuyenmai" element={<KhuyenMaiPage />} />
             <Route path="donhang" element={<DonHangPage />} />
+            <Route path="khachhang" element={<KhachHangPage />} />
+            <Route path="thethanhvien" element={<TheThanhVienPage />} />
           </Route>
 
           {/* 404 */}
