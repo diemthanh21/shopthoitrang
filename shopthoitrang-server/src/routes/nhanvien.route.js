@@ -23,9 +23,6 @@ router.use(authenticateToken);
  *         name: machucnang
  *         schema: { type: integer }
  *       - in: query
- *         name: maquanly
- *         schema: { type: integer }
- *       - in: query
  *         name: q
  *         schema: { type: string }
  *         description: Tìm theo tên/email/số điện thoại (ilike)
@@ -69,12 +66,19 @@ router.get('/:id', ctrl.getById);
  *             required: [hoten, machucnang]
  *             properties:
  *               hoten: { type: string }
+ *               gioitinh: { type: string, enum: ["Nam", "Nữ", "Khác"] }
+ *               cccd: { type: string }
+ *               ngaycap: { type: string, format: date-time }
+ *               noicap: { type: string }
+ *               ngaybatdau: { type: string, format: date-time }
+ *               ngayhethan: { type: string, format: date-time }
+ *               trangthai: { type: string }
+ *               luong: { type: number }
  *               email: { type: string }
  *               sodienthoai: { type: string }
  *               ngaysinh: { type: string, format: date-time }
  *               diachi: { type: string }
  *               machucnang: { type: integer }
- *               maquanly: { type: integer, nullable: true }
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -101,12 +105,19 @@ router.post('/', ctrl.create);
  *             type: object
  *             properties:
  *               hoten: { type: string }
+ *               gioitinh: { type: string, enum: ["Nam", "Nữ", "Khác"] }
+ *               cccd: { type: string }
+ *               ngaycap: { type: string, format: date-time }
+ *               noicap: { type: string }
+ *               ngaybatdau: { type: string, format: date-time }
+ *               ngayhethan: { type: string, format: date-time }
+ *               trangthai: { type: string }
+ *               luong: { type: number }
  *               email: { type: string }
  *               sodienthoai: { type: string }
  *               ngaysinh: { type: string, format: date-time }
  *               diachi: { type: string }
  *               machucnang: { type: integer }
- *               maquanly: { type: integer, nullable: true }
  *     responses:
  *       200:
  *         description: Cập nhật thành công

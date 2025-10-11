@@ -9,7 +9,6 @@ const NhanVienRepository = {
     let query = supabase.from(TABLE).select('*');
 
     if (filters.machucnang) query = query.eq('machucnang', filters.machucnang);
-    if (filters.maquanly) query = query.eq('maquanly', filters.maquanly);
     if (filters.q) {
       // tìm kiếm đơn giản theo tên / email / sđt
       const q = `%${filters.q}%`;

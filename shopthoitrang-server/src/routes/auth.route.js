@@ -32,11 +32,11 @@ const authenticateToken = require('../middlewares/auth.middleware');
  *       properties:
  *         tendangnhap:
  *           type: string
- *           example: nhanvien01
+ *           example: admina
  *         matkhau:
  *           type: string
  *           format: password
- *           example: password123
+ *           example: 123456
  *     RegisterCustomerRequest:
  *       type: object
  *       required: [email, matkhau, hoten]
