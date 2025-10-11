@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const ChiTietDonHang = require('../models/chitietdonhang.model');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../../config/db');
 const TABLE = 'chitietdonhang';
 
 const ChiTietDonHangRepository = {

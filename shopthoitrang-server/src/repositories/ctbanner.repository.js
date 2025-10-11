@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const CTBanner = require('../models/ctbanner.model');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../../config/db');
 const TABLE = 'ctbanner';
 
 const CTBannerRepository = {

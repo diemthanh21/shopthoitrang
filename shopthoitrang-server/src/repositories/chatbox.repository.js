@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const ChatBox = require('../models/chatbox.model');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../../config/db');
 const TABLE = 'chatbox';
 
 const ChatBoxRepository = {

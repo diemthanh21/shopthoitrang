@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const TheThanhVien = require('../models/thethanhvien.model');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../../config/db');
 const TABLE = 'thethanhvien';
 
 const TheThanhVienRepository = {

@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const NoiDungChat = require('../models/noidungchat.model');
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = require('../../config/db');
 const TABLE = 'noidungchat';
 
 const NoiDungChatRepository = {
