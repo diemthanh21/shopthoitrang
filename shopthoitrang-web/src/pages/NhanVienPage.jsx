@@ -1,10 +1,12 @@
 // src/pages/NhanVienPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { Users, Plus, Search, Edit, Trash2, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import nhanvienService from "../services/nhanvienService";
 import chucnangService from "../services/chucnangService";
+import AddressVNCompact from "../components/AddressVNCompact";
 
-// Helpers
+// ===== Helpers (có thể tách ra utils nếu muốn) =====
 function calcAge(yyyyMmDd) {
   if (!yyyyMmDd) return 0;
   const d = new Date(yyyyMmDd);
@@ -31,25 +33,46 @@ function formatDate(v) {
 }
 
 export default function NhanVienPage() {
+  const navigate = useNavigate();
+
   const [employees, setEmployees] = useState([]);
   const [functions, setFunctions] = useState([]); // { machucnang/maChucNang, tenchucnang/tenChucNang }
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
 
+  // State form thêm mới — đầy đủ thuộc tính
   const [newEmployee, setNewEmployee] = useState({
     hoten: "",
+    gioitinh: "",        // "Nam" | "Nữ" 
+    cccd: "",
+    ngaycap: "",         // yyyy-mm-dd
+    noicap: "",
+    ngaybatdau: "",
+    ngayhethan: "",
+    trangthai: "Đang làm", // "Đang làm" | "Tạm nghỉ" | "Đã nghỉ"
+    luong: "",           // số
     email: "",
     sodienthoai: "",
     ngaysinh: "",
-    diachi: "",
     machucnang: "",
     maquanly: "",
   });
 
-  // Load data
+  // Địa chỉ theo mô hình TỈNH → XÃ (+ Thôn/Tổ)
+  // AddressVNCompact sẽ set kèm name để không phải fetch lại
+  const [addr, setAddr] = useState({
+    provinceCode: "",
+    provinceName: "",
+    wardCode: "",
+    wardName: "",
+    hamlet: "",
+  });
+
+  // ===== Load data =====
   useEffect(() => {
     (async () => {
       try {
@@ -58,8 +81,8 @@ export default function NhanVienPage() {
           nhanvienService.getAll(),
           chucnangService.getAll(),
         ]);
-        setEmployees(emps);          // emps đã normalize về camelCase
-        setFunctions(funcs || []);   // có thể snake/camel; ta xử lý khi dùng
+        setEmployees(emps);          // emps đã normalize về camelCase trong service
+        setFunctions(funcs || []);   // có thể snake/camel — xử lý khi hiển thị
         setError("");
       } catch (e) {
         console.error(e);
@@ -70,7 +93,7 @@ export default function NhanVienPage() {
     })();
   }, []);
 
-  // Search
+  // ===== Search =====
   const term = searchTerm.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!term) return employees;
@@ -89,7 +112,7 @@ export default function NhanVienPage() {
     });
   }, [employees, term]);
 
-  // Xoá
+  // ===== Xoá =====
   async function handleDelete(id) {
     if (!window.confirm("Bạn có chắc chắn muốn xóa nhân viên này?")) return;
     try {
@@ -101,30 +124,7 @@ export default function NhanVienPage() {
     }
   }
 
-  // Lọc chức năng chứa "quản lý" (không phân biệt hoa/thường, hỗ trợ cả tenchucnang/tenChucNang)
-  const managerFunctionIds = useMemo(
-    () =>
-      (functions || [])
-        .filter((f) =>
-          ((f.tenchucnang ?? f.tenChucNang ?? "") + "")
-            .toLowerCase()
-            .includes("quản lý")
-        )
-        .map((f) => Number(f.machucnang ?? f.maChucNang))
-        .filter((x) => !Number.isNaN(x)),
-    [functions]
-  );
-
-  // Chỉ nhân viên có maChucNang thuộc nhóm quản lý
-  const managerCandidates = useMemo(
-    () =>
-      (employees || []).filter((m) =>
-        managerFunctionIds.includes(Number(m.maChucNang))
-      ),
-    [employees, managerFunctionIds]
-  );
-
-  // Map id -> tên chức năng
+  // ===== Map id -> tên chức năng =====
   function getTenChucNang(maChucNang) {
     if (!maChucNang) return "N/A";
     const found = functions.find(
@@ -137,37 +137,32 @@ export default function NhanVienPage() {
     return found?.tenchucnang || found?.tenChucNang || `#${maChucNang}`;
   }
 
-  // Tạo mới
+  // ===== Tạo mới =====
   async function handleCreate(e) {
     e.preventDefault();
 
-    // Bắt buộc
+    // Validate cơ bản
     if (!newEmployee.hoten || !newEmployee.machucnang) {
-      alert("Vui lòng nhập Họ tên và Chức năng.");
+      alert("Vui lòng nhập Họ tên và chọn Chức năng.");
       return;
     }
-
-    // Email hợp lệ + không trùng
     if (!isValidEmail(newEmployee.email)) {
       alert("Email không hợp lệ.");
       return;
     }
     const emailLower = (newEmployee.email || "").trim().toLowerCase();
-    if (
-      emailLower &&
-      employees.some((x) => (x.email || "").toLowerCase() === emailLower)
-    ) {
+    if (emailLower && employees.some((x) => (x.email || "").toLowerCase() === emailLower)) {
       alert("Email đã tồn tại, vui lòng dùng email khác.");
       return;
     }
-
-    // SĐT đúng 10 số (nếu nhập)
     if (newEmployee.sodienthoai && !/^\d{10}$/.test(newEmployee.sodienthoai)) {
       alert("Số điện thoại phải gồm đúng 10 chữ số.");
       return;
     }
-
-    // Tuổi ≥ 18 (nếu nhập ngày sinh)
+    if (newEmployee.cccd && !/^(\d{9}|\d{12})$/.test(newEmployee.cccd)) {
+      alert("CCCD phải gồm 9 hoặc 12 chữ số.");
+      return;
+    }
     if (newEmployee.ngaysinh) {
       const age = calcAge(newEmployee.ngaysinh);
       if (age < 18) {
@@ -175,32 +170,66 @@ export default function NhanVienPage() {
         return;
       }
     }
+    if (newEmployee.luong !== "" && Number(newEmployee.luong) < 0) {
+      alert("Lương không hợp lệ.");
+      return;
+    }
+
+    // Gộp địa chỉ theo mô hình mới (Thôn/Tổ, Xã/Phường, Tỉnh/TP)
+    const diachiText = [addr.hamlet, addr.wardName, addr.provinceName]
+      .filter(Boolean)
+      .join(", ");
 
     try {
       const created = await nhanvienService.create({
         hoten: newEmployee.hoten,
+        gioitinh: newEmployee.gioitinh || null,
+        cccd: newEmployee.cccd || null,
+        ngaycap: newEmployee.ngaycap || null,
+        noicap: newEmployee.noicap || null,
+        ngaybatdau: newEmployee.ngaybatdau || null,
+        ngayhethan: newEmployee.ngayhethan || null,
+        trangthai: newEmployee.trangthai || null,
+        luong: newEmployee.luong === "" ? null : Number(newEmployee.luong),
         email: newEmployee.email || null,
         sodienthoai: newEmployee.sodienthoai || null,
-        ngaysinh: newEmployee.ngaysinh || null, // yyyy-mm-dd ok
-        diachi: newEmployee.diachi || null,
-        machucnang: newEmployee.machucnang
-          ? Number(newEmployee.machucnang)
-          : null,
-        maquanly: newEmployee.maquanly
-          ? Number(newEmployee.maquanly)
-          : null,
+        ngaysinh: newEmployee.ngaysinh || null,
+        diachi: diachiText || null, // <-- địa chỉ gộp theo mô hình Tỉnh → Xã (+Thôn)
+        machucnang: newEmployee.machucnang ? Number(newEmployee.machucnang) : null,
+        maquanly: newEmployee.maquanly ? Number(newEmployee.maquanly) : null,
+        // Nếu DB của bạn có thêm cột code/name cho province/ward/hamlet thì thêm vào service.buildBody
+        // province_code: addr.provinceCode ? Number(addr.provinceCode) : null,
+        // province_name: addr.provinceName || null,
+        // ward_code: addr.wardCode ? Number(addr.wardCode) : null,
+        // ward_name: addr.wardName || null,
+        // hamlet: addr.hamlet || null,
       });
 
       setEmployees((prev) => [created, ...prev]);
       setShowForm(false);
+      // reset form
       setNewEmployee({
         hoten: "",
+        gioitinh: "",
+        cccd: "",
+        ngaycap: "",
+        noicap: "",
+        ngaybatdau: "",
+        ngayhethan: "",
+        trangthai: "Đang làm",
+        luong: "",
         email: "",
         sodienthoai: "",
         ngaysinh: "",
-        diachi: "",
         machucnang: "",
         maquanly: "",
+      });
+      setAddr({
+        provinceCode: "",
+        provinceName: "",
+        wardCode: "",
+        wardName: "",
+        hamlet: "",
       });
     } catch (e) {
       console.error(e);
@@ -272,40 +301,32 @@ export default function NhanVienPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">SĐT</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ngày sinh</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Địa chỉ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Giới tính</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Chức năng</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Quản lý</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Thao tác</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.map((e) => {
-                const manager = employees.find((x) => x.maNhanVien === e.maQuanLy);
-                return (
-                  <tr key={e.maNhanVien} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{e.maNhanVien}</td>
-                    <td className="px-4 py-3 text-sm">{e.hoTen}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{e.email || "N/A"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{e.soDienThoai || "N/A"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{formatDate(e.ngaySinh)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{e.diaChi || "N/A"}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{getTenChucNang(e.maChucNang)}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{manager?.hoTen || e.maQuanLy || "N/A"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button className="text-blue-600 hover:text-blue-800 mr-3" title="Sửa (chưa làm)">
-                        <Edit size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(e.maNhanVien)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Xoá"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+              {filtered.map((e) => (
+                <tr key={e.maNhanVien} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{e.maNhanVien}</td>
+                  <td className="px-4 py-3 text-sm">{e.hoTen}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{e.email || "N/A"}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{e.soDienThoai || "N/A"}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{formatDate(e.ngaySinh)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{e.gioiTinh ?? e.gioitinh ?? "N/A"}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{getTenChucNang(e.maChucNang)}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() => navigate(`/nhanvien/${e.maNhanVien}`)}
+                      className="text-green-600 hover:text-green-800 mr-3"
+                      title="Chi tiết"
+                    >
+                      Chi tiết
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         )}
@@ -314,7 +335,7 @@ export default function NhanVienPage() {
       {/* Modal Thêm mới */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-lg relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setShowForm(false)}
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
@@ -326,17 +347,33 @@ export default function NhanVienPage() {
             <h2 className="text-xl font-semibold mb-4">Thêm nhân viên mới</h2>
 
             <form onSubmit={handleCreate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Họ tên *</label>
-                <input
-                  value={newEmployee.hoten}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, hoten: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Nguyễn Văn A"
-                  required
-                />
+              {/* Họ tên + Giới tính */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Họ tên *</label>
+                  <input
+                    value={newEmployee.hoten}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, hoten: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Nguyễn Văn A"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Giới tính</label>
+                  <select
+                    value={newEmployee.gioitinh}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, gioitinh: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">-- Chưa chọn --</option>
+                    <option value="Nam">Nam</option>
+                    <option value="Nữ">Nữ</option>
+                  </select>
+                </div>
               </div>
 
+              {/* Email + SĐT */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Email</label>
@@ -362,6 +399,7 @@ export default function NhanVienPage() {
                 </div>
               </div>
 
+              {/* Ngày sinh + Chức năng */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Ngày sinh</label>
@@ -390,6 +428,95 @@ export default function NhanVienPage() {
                 </div>
               </div>
 
+              {/* CCCD + Ngày cấp */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">CCCD</label>
+                  <input
+                    value={newEmployee.cccd}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, "") })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="123456789012"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ngày cấp</label>
+                  <input
+                    type="date"
+                    value={newEmployee.ngaycap}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, ngaycap: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Nơi cấp + Trạng thái */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Nơi cấp</label>
+                  <input
+                    value={newEmployee.noicap}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, noicap: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Hà Nội"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Trạng thái</label>
+                  <select
+                    value={newEmployee.trangthai}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, trangthai: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option>Đang làm</option>
+                    <option>Tạm nghỉ</option>
+                    <option>Đã nghỉ</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Ngày bắt đầu + Ngày hết hạn */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ngày bắt đầu</label>
+                  <input
+                    type="date"
+                    value={newEmployee.ngaybatdau}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, ngaybatdau: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Ngày hết hạn</label>
+                  <input
+                    type="date"
+                    value={newEmployee.ngayhethan}
+                    onChange={(e) => setNewEmployee({ ...newEmployee, ngayhethan: e.target.value })}
+                    className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Lương */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Lương (₫)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={newEmployee.luong}
+                  onChange={(e) => setNewEmployee({ ...newEmployee, luong: e.target.value })}
+                  className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="13000000"
+                />
+              </div>
+
+              {/* Địa chỉ: Tỉnh → Xã (+Thôn/Tổ) */}
+              <div>
+                <label className="block text-sm font-medium mb-2">Địa chỉ</label>
+                <AddressVNCompact value={addr} onChange={setAddr} />
+              </div>
+
+              {/* Người quản lý */}
               <div>
                 <label className="block text-sm font-medium mb-1">Người quản lý</label>
                 <select
@@ -398,28 +525,15 @@ export default function NhanVienPage() {
                   className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">-- Không có --</option>
-                  {managerCandidates.length === 0 ? (
-                    <option value="" disabled>Không có nhân viên nào có chức vụ Quản lý</option>
-                  ) : (
-                    managerCandidates.map((m) => (
-                      <option key={m.maNhanVien} value={m.maNhanVien}>
-                        {m.hoTen} {/* không kèm #id */}
-                      </option>
-                    ))
-                  )}
+                  {employees.map((m) => (
+                    <option key={m.maNhanVien} value={m.maNhanVien}>
+                      {m.hoTen}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Địa chỉ</label>
-                <input
-                  value={newEmployee.diachi}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, diachi: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="123 Đường ABC, TP.HCM"
-                />
-              </div>
-
+              {/* Action */}
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"

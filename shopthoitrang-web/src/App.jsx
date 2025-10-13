@@ -12,6 +12,8 @@ import KhuyenMaiPage from './pages/KhuyenMaiPage';
 import DonHangPage from './pages/DonHangPage';
 import KhachHangPage from './pages/KhachHangPage';
 import TheThanhVienPage from './pages/TheThanhVienPage';
+import NhanVienDetailPage from "./pages/NhanVienDetailPage";
+import NhanVienEditPage from "./pages/NhanVienEditPage";
 
 function App() {
   return (
@@ -33,6 +35,8 @@ function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="nhanvien" element={<NhanVienPage />} />
+            <Route path="nhanvien/:id" element={<NhanVienDetailPage />} />
+            <Route path="nhanvien/:id/edit" element={<NhanVienEditPage />} />
             <Route path="sanpham" element={<SanPhamPage />} />
             <Route path="banner" element={<BannerPage />} />
             <Route path="phancongca" element={<PhanCongCaPage />} />

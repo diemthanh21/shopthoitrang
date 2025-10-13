@@ -1,8 +1,17 @@
 import api from "./api";
 
+// Chuẩn hóa dữ liệu trả về từ API về camelCase
 const normalize = (r) => ({
   maNhanVien: r.manhanvien ?? r.maNhanVien ?? r.id,
   hoTen: r.hoten ?? r.hoTen ?? "",
+  gioiTinh: r.gioitinh ?? r.gioiTinh ?? null,
+  cccd: r.cccd ?? null,
+  ngayCap: r.ngaycap ?? r.ngayCap ?? null,
+  noiCap: r.noicap ?? r.noiCap ?? null,
+  ngayBatDau: r.ngaybatdau ?? r.ngayBatDau ?? null,
+  ngayHetHan: r.ngayhethan ?? r.ngayHetHan ?? null,
+  trangThai: r.trangthai ?? r.trangThai ?? null,
+  luong: r.luong ?? null,
   email: r.email ?? null,
   soDienThoai: r.sodienthoai ?? r.soDienThoai ?? null,
   ngaySinh: r.ngaysinh ?? r.ngaySinh ?? null,
@@ -26,10 +35,18 @@ function numOrNull(v) {
   return v === "" || v == null ? null : Number(v);
 }
 
-// Map field names (camelCase hoặc snake_case) sang đúng DB
+// Map field names gửi lên API
 function buildBody(data) {
   return {
     hoten: data.hoten ?? data.hoTen ?? null,
+    gioitinh: data.gioitinh ?? data.gioiTinh ?? null,
+    cccd: data.cccd ?? null,
+    ngaycap: toISODate(data.ngaycap ?? data.ngayCap) ?? null,
+    noicap: data.noicap ?? data.noiCap ?? null,
+    ngaybatdau: toISODate(data.ngaybatdau ?? data.ngayBatDau) ?? null,
+    ngayhethan: toISODate(data.ngayhethan ?? data.ngayHetHan) ?? null,
+    trangthai: data.trangthai ?? data.trangThai ?? null,
+    luong: data.luong ?? null,
     email: data.email ?? null,
     sodienthoai: data.sodienthoai ?? data.soDienThoai ?? null,
     ngaysinh: toISODate(data.ngaysinh ?? data.ngaySinh) ?? null,
@@ -71,5 +88,5 @@ const remove = async (id) => {
   return res.data;
 };
 
-// Chỉ export một đối tượng duy nhất
+
 export default { getAll, getById, create, update, delete: remove };
