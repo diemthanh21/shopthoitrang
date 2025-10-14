@@ -10,7 +10,16 @@ const { swaggerUi, specs } = require('./src/swagger');
 
 const app = express();
 
-app.use(cors());
+// CORS config
+app.use(cors({
+  origin: [
+    'http://localhost:5173',    // Vite dev
+    'http://localhost:3000',    // Local test
+    'http://localhost',         // Docker nginx
+    'http://localhost:80'       // Docker nginx explicit
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // Swagger UI hiển thị file đã sinh tự động

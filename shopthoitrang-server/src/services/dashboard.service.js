@@ -1,10 +1,10 @@
 const { createClient } = require('@supabase/supabase-js');
 
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
-  console.warn('[dashboard] Missing SUPABASE_URL or SUPABASE_KEY env vars. Dashboard data will be zeroed.');
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn('[dashboard] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars. Dashboard data will be zeroed.');
 }
 
-const supabase = createClient(process.env.SUPABASE_URL || '', process.env.SUPABASE_KEY || '');
+const supabase = createClient(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '');
 
 // Định nghĩa bảng & cột chính (có thể chỉnh nếu schema khác)
 const TABLES = {
@@ -204,7 +204,7 @@ async function topProducts(limit = 5) {
 
 async function summary() {
   // Early return nếu thiếu env Supabase để tránh crash
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('[dashboard] Missing Supabase env vars - returning empty dashboard');
     return {
       stats: { revenue: 0, ordersCount: 0, productsCount: 0, customersCount: 0 },

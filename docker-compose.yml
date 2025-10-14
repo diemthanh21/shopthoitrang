@@ -9,3 +9,21 @@ services:
     env_file:
       - ./shopthoitrang-server/.env
     restart: unless-stopped
+    networks:
+      - shopthoitrang-network
+
+  shopthoitrang-web:
+    build: ./shopthoitrang-web
+    container_name: shopthoitrang-web
+    ports:
+      - "80:80"
+      - "8080:80"  # Alternative port
+    depends_on:
+      - shopthoitrang-server
+    restart: unless-stopped
+    networks:
+      - shopthoitrang-network
+
+networks:
+  shopthoitrang-network:
+    driver: bridge
