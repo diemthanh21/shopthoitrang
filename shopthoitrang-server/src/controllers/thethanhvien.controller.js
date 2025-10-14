@@ -10,6 +10,15 @@ const TheThanhVienController = {
     }
   },
 
+  async getByKhachHang(req, res) {
+    try {
+      const data = await service.getByKhachHang(req.params.makhachhang);
+      res.json(data.map(r => r.toJSON()));
+    } catch (err) {
+      res.status(err.status || 404).json({ message: err.message });
+    }
+  },
+
   async getById(req, res) {
     try {
       const item = await service.get(req.params.id);

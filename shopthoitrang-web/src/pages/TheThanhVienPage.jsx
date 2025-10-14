@@ -17,8 +17,9 @@ const TheThanhVienPage = () => {
   const fetchMemberCards = async () => {
     try {
       setLoading(true);
-      const data = await thethanhvienService.getAll();
-      setMemberCards(data);
+      // Tạm thời trả về mảng rỗng
+      setMemberCards([]);
+      message.info('Vui lòng sử dụng chức năng xem chi tiết thẻ từ danh sách khách hàng.');
     } catch (error) {
       message.error('Không thể tải dữ liệu thẻ thành viên');
     } finally {
@@ -47,54 +48,22 @@ const TheThanhVienPage = () => {
 
   const handleCancel = () => {
     setModalVisible(false);
-    form.resetFields();
     setEditingCard(null);
+    form.resetFields();
   };
 
-  // CRUD operations
+  // operations
   const handleSubmit = async (values) => {
     try {
-      if (editingCard) {
-        await thethanhvienService.update(editingCard.mathe, {
-          ...values,
-          ngaycap: values.ngaycap.format('YYYY-MM-DD'),
-          ngayhethan: values.ngayhethan.format('YYYY-MM-DD'),
-        });
-        message.success('Cập nhật thẻ thành viên thành công');
-      } else {
-        await thethanhvienService.create({
-          ...values,
-          ngaycap: values.ngaycap.format('YYYY-MM-DD'),
-          ngayhethan: values.ngayhethan.format('YYYY-MM-DD'),
-        });
-        message.success('Tạo thẻ thành viên mới thành công');
-      }
       setModalVisible(false);
-      fetchMemberCards();
+      message.info('Tạm thời vô hiệu hóa cập nhật từ trang chính. Vui lòng sử dụng modal chi tiết để cập nhật trạng thái.');
     } catch (error) {
-      message.error('Có lỗi xảy ra. Vui lòng thử lại');
+      console.error(error);
+      message.error('Không thể cập nhật trạng thái. Vui lòng thử lại.');
     }
   };
 
-  const handleDelete = (record) => {
-    confirm({
-      title: 'Bạn có chắc chắn muốn xóa thẻ thành viên này?',
-      icon: <ExclamationCircleOutlined />,
-      content: 'Hành động này không thể hoàn tác',
-      okText: 'Xóa',
-      okType: 'danger',
-      cancelText: 'Hủy',
-      onOk: async () => {
-        try {
-          await thethanhvienService.delete(record.mathe);
-          message.success('Xóa thẻ thành viên thành công');
-          fetchMemberCards();
-        } catch (error) {
-          message.error('Có lỗi xảy ra khi xóa thẻ thành viên');
-        }
-      },
-    });
-  };
+
 
   // Table columns
   const columns = [
@@ -145,107 +114,65 @@ const TheThanhVienPage = () => {
             icon={<EditOutlined />}
             onClick={() => showModal(record)}
           >
-            Sửa
-          </Button>
-          <Button 
-            type="primary" 
-            danger 
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record)}
-          >
-            Xóa
+            Thay đổi
           </Button>
         </Space>
       ),
     },
   ];
 
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ marginBottom: 16 }}>
-        <Button type="primary" onClick={() => showModal()}>
-          Thêm thẻ thành viên mới
-        </Button>
-      </div>
+return (
+  <div style={{ padding: 24 }}>
+    <Table
+      columns={columns}
+      dataSource={memberCards}
+      rowKey="mathe"
+      loading={loading}
+    />
 
-      <Table
-        columns={columns}
-        dataSource={memberCards}
-        rowKey="mathe"
-        loading={loading}
-      />
-
-      <Modal
-        title={editingCard ? 'Sửa thẻ thành viên' : 'Thêm thẻ thành viên mới'}
-        open={modalVisible}
-        onCancel={handleCancel}
-        footer={null}
+    <Modal
+      title="Cập nhật trạng thái thẻ thành viên"
+      open={modalVisible}
+      onCancel={handleCancel}
+      footer={null}
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={(values) => {
+          Modal.confirm({
+            title: 'Xác nhận thay đổi',
+            content: 'Bạn có chắc muốn thay đổi trạng thái thẻ này không?',
+            okText: 'Có',
+            cancelText: 'Không',
+            onOk: () => handleSubmit(values),
+          });
+        }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
+        <Form.Item
+          name="trangthai"
+          label="Trạng thái"
+          rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
         >
-          <Form.Item
-            name="makhachhang"
-            label="Mã khách hàng"
-            rules={[{ required: true, message: 'Vui lòng nhập mã khách hàng!' }]}
-          >
-            <Input />
-          </Form.Item>
+          <Select placeholder="Chọn trạng thái">
+            <Select.Option value={true}>Hoạt động</Select.Option>
+            <Select.Option value={false}>Ngưng hoạt động</Select.Option>
+          </Select>
+        </Form.Item>
 
-          <Form.Item
-            name="mahangthe"
-            label="Hạng thẻ"
-            rules={[{ required: true, message: 'Vui lòng chọn hạng thẻ!' }]}
-          >
-            <Select>
-              <Select.Option value="BRONZE">Bronze</Select.Option>
-              <Select.Option value="SILVER">Silver</Select.Option>
-              <Select.Option value="GOLD">Gold</Select.Option>
-              <Select.Option value="PLATINUM">Platinum</Select.Option>
-            </Select>
-          </Form.Item>
+        <Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit">
+              Cập nhật
+            </Button>
+            <Button onClick={handleCancel}>Hủy</Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
+  </div>
+);
 
-          <Form.Item
-            name="ngaycap"
-            label="Ngày cấp"
-            rules={[{ required: true, message: 'Vui lòng chọn ngày cấp!' }]}
-          >
-            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item
-            name="ngayhethan"
-            label="Ngày hết hạn"
-            rules={[{ required: true, message: 'Vui lòng chọn ngày hết hạn!' }]}
-          >
-            <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} />
-          </Form.Item>
-
-          <Form.Item
-            name="trangthai"
-            label="Trạng thái"
-            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
-          >
-            <Select>
-              <Select.Option value={true}>Hoạt động</Select.Option>
-              <Select.Option value={false}>Ngưng hoạt động</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" htmlType="submit">
-                {editingCard ? 'Cập nhật' : 'Thêm mới'}
-              </Button>
-              <Button onClick={handleCancel}>Hủy</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
-    </div>
-  );
 };
 
 export default TheThanhVienPage;

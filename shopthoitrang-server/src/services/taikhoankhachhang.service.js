@@ -26,6 +26,7 @@ class TaiKhoanKhachHangService {
       }
     }
 
+    // Mã hoá mật khẩu
     const hashedPassword = await bcrypt.hash(body.pass, 10);
 
     const payload = {
@@ -34,14 +35,16 @@ class TaiKhoanKhachHangService {
       email: body.email ?? null,
       pass: hashedPassword,
       sodienthoai: body.sodienthoai ?? null,
-      danghoatdong: body.danghoatdong ?? true,
-      anhdaidien: body.anhdaidien ?? null
+      gioitinh: body.gioitinh ?? null,
+      ngaysinh: body.ngaysinh ?? null,
+      danghoatdong: body.danghoatdong ?? true
     };
 
     return repo.create(payload);
   }
 
   async update(id, body) {
+    // Nếu có đổi mật khẩu thì mã hoá lại
     if (body.pass) {
       body.pass = await bcrypt.hash(body.pass, 10);
     }

@@ -6,9 +6,9 @@ import diachikhachhangService from '../services/diachikhachhangService';
 const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);  // liên quan handleAdd
   const [form] = Form.useForm();
-  const [editingAddress, setEditingAddress] = useState(null);
+  const [editingAddress, setEditingAddress] = useState(null);   // liên quan handleEdit
 
   useEffect(() => {
     if (isModalOpen && makhachhang) {
@@ -30,57 +30,57 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
     }
   };
 
-  const handleAdd = () => {
-    form.resetFields();
-    setEditingAddress(null);
-    setIsAddModalOpen(true);
-  };
+  // const handleAdd = () => {
+  //   form.resetFields();
+  //   setEditingAddress(null);
+  //   setIsAddModalOpen(true);
+  // };
 
-  const handleEdit = (record) => {
-    form.setFieldsValue(record);
-    setEditingAddress(record);
-    setIsAddModalOpen(true);
-  };
+  // const handleEdit = (record) => {
+  //   form.setFieldsValue(record);
+  //   setEditingAddress(record);
+  //   setIsAddModalOpen(true);
+  // };
 
-  const handleDelete = async (madiachi) => {
-    try {
-      await diachikhachhangService.delete(madiachi);
-      message.success('Xóa địa chỉ thành công');
-      fetchAddresses();
-    } catch (error) {
-      message.error('Không thể xóa địa chỉ');
-      console.error('Error deleting address:', error);
-    }
-  };
+  // const handleDelete = async (madiachi) => {
+  //   try {
+  //     await diachikhachhangService.delete(madiachi);
+  //     message.success('Xóa địa chỉ thành công');
+  //     fetchAddresses();
+  //   } catch (error) {
+  //     message.error('Không thể xóa địa chỉ');
+  //     console.error('Error deleting address:', error);
+  //   }
+  // };
 
-  const handleSubmit = async (values) => {
-    try {
-      const data = {
-        ...values,
-        makhachhang,
-      };
+  // const handleSubmit = async (values) => {
+  //   try {
+  //     const data = {
+  //       ...values,
+  //       makhachhang,
+  //     };
 
-      let response;
-      if (editingAddress) {
-        // Nếu đang sửa địa chỉ
-        response = await diachikhachhangService.update(editingAddress.madiachi, data);
-      } else {
-        // Nếu đang thêm địa chỉ mới
-        response = await diachikhachhangService.create(data);
-      }
+  //     let response;
+  //     if (editingAddress) {
+  //       // Nếu đang sửa địa chỉ
+  //       response = await diachikhachhangService.update(editingAddress.madiachi, data);
+  //     } else {
+  //       // Nếu đang thêm địa chỉ mới
+  //       response = await diachikhachhangService.create(data);
+  //     }
 
-      if (response) {
-        message.success(editingAddress ? 'Cập nhật địa chỉ thành công' : 'Thêm địa chỉ thành công');
-        setIsAddModalOpen(false);
-        fetchAddresses();
-      } else {
-        throw new Error('Không nhận được phản hồi từ server');
-      }
-    } catch (error) {
-      message.error('Không thể lưu địa chỉ: ' + (error.message || 'Lỗi không xác định'));
-      console.error('Error saving address:', error);
-    }
-  };
+  //     if (response) {
+  //       message.success(editingAddress ? 'Cập nhật địa chỉ thành công' : 'Thêm địa chỉ thành công');
+  //       setIsAddModalOpen(false);
+  //       fetchAddresses();
+  //     } else {
+  //       throw new Error('Không nhận được phản hồi từ server');
+  //     }
+  //   } catch (error) {
+  //     message.error('Không thể lưu địa chỉ: ' + (error.message || 'Lỗi không xác định'));
+  //     console.error('Error saving address:', error);
+  //   }
+  // };
 
   const columns = [
     {
@@ -93,7 +93,7 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
       key: 'action',
       render: (_, record) => (
         <div className="flex gap-2">
-          <Button
+          {/* <Button
             type="text"
             icon={<Edit className="w-4 h-4" />}
             onClick={() => handleEdit(record)}
@@ -109,7 +109,7 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
               icon={<Trash2 className="w-4 h-4" />}
               danger
             />
-          </Popconfirm>
+          </Popconfirm> */}
         </div>
       ),
     },
@@ -124,13 +124,13 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
       footer={null}
     >
       <div className="mb-4">
-        <Button
+        {/* <Button
           type="primary"
           icon={<Plus className="w-4 h-4" />}
-          onClick={handleAdd}
+          onClick={() => {}}
         >
           Thêm địa chỉ mới
-        </Button>
+        </Button> */}
       </div>
 
       <Table
@@ -142,7 +142,7 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
         scroll={{ y: 400 }}
       />
 
-      <Modal
+      {/* <Modal
         title={editingAddress ? "Chỉnh sửa địa chỉ" : "Thêm địa chỉ mới"}
         open={isAddModalOpen}
         onCancel={() => setIsAddModalOpen(false)}
@@ -151,7 +151,7 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
         <Form
           form={form}
           layout="vertical"
-          onFinish={handleSubmit}
+          onFinish={() => {}}
         >
           <Form.Item
             name="diachi"
@@ -170,7 +170,8 @@ const DiaChiKhachHangModal = ({ makhachhang, isModalOpen, onClose }) => {
             </Button>
           </div>
         </Form>
-      </Modal>
+      </Modal> */}
+
     </Modal>
   );
 };

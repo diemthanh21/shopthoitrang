@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Users, Plus, Search, Edit, Trash2, X, MapPin } from "lucide-react";
+import { Users, Search, Edit, MapPin, CreditCard } from "lucide-react";
+import { message, Button, Popconfirm, Switch } from 'antd';
 import khachhangServices from '../services/khachhangService';
 import DiaChiKhachHangModal from '../components/DiaChiKhachHangModal';
+import TheThanhVienModal from '../components/TheThanhVienModal';
 
 function formatDate(v) {
   if (!v) return "N/A";
@@ -23,6 +25,7 @@ export default function KhachHangPage() {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
 
 
   async function fetchCustomers() {
@@ -55,14 +58,6 @@ export default function KhachHangPage() {
     fetchCustomers();
   }, []);
 
-  function handleAdd() {
-    window.location.href = `/khachhang/them`;
-  }
-
-  function handleEdit(customer) {
-    setEditingCustomer(customer);
-    setEditMode(true);
-  }
 
   function handleCancel() {
     setEditMode(false);
@@ -74,64 +69,58 @@ export default function KhachHangPage() {
     setIsAddressModalOpen(true);
   }
 
+  // Open member cards modal for a customer (modal will fetch its own data)
+  function handleViewMemberCards(customer) {
+    setSelectedCustomer(customer);
+    setIsMemberModalOpen(true);
+  }
 
   async function handleEditSubmit(e) {
-    e.preventDefault();
-    const form = e.target;
-    const formData = new FormData(form);
-    
-    try {
-      await khachhangServices.update(editingCustomer.makhachhang, {
-        hoten: formData.get("hoten"),
-        tendangnhap: formData.get("tendangnhap"),
-        email: formData.get("email"),
-        sodienthoai: formData.get("sodienthoai"),
-        danghoatdong: formData.get("danghoatdong") === "on"
-      });
-      
-      setEditMode(false);
-      setEditingCustomer(null);
-      fetchCustomers();
-    } catch (err) {
-      console.error(err);
-      alert("Không thể cập nhật thông tin khách hàng");
+    // Deprecated: replaced by toggleCustomerStatus. Keep for backwards-compatibility if called with an event.
+    if (e && e.preventDefault) e.preventDefault();
+    // Try to extract makhachhang if passed as argument
+    let makhachhang = null;
+    if (typeof e === 'string' || typeof e === 'number') {
+      makhachhang = e;
+    } else if (editingCustomer) {
+      makhachhang = editingCustomer.makhachhang;
     }
+    if (!makhachhang) {
+      console.warn('No makhachhang provided to handleEditSubmit');
+      return;
+    }
+    // toggle status
+    await toggleCustomerStatus(makhachhang);
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa khách hàng này?")) return;
+  // New: toggle the danghoatdong status for a customer
+  async function toggleCustomerStatus(makhachhang) {
+    if (!makhachhang) return;
     try {
-      await khachhangServices.delete(id);
-      fetchCustomers();
-    } catch (err) {
-      console.error(err);
-      alert("Không thể xóa khách hàng");
-    }
-  }
-
-  const handleSubmit = async (values) => {
-    try {
-      if (editingCustomer) {
-        await khachhangServices.update(editingCustomer.makhachhang, values);
-        message.success('Cập nhật khách hàng thành công');
-      } else {
-        await khachhangServices.create(values);
-        message.success('Thêm khách hàng thành công');
+      // find customer in local list to determine current status
+      const cust = customers.find(c => String(c.makhachhang) === String(makhachhang));
+      if (!cust) {
+        console.warn('Customer not found locally, fetching latest list');
+        await fetchCustomers();
       }
-      setModalVisible(false);
-      fetchCustomers();
-    } catch (error) {
-      message.error('Lỗi khi lưu thông tin khách hàng');
+      const current = cust ? !!cust.danghoatdong : true;
+      const newStatus = !current;
+
+      // Confirm with user
+      const ok = window.confirm(`Bạn có chắc chắn muốn ${newStatus ? 'mở' : 'khóa'} khách hàng ${makhachhang}?`);
+      if (!ok) return;
+
+      await khachhangServices.update(makhachhang, { danghoatdong: newStatus });
+      // update local state to reflect change immediately
+      setCustomers(prev => prev.map(p => p.makhachhang === makhachhang ? { ...p, danghoatdong: newStatus } : p));
+      message && message.success && message.success('Cập nhật trạng thái khách hàng thành công');
+    } catch (err) {
+      console.error(err);
+      alert('Không thể thực hiện thay đổi này');
     }
-  };
+  }
 
   const columns = [
-    {
-      title: 'Ảnh đại diện',
-      dataIndex: 'anhdaidien',
-      key: 'anhdaidien',
-      render: (avatar) => <Avatar src={avatar} />,
-    },
     {
       title: 'Họ tên',
       dataIndex: 'hoten',
@@ -172,25 +161,27 @@ export default function KhachHangPage() {
             onClick={() => handleViewAddresses(record)}
             title="Xem địa chỉ"
           />
-          <Button 
-            type="text"
-            icon={<Edit className="w-4 h-4" />}
-            onClick={() => handleEdit(record)}
-            title="Chỉnh sửa"
-          />
+
           <Popconfirm
-            title="Bạn có chắc muốn xóa khách hàng này?"
-            onConfirm={() => handleDelete(record.makhachhang)}
+            title="Bạn có chắc muốn thay đổi tại khách hàng này?"
+            onConfirm={() => handleEditSubmit(record.makhachhang)}
             okText="Có"
             cancelText="Không"
           >
             <Button 
               type="text"
-              icon={<Trash2 className="w-4 h-4" />}
+              icon={<Edit className="w-4 h-4" />}
               danger
-              title="Xóa"
+              title="Thay đổi trạng thái"
             />
           </Popconfirm>
+
+          <Button
+            type="text"
+            icon={<CreditCard className="w-4 h-4" />}
+            onClick={() => handleViewMemberCards(record)}
+            title="Chi tiết thẻ"
+          />
         </div>
       ),
     },
@@ -229,10 +220,6 @@ export default function KhachHangPage() {
             <p className="text-gray-600">Quản lý thông tin khách hàng trong hệ thống</p>
           </div>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          <Plus size={20} />
-          Thêm khách hàng
-        </button>
       </div>
 
       {/* Search */}
@@ -267,7 +254,7 @@ export default function KhachHangPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã KH</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ảnh đại diện</th>
+                {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ảnh đại diện</th> */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Họ tên</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên đăng nhập</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
@@ -280,7 +267,7 @@ export default function KhachHangPage() {
               {filtered.map((customer) => (
                 <tr key={customer.makhachhang} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{customer.makhachhang}</td>
-                  <td className="px-4 py-3">
+                  {/* <td className="px-4 py-3">
                     {customer.anhdaidien ? (
                       <img 
                         src={customer.anhdaidien} 
@@ -292,7 +279,7 @@ export default function KhachHangPage() {
                         <Users size={20} className="text-gray-500" />
                       </div>
                     )}
-                  </td>
+                  </td> */}
                   <td className="px-4 py-3 text-sm text-gray-900">{customer.hoten}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{customer.tendangnhap}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{customer.email || "N/A"}</td>
@@ -303,6 +290,13 @@ export default function KhachHangPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-sm">
+                    <button
+                      onClick={() => handleViewMemberCards(customer)}
+                      className="text-gray-700 hover:text-gray-900 mr-3"
+                      title="Chi tiết thẻ"
+                    >
+                      <CreditCard size={18} />
+                    </button>
                     <button 
                       onClick={() => handleViewAddresses(customer)}
                       className="text-indigo-600 hover:text-indigo-800 mr-3"
@@ -310,19 +304,12 @@ export default function KhachHangPage() {
                     >
                       <MapPin size={18} />
                     </button>
-                    <button 
-                      onClick={() => handleEdit(customer)}
-                      className="text-blue-600 hover:text-blue-800 mr-3"
-                      title="Chỉnh sửa"
+                    <button
+                      onClick={() => handleEditSubmit(customer.makhachhang)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Thay đổi trạng thái"
                     >
                       <Edit size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(customer.makhachhang)}
-                      className="text-red-600 hover:text-red-800"
-                      title="Xóa"
-                    >
-                      <Trash2 size={18} />
                     </button>
                   </td>
                 </tr>
@@ -338,6 +325,15 @@ export default function KhachHangPage() {
         isModalOpen={isAddressModalOpen}
         onClose={() => {
           setIsAddressModalOpen(false);
+          setSelectedCustomer(null);
+        }}
+      />
+
+      <TheThanhVienModal
+        makhachhang={selectedCustomer?.makhachhang}
+        visible={isMemberModalOpen}
+        onClose={() => {
+          setIsMemberModalOpen(false);
           setSelectedCustomer(null);
         }}
       />

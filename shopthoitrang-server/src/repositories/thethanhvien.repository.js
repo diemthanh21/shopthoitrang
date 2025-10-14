@@ -11,6 +11,15 @@ const TheThanhVienRepository = {
     return data.map(row => new TheThanhVien(row));
   },
 
+  async findByKhachHang(makhachhang) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('makhachhang', makhachhang);
+    if (error) throw error;
+    return data.map(row => new TheThanhVien(row));
+  },
+
   async getById(mathe) {
     const { data, error } = await supabase
       .from(TABLE)
