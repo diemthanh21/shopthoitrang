@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   Package,
-  Image,
   Tag,
   ShoppingCart,
   LogOut,
@@ -62,8 +61,8 @@ const DashboardLayout = () => {
       label: "Sản phẩm",
       icon: Package,
       items: [
-        { label: "Danh sách sản phẩm", link: "/sanpham" },
-        { label: "Thương hiệu", link: "/thuonghieu" },
+        { label: "Danh sách sản phẩm", link: "/sanpham" },        
+        { label: "Danh mục", link: "/danhmuc" },
       ],
     },
     {
@@ -80,8 +79,8 @@ const DashboardLayout = () => {
       label: "Khách hàng",
       icon: User,
       items: [
-        { label: "Danh sách khách hàng", link: "/khachhang" },
-        { label: "Thẻ thành viên", link: "/thethanhvien" },
+        { label: "Thông tin khách hàng", link: "/khachhang" },
+        
       ],
     },
     {
@@ -98,6 +97,7 @@ const DashboardLayout = () => {
       items: [
         { label: "Nhà cung cấp", link: "/nhacungcap" },
         { label: "Banner", link: "/banner" },
+        { label: "Danh sách thẻ", link: "/hangthe" },
       ],
     },
   ];

@@ -143,6 +143,16 @@ export default function KhachHangPage() {
       key: 'sodienthoai',
     },
     {
+      title: 'Giới tính',
+      dataIndex: 'gioitinh',
+      key: 'gioitinh',
+    },    
+    {
+      title: 'Ngày sinh',
+      dataIndex: 'ngaysinh',
+      key: 'ngaysinh',
+    },  
+    {
       title: 'Trạng thái',
       dataIndex: 'danghoatdong',
       key: 'danghoatdong',
@@ -253,12 +263,14 @@ export default function KhachHangPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã KH</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã khách hàng</th>
                 {/* <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ảnh đại diện</th> */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Họ tên</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên đăng nhập</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số điện thoại</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giới tính</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày sinh</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
               </tr>
@@ -284,6 +296,8 @@ export default function KhachHangPage() {
                   <td className="px-4 py-3 text-sm text-gray-700">{customer.tendangnhap}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{customer.email || "N/A"}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{customer.sodienthoai || "N/A"}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{customer.gioitinh || "N/A"}</td>
+                  <td className="px-4 py-3 text-sm text-gray-700">{formatDate(customer.ngaysinh)}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     <span className={`px-2 py-1 rounded-full text-xs ${customer.danghoatdong ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                       {customer.danghoatdong ? 'Hoạt động' : 'Khóa'}
