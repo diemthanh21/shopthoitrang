@@ -45,6 +45,25 @@ router.get('/:id', ctrl.getById);
 
 /**
  * @swagger
+ * /api/thethanhvien/khachhang/{makhachhang}:
+ *   get:
+ *     summary: Lấy danh sách thẻ thành viên của khách hàng
+ *     tags: [Thẻ thành viên]
+ *     parameters:
+ *       - in: path
+ *         name: makhachhang
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Thành công
+ *       404:
+ *         description: Không tìm thấy
+ */
+router.get('/khachhang/:makhachhang', ctrl.getByKhachHang);
+
+/**
+ * @swagger
  * /api/thethanhvien:
  *   post:
  *     summary: Tạo thẻ thành viên mới

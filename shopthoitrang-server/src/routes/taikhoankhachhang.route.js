@@ -21,13 +21,21 @@ router.use(authenticateToken);
  *     parameters:
  *       - in: query
  *         name: hoten
- *         schema: { type: string }
+ *         schema:
+ *           type: string
  *       - in: query
  *         name: email
- *         schema: { type: string }
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: gioitinh
+ *         schema:
+ *           type: string
+ *           enum: [Nam, Nữ, Khác]
  *       - in: query
  *         name: danghoatdong
- *         schema: { type: boolean }
+ *         schema:
+ *           type: boolean
  *     responses:
  *       200:
  *         description: Thành công
@@ -44,7 +52,8 @@ router.get('/', ctrl.getAll);
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: integer }
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Thành công
@@ -65,14 +74,31 @@ router.get('/:id', ctrl.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [hoten, tendangnhap, pass]
+ *             required:
+ *               - hoten
+ *               - tendangnhap
+ *               - pass
  *             properties:
- *               hoten: { type: string }
- *               tendangnhap: { type: string }
- *               pass: { type: string }
- *               email: { type: string }
- *               sodienthoai: { type: string }
- *               anhdaidien: { type: string }
+ *               hoten:
+ *                 type: string
+ *               tendangnhap:
+ *                 type: string
+ *               pass:
+ *                 type: string
+ *                 description: Mật khẩu (sẽ được mã hoá)
+ *               email:
+ *                 type: string
+ *               sodienthoai:
+ *                 type: string
+ *               gioitinh:
+ *                 type: string
+ *                 enum: [Nam, Nữ, Khác]
+ *               ngaysinh:
+ *                 type: string
+ *                 format: date
+ *               danghoatdong:
+ *                 type: boolean
+ *                 default: true
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -91,18 +117,31 @@ router.post('/', ctrl.create);
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: integer }
+ *         schema:
+ *           type: integer
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               hoten: { type: string }
- *               email: { type: string }
- *               sodienthoai: { type: string }
- *               anhdaidien: { type: string }
- *               pass: { type: string }
+ *               hoten:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               sodienthoai:
+ *                 type: string
+ *               gioitinh:
+ *                 type: string
+ *                 enum: [Nam, Nữ, Khác]
+ *               ngaysinh:
+ *                 type: string
+ *                 format: date
+ *               pass:
+ *                 type: string
+ *                 description: Mật khẩu mới (nếu cần đổi)
+ *               danghoatdong:
+ *                 type: boolean
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -121,7 +160,8 @@ router.put('/:id', ctrl.update);
  *       - in: path
  *         name: id
  *         required: true
- *         schema: { type: integer }
+ *         schema:
+ *           type: integer
  *     responses:
  *       200:
  *         description: Xoá thành công

@@ -10,8 +10,7 @@ const authenticateToken = require('../middlewares/auth.middleware');
  *     description: Quản lý đánh giá sản phẩm của khách hàng
  */
 
-router.use(authenticateToken);
-
+// Public routes (no auth required)
 /**
  * @swagger
  * /api/danhgia:
@@ -52,6 +51,9 @@ router.get('/', ctrl.getAll);
  *         description: Không tìm thấy
  */
 router.get('/:id', ctrl.getById);
+
+// Protected routes (require auth)
+router.use(authenticateToken);
 
 /**
  * @swagger

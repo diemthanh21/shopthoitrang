@@ -15,7 +15,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
 const SALT_ROUNDS = 10;
@@ -140,8 +140,8 @@ async function runMigration() {
   console.log('⚠️  Only run this script ONCE!\n');
 
   // Check environment variables
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
-    console.error('❌ Missing SUPABASE_URL or SUPABASE_KEY in .env file');
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env file');
     process.exit(1);
   }
 

@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('[dashboard] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars. Dashboard data will be zeroed.');
+  console.warn('[dashboard] Missing SUPABASE_URL or SUPABASE_KEY env vars. Dashboard data will be zeroed.');
 }
 
 const supabase = createClient(process.env.SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '');

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
@@ -15,14 +16,28 @@ class ApiException implements Exception {
 class ApiClient {
   final http.Client _http;
   final Duration timeout;
-  ApiClient([http.Client? httpClient, this.timeout = const Duration(seconds: 15)])
+  ApiClient(
+      [http.Client? httpClient, this.timeout = const Duration(seconds: 15)])
       : _http = httpClient ?? http.Client();
 
-  Future<Map<String, dynamic>> get(String path) async {
-    final headers = await _headers();
-    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+  Future<Map<String, dynamic>> get(String path,
+      {Map<String, String>? headers, Map<String, String>? query}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    Uri uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    if (query != null && query.isNotEmpty) {
+      uri = uri.replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          ...query,
+        },
+      );
+    }
     try {
-      final res = await _http.get(uri, headers: headers).timeout(timeout);
+      final res = await _http.get(uri, headers: merged).timeout(timeout);
       return _handleResponse(res);
     } on SocketException {
       throw ApiException('Không thể kết nối máy chủ');
@@ -33,12 +48,17 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body) async {
-    final headers = await _headers();
+  Future<Map<String, dynamic>> post(String path, Map<String, dynamic> body,
+      {Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
     final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
     try {
       final res = await _http
-          .post(uri, headers: headers, body: jsonEncode(body))
+          .post(uri, headers: merged, body: jsonEncode(body))
           .timeout(timeout);
       return _handleResponse(res);
     } on SocketException {
@@ -64,13 +84,33 @@ class ApiClient {
       return json;
     }
 
-    final msg = (json['message'] ?? json['error'] ?? 'Yêu cầu thất bại').toString();
+    final msg =
+        (json['message'] ?? json['error'] ?? 'Yêu cầu thất bại').toString();
     throw ApiException(msg, statusCode: res.statusCode);
   }
 
   Future<Map<String, String>> _headers() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
+
+    // Debug: Log token để kiểm tra
+    if (kDebugMode && token != null) {
+      // Decode token để xem user info (chỉ phần payload, không verify)
+      try {
+        final parts = token.split('.');
+        if (parts.length == 3) {
+          final payload = parts[1];
+          final normalized = base64Url.normalize(payload);
+          final decoded = utf8.decode(base64Url.decode(normalized));
+          final json = jsonDecode(decoded);
+          print(
+              '[ApiClient] Using token for user: ${json['email']} (id: ${json['makhachhang']})');
+        }
+      } catch (e) {
+        print('[ApiClient] Token exists but cannot decode: $e');
+      }
+    }
+
     return {
       'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',

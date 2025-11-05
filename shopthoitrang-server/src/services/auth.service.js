@@ -42,7 +42,7 @@ const AuthService = {
    * Đăng ký khách hàng mới
    */
   async registerCustomer(payload) {
-    const { email, matkhau, hoten, sodienthoai } = payload;
+    const { email, matkhau, hoten, sodienthoai, tendangnhap, gioitinh, ngaysinh } = payload;
 
     // Kiểm tra email đã tồn tại
     const existingCustomers = await TaiKhoanKhachHangRepository.getAll({ email });
@@ -59,9 +59,11 @@ const AuthService = {
       email,
       pass: hashedPassword,   // cột mật khẩu là 'pass'
       hoten,
-      tendangnhap: usernameFromEmail,
+      tendangnhap: tendangnhap || usernameFromEmail,
     };
     if (sodienthoai) insertPayload.sodienthoai = sodienthoai;
+    if (gioitinh) insertPayload.gioitinh = gioitinh;
+    if (ngaysinh) insertPayload.ngaysinh = ngaysinh;
 
     // Tạo tài khoản mới
     const newCustomer = await TaiKhoanKhachHangRepository.create(insertPayload);
@@ -78,7 +80,10 @@ const AuthService = {
         makhachhang: newCustomer.makhachhang,
         email: newCustomer.email,
         hoten: newCustomer.hoten,
-        sodienthoai: newCustomer.sodienthoai
+        tendangnhap: newCustomer.tendangnhap,
+        sodienthoai: newCustomer.sodienthoai,
+        gioitinh: newCustomer.gioitinh,
+        ngaysinh: newCustomer.ngaysinh
       },
       token
     };
@@ -140,7 +145,10 @@ const AuthService = {
         makhachhang: customer.maKhachHang || customer.makhachhang,
         email: customer.email,
         hoten: customer.hoTen || customer.hoten,
+        tendangnhap: customer.tenDangNhap || customer.tendangnhap,
         sodienthoai: customer.soDienThoai || customer.sodienthoai,
+        gioitinh: customer.gioiTinh || customer.gioitinh,
+        ngaysinh: customer.ngaySinh || customer.ngaysinh,
         diachi: customer.diachi
       },
       token

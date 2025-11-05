@@ -5,6 +5,14 @@ class TheThanhVienService {
     return repo.getAll();
   }
 
+  async getByKhachHang(makhachhang) {
+    const items = await repo.findByKhachHang(makhachhang);
+    if (!items || items.length === 0) {
+      return [];
+    }
+    return items;
+  }
+
   async get(id) {
     const item = await repo.getById(id);
     if (!item) {

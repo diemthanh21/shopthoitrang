@@ -1,13 +1,13 @@
-import axios from '../configs/axios';
+import api from './api';
 
 const diachikhachhangService = {
   getByMaKH: async (makhachhang) => {
-    const response = await axios.get(`/diachikhachhang/khachhang/${makhachhang}`);
+  const response = await api.get(`/diachikhachhang/khachhang/${makhachhang}`);
     return response.data;
   },
 
   create: async (data) => {
-    const response = await axios.post('/diachikhachhang', {
+  const response = await api.post('/diachikhachhang', {
       makhachhang: data.makhachhang,
       diachi: data.diachi,
       tennguoinhan: data.tennguoinhan,
@@ -17,7 +17,7 @@ const diachikhachhangService = {
   },
 
   update: async (madiachi, data) => {
-    const response = await axios.put(`/diachikhachhang/${madiachi}`, {
+  const response = await api.put(`/diachikhachhang/${madiachi}`, {
       makhachhang: data.makhachhang,
       diachi: data.diachi,
       tennguoinhan: data.tennguoinhan,
@@ -27,7 +27,7 @@ const diachikhachhangService = {
   },
 
   delete: async (madiachi) => {
-    const response = await axios.delete(`/diachikhachhang/${madiachi}`);
+  const response = await api.delete(`/diachikhachhang/${madiachi}`);
     return response.data;
   }
 };

@@ -12,7 +12,7 @@ module.exports = {
         hasAuth: !!req.headers.authorization,
         authPreview: sanitizedAuth,
         supabaseUrlSet: !!process.env.SUPABASE_URL,
-        supabaseKeySet: !!process.env.SUPABASE_KEY
+        supabaseKeySet: !!process.env.SUPABASE_SERVICE_ROLE_KEY
       });
 
       const data = await dashboardService.summary();

@@ -28,7 +28,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 // Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 app.set('supabase', supabase);
 
@@ -71,6 +71,8 @@ app.use('/api/thuonghieu', require('./src/routes/thuonghieu.route'));
 app.use('/api/tichluy_chitieu', require('./src/routes/tichluy_chitieu.route'));
 app.use('/api/trahang', require('./src/routes/trahang.route'));
 app.use('/api/dashboard', require('./src/routes/dashboard.route'));
+app.use('/api/catalog', require('./src/routes/catalog.route'));
+app.use('/api/cart', require('./src/routes/cart.route'));
 
 
 
