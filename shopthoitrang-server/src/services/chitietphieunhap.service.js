@@ -10,20 +10,51 @@ class ChiTietPhieuNhapService {
   }
 
   async taoMoi(data) {
-    if (!data.maphieunhap || !data.machitietsanpham || !data.soluong || !data.dongianhap) {
-      throw new Error('Thiếu thông tin bắt buộc: maphieunhap, machitietsanpham, soluong, dongianhap');
+    const { maphieunhap, machitietsanpham, soluong, ghichu } = data || {};
+
+    // Bắt buộc: maphieunhap, machitietsanpham, soluong
+    if (!maphieunhap || !machitietsanpham || !soluong) {
+      throw new Error(
+        'Thiếu thông tin bắt buộc: maphieunhap, machitietsanpham, soluong'
+      );
     }
 
-    if (data.soluong <= 0) throw new Error('Số lượng phải lớn hơn 0');
+    if (soluong <= 0) {
+      throw new Error('Số lượng phải lớn hơn 0');
+    }
 
-    return await repo.create(data);
+    // Chỉ gửi những field hợp lệ xuống DB
+    const entity = {
+      maphieunhap,
+      machitietsanpham,
+      soluong,
+      ghichu: ghichu ?? null
+    };
+
+    return await repo.create(entity);
   }
 
   async capNhat(ma, data) {
-    if (data.soluong && data.soluong <= 0) {
-      throw new Error('Số lượng phải lớn hơn 0');
+    const fields = {};
+
+    if (data.soluong !== undefined) {
+      if (data.soluong <= 0) {
+        throw new Error('Số lượng phải lớn hơn 0');
+      }
+      fields.soluong = data.soluong;
     }
-    return await repo.update(ma, data);
+
+    if (data.ghichu !== undefined) {
+      fields.ghichu = data.ghichu;
+    }
+
+    // Nếu không có gì để update thì có thể trả luôn bản ghi cũ hoặc báo lỗi tuỳ ý
+    if (Object.keys(fields).length === 0) {
+      // Ở đây mình cứ cho update rỗng -> repo.update sẽ trả bản ghi hiện tại
+      return await repo.getById(ma);
+    }
+
+    return await repo.update(ma, fields);
   }
 
   async xoa(ma) {

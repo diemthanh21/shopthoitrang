@@ -1,13 +1,15 @@
 class ChucNang {
-  constructor({ machucnang, tenchucnang }) {
+  constructor({ machucnang, tenchucnang, maquyen }) {
     this.machucnang = machucnang;
     this.tenchucnang = tenchucnang;
+    this.maquyen = maquyen;
   }
 
   toJSON() {
     return {
       machucnang: this.machucnang,
-      tenchucnang: this.tenchucnang
+      tenchucnang: this.tenchucnang,
+      maquyen: this.maquyen
     };
   }
 }

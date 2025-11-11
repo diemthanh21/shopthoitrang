@@ -5,6 +5,7 @@ import api from "./api";
 const normalize = (r) => ({
   maChucNang: r.machucnang ?? r.maChucNang ?? r.id,
   tenChucNang: r.tenchucnang ?? r.tenChucNang ?? "",
+  maQuyen: r.maquyen ?? r.maQuyen ?? "",
 });
 
 const PREFIX = "/chucnang";
@@ -25,8 +26,12 @@ const create = async (data) => {
   // Chấp nhận cả camelCase & snake_case từ UI
   const body = {
     tenchucnang: data.tenchucnang ?? data.tenChucNang ?? "",
+    maquyen: data.maquyen ?? data.maQuyen ?? "",
   };
+
   if (!body.tenchucnang) throw new Error("Thiếu tên chức năng");
+  if (!body.maquyen) throw new Error("Thiếu mã quyền");
+
   const res = await api.post(PREFIX, body);
   return normalize(res.data);
 };
@@ -34,6 +39,7 @@ const create = async (data) => {
 const update = async (id, data) => {
   const body = {
     tenchucnang: data.tenchucnang ?? data.tenChucNang ?? "",
+    maquyen: data.maquyen ?? data.maQuyen ?? "",
   };
   const res = await api.put(`${PREFIX}/${id}`, body);
   return normalize(res.data);

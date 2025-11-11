@@ -1,13 +1,14 @@
+// routes/phieunhapkho.route.js
 const express = require('express');
 const router = express.Router();
-const ctrl = require('../controllers/phieunhapkho.controller');
+const controller = require('../controllers/phieunhapkho.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
  * @swagger
  * tags:
  *   - name: Phiếu nhập kho
- *     description: Quản lý phiếu nhập hàng từ nhà cung cấp
+ *     description: Quản lý phiếu nhập kho
  */
 
 router.use(authenticateToken);
@@ -18,30 +19,17 @@ router.use(authenticateToken);
  *   get:
  *     summary: Lấy danh sách phiếu nhập kho
  *     tags: [Phiếu nhập kho]
- *     parameters:
- *       - in: query
- *         name: manhanvien
- *         schema: { type: integer }
- *       - in: query
- *         name: manhacungcap
- *         schema: { type: integer }
- *       - in: query
- *         name: from
- *         schema: { type: string, format: date-time }
- *       - in: query
- *         name: to
- *         schema: { type: string, format: date-time }
  *     responses:
  *       200:
  *         description: Thành công
  */
-router.get('/', ctrl.getAll);
+router.get('/', controller.getAll);
 
 /**
  * @swagger
  * /api/phieunhapkho/{id}:
  *   get:
- *     summary: Lấy chi tiết phiếu nhập kho theo ID
+ *     summary: Lấy phiếu nhập kho theo mã
  *     tags: [Phiếu nhập kho]
  *     parameters:
  *       - in: path
@@ -54,13 +42,13 @@ router.get('/', ctrl.getAll);
  *       404:
  *         description: Không tìm thấy
  */
-router.get('/:id', ctrl.getById);
+router.get('/:id', controller.getById);
 
 /**
  * @swagger
  * /api/phieunhapkho:
  *   post:
- *     summary: Tạo phiếu nhập kho mới
+ *     summary: Thêm phiếu nhập kho mới
  *     tags: [Phiếu nhập kho]
  *     requestBody:
  *       required: true
@@ -70,16 +58,30 @@ router.get('/:id', ctrl.getById);
  *             type: object
  *             required: [manhanvien, manhacungcap]
  *             properties:
- *               manhanvien: { type: integer }
- *               manhacungcap: { type: integer }
- *               ngaynhap: { type: string, format: date-time }
- *               thanhtien: { type: number }
- *               ghichu: { type: string }
+ *               manhanvien:
+ *                 type: integer
+ *                 example: 1
+ *               manhacungcap:
+ *                 type: integer
+ *                 example: 2
+ *               ngaynhap:
+ *                 type: string
+ *                 format: date-time
+ *                 example: "2025-11-10T00:00:00Z"
+ *               trangthai:
+ *                 type: string
+ *                 enum: ['Tạo mới', 'Đang xử lý', 'Hoàn tất', 'Đã hủy']
+ *                 example: "Tạo mới"
+ *               ghichu:
+ *                 type: string
+ *                 example: "Nhập lô hàng áo khoác"
  *     responses:
  *       201:
  *         description: Tạo thành công
+ *       400:
+ *         description: Thất bại
  */
-router.post('/', ctrl.create);
+router.post('/', controller.create);
 
 /**
  * @swagger
@@ -93,18 +95,31 @@ router.post('/', ctrl.create);
  *         required: true
  *         schema: { type: integer }
  *     requestBody:
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               thanhtien: { type: number }
- *               ghichu: { type: string }
+ *               manhanvien:
+ *                 type: integer
+ *               manhacungcap:
+ *                 type: integer
+ *               ngaynhap:
+ *                 type: string
+ *                 format: date-time
+ *               trangthai:
+ *                 type: string
+ *                 enum: ['Tạo mới', 'Đang xử lý', 'Hoàn tất', 'Đã hủy']
+ *               ghichu:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Cập nhật thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.put('/:id', ctrl.update);
+router.put('/:id', controller.update);
 
 /**
  * @swagger
@@ -120,7 +135,9 @@ router.put('/:id', ctrl.update);
  *     responses:
  *       200:
  *         description: Xoá thành công
+ *       404:
+ *         description: Không tìm thấy
  */
-router.delete('/:id', ctrl.delete);
+router.delete('/:id', controller.delete);
 
 module.exports = router;

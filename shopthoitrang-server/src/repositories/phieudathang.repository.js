@@ -8,7 +8,7 @@ const PhieuDatHangRepository = {
   async getAll(filters = {}) {
     let query = supabase.from(TABLE).select('*');
 
-    if (filters.makhachhang) query = query.eq('makhachhang', filters.makhachhang);
+    if (filters.manhacungcap) query = query.eq('manhacungcap', filters.manhacungcap);
     if (filters.trangthai) query = query.eq('trangthaiphieu', filters.trangthai);
     if (filters.from) query = query.gte('ngaydatphieu', filters.from);
     if (filters.to) query = query.lte('ngaydatphieu', filters.to);

@@ -1,7 +1,7 @@
 class PhieuDatHang {
   constructor({
     maphieudathang,
-    makhachhang,
+    manhacungcap,
     manhanvien,
     ngaydatphieu,
     ngayhendukien,
@@ -13,7 +13,7 @@ class PhieuDatHang {
     ghichu
   }) {
     this.maPhieuDatHang = maphieudathang;
-    this.maKhachHang = makhachhang;
+    this.maNhaCungCap = manhacungcap ?? null;
     this.maNhanVien = manhanvien;
     this.ngayDatPhieu = ngaydatphieu;
     this.ngayHenDuKien = ngayhendukien;
@@ -28,7 +28,7 @@ class PhieuDatHang {
   toJSON() {
     return {
       maphieudathang: this.maPhieuDatHang,
-      makhachhang: this.maKhachHang,
+      manhacungcap: this.maNhaCungCap,
       manhanvien: this.maNhanVien,
       ngaydatphieu: this.ngayDatPhieu,
       ngayhendukien: this.ngayHenDuKien,

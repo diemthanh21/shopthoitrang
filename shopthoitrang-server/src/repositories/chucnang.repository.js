@@ -1,12 +1,14 @@
-const { createClient } = require('@supabase/supabase-js');
 const ChucNang = require('../models/chucnang.model');
-
 const supabase = require('../../config/db');
+
 const TABLE = 'chucnang';
 
 const ChucNangRepository = {
   async getAll() {
-    const { data, error } = await supabase.from(TABLE).select('*').order('machucnang', { ascending: true });
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .order('machucnang', { ascending: true });
     if (error) throw error;
     return data.map(row => new ChucNang(row));
   },
@@ -22,7 +24,11 @@ const ChucNangRepository = {
   },
 
   async create(chucnang) {
-    const { data, error } = await supabase.from(TABLE).insert([chucnang]).select().single();
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert([chucnang])
+      .select()
+      .single();
     if (error) throw error;
     return new ChucNang(data);
   },

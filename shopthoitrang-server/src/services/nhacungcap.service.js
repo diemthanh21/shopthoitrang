@@ -24,7 +24,7 @@ class NhaCungCapService {
 
     const payload = {
       tennhacungcap: body.tennhacungcap,
-      thongtinlienhe: body.thongtinlienhe ?? null
+      email: body.email ?? null
     };
 
     return repo.create(payload);

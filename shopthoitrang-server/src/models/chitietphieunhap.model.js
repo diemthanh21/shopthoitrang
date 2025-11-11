@@ -4,13 +4,13 @@ class ChiTietPhieuNhap {
     maphieunhap,
     machitietsanpham,
     soluong,
-    dongianhap
+    ghichu
   }) {
     this.machitietnhap = machitietnhap;
     this.maphieunhap = maphieunhap;
     this.machitietsanpham = machitietsanpham;
     this.soluong = soluong;
-    this.dongianhap = dongianhap;
+    this.ghichu = ghichu ?? null;
   }
 
   toJSON() {
@@ -19,7 +19,7 @@ class ChiTietPhieuNhap {
       maphieunhap: this.maphieunhap,
       machitietsanpham: this.machitietsanpham,
       soluong: this.soluong,
-      dongianhap: this.dongianhap
+      ghichu: this.ghichu
     };
   }
 }

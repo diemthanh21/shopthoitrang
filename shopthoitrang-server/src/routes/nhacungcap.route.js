@@ -63,7 +63,9 @@ router.get('/:id', ctrl.getById);
  *             required: [tennhacungcap]
  *             properties:
  *               tennhacungcap: { type: string }
- *               thongtinlienhe: { type: string, nullable: true }
+ *               email:        { type: string, nullable: true }
+ *               diachi:       { type: string, nullable: true }
+ *               sodienthoai:  { type: string, nullable: true }
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -90,7 +92,9 @@ router.post('/', ctrl.create);
  *             type: object
  *             properties:
  *               tennhacungcap: { type: string }
- *               thongtinlienhe: { type: string }
+ *               email:        { type: string }
+ *               diachi:       { type: string }
+ *               sodienthoai:  { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
