@@ -10,6 +10,16 @@ const ChiTietDonHangRepository = {
     if (error) throw error;
     return data.map(row => new ChiTietDonHang(row));
   },
+  
+  async getByOrderId(madonhang) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('madonhang', madonhang)
+      .order('machitietdonhang', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(row => new ChiTietDonHang(row));
+  },
 
   async getById(id) {
     const { data, error } = await supabase.from(TABLE).select('*').eq('machitietdonhang', id).single();

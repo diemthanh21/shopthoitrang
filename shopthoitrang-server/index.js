@@ -51,6 +51,10 @@ app.use('/api/magiamgia', require('./src/routes/magiamgia.route'));
 app.use('/api/nhacungcap', require('./src/routes/nhacungcap.route'));
 app.use('/api/nhanvien', require('./src/routes/nhanvien.route'));
 app.use('/api/noidungchat', require('./src/routes/noidungchat.route'));
+// New consolidated chat endpoints (enhanced list, start, messages, send, read)
+app.use('/api/chat', require('./src/routes/chat.route'));
+app.use('/api/membership', require('./src/routes/membership.route'));
+app.use('/api/loyalty', require('./src/routes/loyalty.route'));
 app.use('/api/phancongca', require('./src/routes/phancongca.route'));
 app.use('/api/phieudathang', require('./src/routes/phieudathang.route'));
 app.use('/api/phieunhapkho', require('./src/routes/phieunhapkho.route'));

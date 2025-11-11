@@ -5,7 +5,9 @@ class TheThanhVien {
     mahangthe,
     ngaycap,
     ngayhethan,
-    trangthai
+    trangthai,
+    tier_snapshot,
+    tichluy_khi_cap
   }) {
     this.maThe = mathe;
     this.maKhachHang = makhachhang;
@@ -13,6 +15,8 @@ class TheThanhVien {
     this.ngayCap = ngaycap;
     this.ngayHetHan = ngayhethan;
     this.trangThai = trangthai;
+    this.tierSnapshot = tier_snapshot || null;
+    this.tichLuyKhiCap = Number(tichluy_khi_cap ?? 0);
   }
 
   toJSON() {
@@ -22,7 +26,9 @@ class TheThanhVien {
       mahangthe: this.maHangThe,
       ngaycap: this.ngayCap,
       ngayhethan: this.ngayHetHan,
-      trangthai: this.trangThai
+      trangthai: this.trangThai,
+      tier_snapshot: this.tierSnapshot,
+      tichluy_khi_cap: this.tichLuyKhiCap
     };
   }
 }

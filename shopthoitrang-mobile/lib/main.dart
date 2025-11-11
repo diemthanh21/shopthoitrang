@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shopthoitrang_mobile/screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
+import 'providers/return_provider.dart';
+import 'providers/exchange_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 
@@ -39,6 +41,8 @@ class _ShopThoitrangAppState extends State<ShopThoitrangApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: _authProvider),
+        ChangeNotifierProvider(create: (_) => ReturnProvider()),
+        ChangeNotifierProvider(create: (_) => ExchangeProvider()),
       ],
       child: Consumer<AuthProvider>(
         builder: (context, auth, _) {

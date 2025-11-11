@@ -10,20 +10,18 @@ import BannerPage from './pages/BannerPage';
 import PhanCongCaPage from './pages/PhanCongCaPage';
 import KhuyenMaiPage from './pages/KhuyenMaiPage';
 import DonHangPage from './pages/DonHangPage';
+import DonHangDetailPage from './pages/DonHangDetailPage';
 import KhachHangPage from './pages/KhachHangPage';
-import PhieuDatHangPage from './pages/PhieuDatHangPage';
-import ChiTietPhieuDatHangPage from './pages/ChiTietPhieuDatHangPage';
+import TheThanhVienPage from './pages/TheThanhVienPage';
 import NhanVienDetailPage from "./pages/NhanVienDetailPage";
 import NhanVienEditPage from "./pages/NhanVienEditPage";
-import HangThePage from './pages/HangThePage';
-import DanhMucPage from './pages/DanhMucPage';
-import PhieuNhapKhoPage from './pages/PhieuNhapKhoPage';
-import ChiTietPhieuNhapKhoPage from './pages/ChiTietPhieuNhapKhoPage'
-import NhaCungCapPage from "./pages/NhaCungCapPage";
-import SanPhamDetailPage from "./pages/SanPhamDetailPage";
-import TaiKhoanNhanVienPage from './pages/TaiKhoanNhanVienPage';
-import CaLamViecPage from './pages/CaLamViecPage';
-import VoucherGiamGiaPage from './pages/VoucherGiamGiaPage';
+import TinNhanPage from './pages/TinNhanPage';
+import ThongBaoPage from './pages/ThongBaoPage';
+import DanhGiaPage from './pages/DanhGiaPage';
+import TraHangPage from './pages/TraHangPage';
+import TraHangDetailPage from './pages/TraHangDetailPage';
+import DoiHangPage from './pages/DoiHangPage';
+import DoiHangDetailPage from './pages/DoiHangDetailPage';
 
 function App() {
   return (
@@ -48,22 +46,20 @@ function App() {
             <Route path="nhanvien/:id" element={<NhanVienDetailPage />} />
             <Route path="nhanvien/:id/edit" element={<NhanVienEditPage />} />
             <Route path="sanpham" element={<SanPhamPage />} />
-            <Route path="taikhoannhanvien" element={<TaiKhoanNhanVienPage />} />
             <Route path="banner" element={<BannerPage />} />
             <Route path="phancongca" element={<PhanCongCaPage />} />
             <Route path="khuyenmai" element={<KhuyenMaiPage />} />
-            <Route path="vouchergiamgia" element={<VoucherGiamGiaPage />} />
             <Route path="donhang" element={<DonHangPage />} />
-            <Route path="phieudathang" element={<PhieuDatHangPage />} />
-            <Route path="phieudathang/:id" element={<ChiTietPhieuDatHangPage />} />
-            <Route path="phieunhapkho" element={<PhieuNhapKhoPage />} />
-            <Route path="phieunhapkho/:id" element={<ChiTietPhieuNhapKhoPage />} />
+            <Route path="donhang/:id" element={<DonHangDetailPage />} />
+            <Route path="trahang" element={<TraHangPage />} />
+            <Route path="trahang/:id" element={<TraHangDetailPage />} />
+            <Route path="doihang" element={<DoiHangPage />} />
+            <Route path="doihang/:id" element={<DoiHangDetailPage />} />
             <Route path="khachhang" element={<KhachHangPage />} />
-            <Route path="hangthe" element={<HangThePage />} />
-            <Route path="danhmuc" element={<DanhMucPage />} />
-            <Route path="nhacungcap" element={<NhaCungCapPage />} />
-            <Route path="sanpham/:id" element={<SanPhamDetailPage />} />
-            <Route path="calamviec" element={<CaLamViecPage />} />
+            <Route path="thethanhvien" element={<TheThanhVienPage />} />
+            <Route path="tinnhan" element={<TinNhanPage />} />
+            <Route path="danhgia" element={<DanhGiaPage />} />
+            <Route path="thongbao" element={<ThongBaoPage />} />
           </Route>
 
           {/* 404 */}

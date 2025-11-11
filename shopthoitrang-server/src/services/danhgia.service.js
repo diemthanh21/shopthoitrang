@@ -34,9 +34,32 @@ class DanhGiaService {
   }
 
   async update(id, body) {
+    // Auto-set timestamp when admin replies
+    if (body.phanhoitushop && body.phanhoitushop.trim()) {
+      body.ngayphanhoitushop = new Date().toISOString();
+      body.dadocbyadmin = true;
+      if (!body.ngayadmindoc) {
+        body.ngayadmindoc = new Date().toISOString();
+      }
+    }
+    
     const updated = await repo.update(id, body);
     if (!updated) {
       const e = new Error('Không tìm thấy đánh giá để cập nhật');
+      e.status = 404;
+      throw e;
+    }
+    return updated;
+  }
+
+  async markAsRead(id) {
+    const now = new Date().toISOString();
+    const updated = await repo.update(id, { 
+      dadocbyadmin: true, 
+      ngayadmindoc: now 
+    });
+    if (!updated) {
+      const e = new Error('Không tìm thấy đánh giá');
       e.status = 404;
       throw e;
     }

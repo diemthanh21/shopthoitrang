@@ -24,6 +24,9 @@ router.use(authenticateToken);
  */
 router.get('/', controller.getAll);
 
+// Lấy toàn bộ item theo mã đơn hàng
+router.get('/donhang/:madonhang', controller.getByOrder);
+
 /**
  * @swagger
  * /api/chitietdonhang/{id}:

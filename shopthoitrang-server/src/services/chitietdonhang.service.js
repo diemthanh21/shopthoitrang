@@ -19,6 +19,11 @@ class ChiTietDonHangService {
     return await repo.create(data);
   }
 
+  async layTheoDonHang(madonhang) {
+    if (!madonhang) throw new Error('Thiếu madonhang');
+    return await repo.getByOrderId(madonhang);
+  }
+
   async capNhat(ma, data) {
     if (data.soluong && data.soluong <= 0) {
       throw new Error('Số lượng phải lớn hơn 0');

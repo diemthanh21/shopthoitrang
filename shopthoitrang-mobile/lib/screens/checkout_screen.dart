@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/order_model.dart';
 import '../models/product_model.dart';
+import '../models/membership_model.dart';
 import '../services/order_service.dart';
 import '../services/cart_service.dart';
+import '../services/address_service.dart';
 import '../providers/auth_provider.dart';
+import 'address_selection_screen.dart';
 
 enum CheckoutSource { buyNow, cart }
 
@@ -33,7 +36,7 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final OrderService _orderService = OrderService();
   final CartService _cartService = CartService();
-  final TextEditingController _addressController = TextEditingController();
+  final AddressService _addressService = AddressService();
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _couponController = TextEditingController();
 
@@ -41,11 +44,44 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _isLoading = false;
   List<OrderItem> _orderItems = [];
   double _totalAmount = 0;
+  DiaChiKhachHang? _selectedAddress;
 
   @override
   void initState() {
     super.initState();
     _loadOrderItems();
+    _loadDefaultAddress();
+  }
+
+  Future<void> _loadDefaultAddress() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      if (!auth.isAuthenticated || auth.user == null) return;
+
+      final addresses =
+          await _addressService.getAddresses(auth.user!.maKhachHang);
+
+      debugPrint('📍 [Checkout] Loaded ${addresses.length} addresses');
+
+      if (addresses.isNotEmpty) {
+        final defaultAddr = addresses.firstWhere(
+          (addr) => addr.macDinh == true,
+          orElse: () => addresses.first,
+        );
+
+        debugPrint('📍 [Checkout] Selected address:');
+        debugPrint('  - ten: ${defaultAddr.ten}');
+        debugPrint('  - sodienthoai: ${defaultAddr.soDienThoai}');
+        debugPrint('  - tinh: ${defaultAddr.tinh}');
+        debugPrint('  - phuong: ${defaultAddr.phuong}');
+        debugPrint('  - diachicuthe: ${defaultAddr.diaChiCuThe}');
+        debugPrint('  - diachi (old): ${defaultAddr.diaChi}');
+
+        setState(() => _selectedAddress = defaultAddr);
+      }
+    } catch (e) {
+      debugPrint('Error loading address: $e');
+    }
   }
 
   Future<void> _loadOrderItems() async {
@@ -90,10 +126,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
-    if (_addressController.text.trim().isEmpty) {
+    if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng nhập địa chỉ giao hàng'),
+          content: Text('Vui lòng chọn địa chỉ giao hàng'),
           backgroundColor: Colors.red,
         ),
       );
@@ -113,10 +149,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         orderDate: DateTime.now(),
         total: _totalAmount,
         paymentMethod: _selectedPaymentMethod,
-        paymentStatus:
-            _selectedPaymentMethod == 'COD' ? 'Chưa thanh toán' : 'Đang xử lý',
-        orderStatus: 'Đang xử lý',
+        paymentStatus: _selectedPaymentMethod == 'COD'
+            ? 'Chưa thanh toán'
+            : 'Đã thanh toán',
+        // Trạng thái đơn hàng theo luồng Shopee:
+        // - COD: Chờ xác nhận (cần admin xác nhận trước)
+        // - Thanh toán online: Chờ lấy hàng (đã thanh toán, chờ shop chuẩn bị)
+        orderStatus:
+            _selectedPaymentMethod == 'COD' ? 'Chờ xác nhận' : 'Chờ lấy hàng',
         items: _orderItems,
+        shippingAddress: _selectedAddress,
       );
 
       final createdOrder = await _orderService.createOrder(order);
@@ -166,7 +208,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
-    _addressController.dispose();
     _noteController.dispose();
     _couponController.dispose();
     super.dispose();
@@ -189,16 +230,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   // Địa chỉ giao hàng
                   _buildSection(
                     title: 'Phương thức giao hàng',
-                    child: TextField(
-                      controller: _addressController,
-                      decoration: const InputDecoration(
-                        hintText:
-                            'Nhập địa chỉ để xem các phương thức giao hàng',
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.all(12),
-                      ),
-                      maxLines: 2,
-                    ),
+                    child: _buildAddressSelector(),
                   ),
 
                   const Divider(thickness: 8, color: Color(0xFFF5F5F5)),
@@ -412,6 +444,209 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAddressSelector() {
+    return InkWell(
+      onTap: () async {
+        final auth = context.read<AuthProvider>();
+        if (auth.user == null) return;
+
+        // Navigate to address selection screen
+        final result = await Navigator.push<DiaChiKhachHang>(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AddressSelectionScreen(
+              customerId: auth.user!.maKhachHang,
+              selectedAddress: _selectedAddress,
+            ),
+          ),
+        );
+
+        // Cập nhật địa chỉ đã chọn
+        if (result != null) {
+          debugPrint('🔄 [Checkout] Address selected from picker:');
+          debugPrint('  - ten: ${result.ten}');
+          debugPrint('  - sodienthoai: ${result.soDienThoai}');
+          debugPrint('  - tinh: ${result.tinh}');
+          debugPrint('  - phuong: ${result.phuong}');
+          debugPrint('  - diachicuthe: ${result.diaChiCuThe}');
+          debugPrint('  - diachi (old): ${result.diaChi}');
+          setState(() => _selectedAddress = result);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: _selectedAddress == null
+            ? Row(
+                children: [
+                  Icon(Icons.add_location_alt, color: Colors.grey[600]),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Nhấn để chọn địa chỉ giao hàng',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on,
+                          color: Colors.orange, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Địa chỉ đã chọn',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          final auth = context.read<AuthProvider>();
+                          if (auth.user == null) return;
+
+                          // Navigate to address selection
+                          final result = await Navigator.push<DiaChiKhachHang>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AddressSelectionScreen(
+                                customerId: auth.user!.maKhachHang,
+                                selectedAddress: _selectedAddress,
+                              ),
+                            ),
+                          );
+
+                          if (result != null) {
+                            debugPrint('🔄 [Checkout] Address changed:');
+                            debugPrint('  - ten: ${result.ten}');
+                            debugPrint(
+                                '  - sodienthoai: ${result.soDienThoai}');
+                            setState(() => _selectedAddress = result);
+                          }
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(50, 30),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: const Text(
+                          'Thay đổi',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Họ tên
+                  if (_selectedAddress!.ten?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'Họ tên: ',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            TextSpan(
+                              text: _selectedAddress!.ten!,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Số điện thoại
+                  if (_selectedAddress!.soDienThoai?.isNotEmpty == true)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: RichText(
+                        text: TextSpan(
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                          children: [
+                            const TextSpan(
+                              text: 'Số điện thoại: ',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            TextSpan(
+                              text: _selectedAddress!.soDienThoai!,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Địa chỉ
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'Địa chỉ: ',
+                          style: TextStyle(fontWeight: FontWeight.w500),
+                        ),
+                        TextSpan(
+                          text: _getFormattedAddress(_selectedAddress!),
+                          style: TextStyle(color: Colors.grey[700]),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  String _getFormattedAddress(DiaChiKhachHang address) {
+    final parts = <String>[];
+
+    // Ưu tiên format mới (structured)
+    if (address.diaChiCuThe?.isNotEmpty == true) {
+      parts.add(address.diaChiCuThe!);
+    }
+    if (address.phuong?.isNotEmpty == true) {
+      parts.add(address.phuong!);
+    }
+    if (address.tinh?.isNotEmpty == true) {
+      parts.add(address.tinh!);
+    }
+
+    if (parts.isNotEmpty) {
+      return parts.join(', ');
+    }
+
+    // Fallback về format cũ
+    return address.diaChi ?? 'Chưa có địa chỉ';
   }
 
   Widget _buildPaymentOption({

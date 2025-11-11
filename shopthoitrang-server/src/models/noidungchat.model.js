@@ -5,7 +5,10 @@ class NoiDungChat {
     nguoigui,
     noidung,
     thoigiangui,
-    daxem
+    daxem,
+    manhanvien,
+    message_type,
+    product_snapshot
   }) {
     this.maChat = machat;
     this.maChatBox = machatbox;
@@ -13,6 +16,9 @@ class NoiDungChat {
     this.noiDung = noidung;
     this.thoiGianGui = thoigiangui;     // ISO datetime
     this.daXem = daxem;                 // boolean
+    this.maNhanVien = manhanvien || null;
+    this.messageType = message_type || 'text'; // 'text' | 'product' | future types
+    this.productSnapshot = product_snapshot || null; // JSON object when message_type = 'product'
   }
 
   toJSON() {
@@ -22,7 +28,10 @@ class NoiDungChat {
       nguoigui: this.nguoiGui,
       noidung: this.noiDung,
       thoigiangui: this.thoiGianGui,
-      daxem: this.daXem
+      daxem: this.daXem,
+      manhanvien: this.maNhanVien,
+      message_type: this.messageType,
+      product_snapshot: this.productSnapshot
     };
   }
 }

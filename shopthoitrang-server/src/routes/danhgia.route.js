@@ -112,6 +112,25 @@ router.put('/:id', ctrl.update);
 
 /**
  * @swagger
+ * /api/danhgia/{id}/mark-read:
+ *   patch:
+ *     summary: Đánh dấu đánh giá là đã đọc (admin)
+ *     tags: [Đánh giá]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Đánh dấu thành công
+ *       404:
+ *         description: Không tìm thấy
+ */
+router.patch('/:id/mark-read', ctrl.markAsRead);
+
+/**
+ * @swagger
  * /api/danhgia/{id}:
  *   delete:
  *     summary: Xoá đánh giá

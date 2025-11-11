@@ -121,7 +121,7 @@ export default function NhanVienDetailPage() {
   );
 }
 
-/* ——— Components phụ ——— */
+/*  Components phụ  */
 
 function Card({ title, children }) {
   return (

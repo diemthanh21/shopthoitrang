@@ -10,6 +10,15 @@ const DanhGiaController = {
     }
   },
 
+  async markAsRead(req, res) {
+    try {
+      const item = await service.markAsRead(req.params.id);
+      res.json(item.toJSON());
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  },
+
   async getById(req, res) {
     try {
       const item = await service.get(req.params.id);

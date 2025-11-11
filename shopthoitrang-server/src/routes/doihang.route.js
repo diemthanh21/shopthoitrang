@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/doihang.controller');
+const logCtrl = require('../controllers/doihanglog.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
@@ -72,12 +73,12 @@ router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [madonhang, makhachhang, machitietsanphamcu, machitietsanphamoi, soluong, lydo, trangthai]
+ *             required: [madonhang, makhachhang, machitietsanphamcu, machitietsanphammoi, soluong, lydo, trangthai]
  *             properties:
  *               madonhang: { type: integer }
  *               makhachhang: { type: integer }
  *               machitietsanphamcu: { type: integer }
- *               machitietsanphamoi: { type: integer }
+ *               machitietsanphammoi: { type: integer }
  *               soluong: { type: integer }
  *               lydo: { type: string }
  *               trangthai: { type: string }
@@ -135,5 +136,22 @@ router.put('/:id', ctrl.update);
  *         description: Không tìm thấy
  */
 router.delete('/:id', ctrl.delete);
+
+// Workflow endpoints for exchange process
+router.post('/:id/accept', ctrl.accept);              // body: { diachiguihang }
+router.post('/:id/reject', ctrl.reject);              // body: { lydo }
+router.post('/:id/mark-received-old', ctrl.markReceivedOld);
+router.post('/:id/mark-invalid', ctrl.markInvalid);   // body: { ghichu }
+router.post('/:id/mark-valid', ctrl.markValid);
+router.post('/:id/calc-diff', ctrl.calcDiff);
+router.get('/:id/diff-preview', ctrl.diffPreview);
+router.post('/:id/request-extra-payment', ctrl.requestExtraPayment);
+router.post('/:id/confirm-extra-paid', ctrl.confirmExtraPaid);
+router.post('/:id/refund-difference', ctrl.refundDifference); // body: { method }
+router.post('/:id/create-new-order', ctrl.createNewOrder);
+router.post('/:id/complete', ctrl.markExchangeComplete);
+router.post('/:id/sync-complete', ctrl.syncComplete);
+// Logs
+router.get('/:id/logs', logCtrl.list);
 
 module.exports = router;

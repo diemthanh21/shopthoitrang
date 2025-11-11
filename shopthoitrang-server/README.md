@@ -45,7 +45,19 @@ npm start
 
 Server sẽ chạy tại: http://localhost:3000
 
-## 📚 API Documentation
+## �️ Migration bắt buộc cho tính năng địa chỉ giao hàng
+
+Để hiển thị đúng địa chỉ khách đã chọn lúc thanh toán (mobile + web admin), cần cập nhật DB:
+
+1) Thêm cột `madiachi` cho bảng `donhang`
+- Chạy file: `ADD_MADIACHI_TO_DONHANG.sql`
+
+2) Bảng snapshot địa chỉ theo đơn (khuyến nghị)
+- Chạy file: `CREATE_DIA_CHI_GIAO_HANG.sql`
+
+Cả hai file đều an toàn chạy nhiều lần. Sau khi chạy, khởi động lại server.
+
+## �📚 API Documentation
 
 Swagger UI: http://localhost:3000/api-docs
 

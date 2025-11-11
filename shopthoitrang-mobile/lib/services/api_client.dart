@@ -70,6 +70,28 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> put(String path, Map<String, dynamic> body,
+      {Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    try {
+      final res = await _http
+          .put(uri, headers: merged, body: jsonEncode(body))
+          .timeout(timeout);
+      return _handleResponse(res);
+    } on SocketException {
+      throw ApiException('Không thể kết nối máy chủ');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Lỗi không xác định: $e');
+    }
+  }
+
   Map<String, dynamic> _handleResponse(http.Response res) {
     final text = res.body.isEmpty ? '{}' : res.body;
     Map<String, dynamic> json;

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/trahang.controller');
+const logCtrl = require('../controllers/trahanglog.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 
 /**
@@ -132,5 +133,17 @@ router.put('/:id', ctrl.update);
  *       404: { description: Không tìm thấy }
  */
 router.delete('/:id', ctrl.delete);
+
+// --- Workflow specific endpoints ---
+router.post('/:id/accept', ctrl.accept);        // body: { diachiguihang }
+router.post('/:id/reject', ctrl.reject);        // body: { lydo }
+router.post('/:id/mark-received', ctrl.markReceived);
+router.post('/:id/mark-invalid', ctrl.markInvalid); // body: { ghichu }
+router.post('/:id/mark-valid', ctrl.markValid);
+router.post('/:id/calc-refund', ctrl.calcRefund);
+router.post('/:id/refund', ctrl.refund);        // body: { phuongthuc }
+router.get('/:id/refund-preview', ctrl.refundPreview);
+// Logs
+router.get('/:id/logs', logCtrl.list);
 
 module.exports = router;

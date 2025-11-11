@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const { generateToken } = require('../utils/jwt');
 const TaiKhoanKhachHangRepository = require('../repositories/taikhoankhachhang.repository');
 const TaiKhoanNhanVienRepository = require('../repositories/taikhoannhanvien.repository');
+const membershipWorkflow = require('./membership.workflow');
 
 const SALT_ROUNDS = 10;
 
@@ -42,7 +43,7 @@ const AuthService = {
    * Đăng ký khách hàng mới
    */
   async registerCustomer(payload) {
-    const { email, matkhau, hoten, sodienthoai } = payload;
+    const { email, matkhau, hoten, sodienthoai, tendangnhap, gioitinh, ngaysinh } = payload;
 
     // Kiểm tra email đã tồn tại
     const existingCustomers = await TaiKhoanKhachHangRepository.getAll({ email });
@@ -50,19 +51,28 @@ const AuthService = {
       throw new Error('Email đã được sử dụng');
     }
 
-    // Hash mật khẩu
-    const hashedPassword = await this.hashPassword(matkhau);
+  // Hash mật khẩu
+  const hashedPassword = await this.hashPassword(matkhau);
+
+    // Xây dựng payload chỉ gồm các cột chắc chắn tồn tại để tránh lỗi schema
+    const usernameFromEmail = (email || '').split('@')[0] || email;
+    const insertPayload = {
+      email,
+      pass: hashedPassword,   // cột mật khẩu là 'pass'
+      hoten,
+      tendangnhap: tendangnhap || usernameFromEmail,
+    };
+    if (sodienthoai) insertPayload.sodienthoai = sodienthoai;
+    if (gioitinh) insertPayload.gioitinh = gioitinh;
+    if (ngaysinh) insertPayload.ngaysinh = ngaysinh;
 
     // Tạo tài khoản mới
-    const newCustomer = await TaiKhoanKhachHangRepository.create({
-      email,
-      matkhau: hashedPassword,
-      hoten,
-      sodienthoai,
-      danghoatdong: true,
-      ngaytao: new Date().toISOString()
-    });
-
+    const newCustomer = await TaiKhoanKhachHangRepository.create(insertPayload);
+    try {
+      await membershipWorkflow.ensureDefaultCard(newCustomer.makhachhang);
+    } catch (err) {
+      console.error('[AuthService] Khong the khoi tao the thanh vien mac dinh:', err?.message || err);
+    }
     // Tạo JWT token
     const token = generateToken({
       makhachhang: newCustomer.makhachhang,
@@ -75,7 +85,10 @@ const AuthService = {
         makhachhang: newCustomer.makhachhang,
         email: newCustomer.email,
         hoten: newCustomer.hoten,
-        sodienthoai: newCustomer.sodienthoai
+        tendangnhap: newCustomer.tendangnhap,
+        sodienthoai: newCustomer.sodienthoai,
+        gioitinh: newCustomer.gioitinh,
+        ngaysinh: newCustomer.ngaysinh
       },
       token
     };
@@ -137,7 +150,10 @@ const AuthService = {
         makhachhang: customer.maKhachHang || customer.makhachhang,
         email: customer.email,
         hoten: customer.hoTen || customer.hoten,
+        tendangnhap: customer.tenDangNhap || customer.tendangnhap,
         sodienthoai: customer.soDienThoai || customer.sodienthoai,
+        gioitinh: customer.gioiTinh || customer.gioitinh,
+        ngaysinh: customer.ngaySinh || customer.ngaysinh,
         diachi: customer.diachi
       },
       token
@@ -207,8 +223,8 @@ const AuthService = {
       throw new Error('Không tìm thấy tài khoản');
     }
 
-    // Kiểm tra mật khẩu cũ
-    const isPasswordValid = await this.comparePassword(matkhaucu, customer.matkhau);
+  // Kiểm tra mật khẩu cũ (model ánh xạ pass -> matKhau)
+  const isPasswordValid = await this.comparePassword(matkhaucu, customer.matKhau);
     if (!isPasswordValid) {
       throw new Error('Mật khẩu cũ không đúng');
     }
@@ -216,9 +232,9 @@ const AuthService = {
     // Hash mật khẩu mới
     const hashedNewPassword = await this.hashPassword(matkhaumoi);
 
-    // Cập nhật mật khẩu
+    // Cập nhật mật khẩu (cột 'pass')
     await TaiKhoanKhachHangRepository.update(makhachhang, {
-      matkhau: hashedNewPassword
+      pass: hashedNewPassword
     });
 
     return { message: 'Đổi mật khẩu thành công' };
@@ -253,3 +269,4 @@ const AuthService = {
 };
 
 module.exports = AuthService;
+

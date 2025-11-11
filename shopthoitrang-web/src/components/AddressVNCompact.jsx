@@ -154,7 +154,7 @@ export default function AddressVNCompact({
 
       <div className="md:col-span-3 text-sm text-gray-500">
         <span className="font-medium">Xem trước:</span>{" "}
-        {[hamlet, wardName, provinceName].filter(Boolean).join(", ") || "—"}
+        {[hamlet, wardName, provinceName].filter(Boolean).join(", ") || ""}
       </div>
     </div>
   );
