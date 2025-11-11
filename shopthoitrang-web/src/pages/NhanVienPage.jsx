@@ -1,12 +1,13 @@
 // src/pages/NhanVienPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Users, Plus, Search, Edit, Trash2, X } from "lucide-react";
+import { Users, Plus, Search, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import nhanvienService from "../services/nhanvienService";
 import chucnangService from "../services/chucnangService";
 import AddressVNCompact from "../components/AddressVNCompact";
+import { useAuth } from "../contexts/AuthContext";
 
-// ===== Helpers (có thể tách ra utils nếu muốn) =====
+// ===== Helpers =====
 function calcAge(yyyyMmDd) {
   if (!yyyyMmDd) return 0;
   const d = new Date(yyyyMmDd);
@@ -34,9 +35,15 @@ function formatDate(v) {
 
 export default function NhanVienPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // chỉ ADMIN mới được thêm / xem chi tiết
+  // nếu muốn MANAGER cũng có quyền thì sửa thành:
+  const canEdit = ["ADMIN", "MANAGER"].includes(user?.maQuyen);
+  //const canEdit = user?.maQuyen === "ADMIN";
 
   const [employees, setEmployees] = useState([]);
-  const [functions, setFunctions] = useState([]); // { machucnang/maChucNang, tenchucnang/tenChucNang }
+  const [functions, setFunctions] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -44,17 +51,17 @@ export default function NhanVienPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
 
-  // State form thêm mới  đầy đủ thuộc tính
+  // State form thêm mới
   const [newEmployee, setNewEmployee] = useState({
     hoten: "",
-    gioitinh: "",        // "Nam" | "Nữ" 
+    gioitinh: "",
     cccd: "",
-    ngaycap: "",         // yyyy-mm-dd
+    ngaycap: "",
     noicap: "",
     ngaybatdau: "",
     ngayhethan: "",
-    trangthai: "Đang làm", // "Đang làm" | "Tạm nghỉ" | "Đã nghỉ"
-    luong: "",           // số
+    trangthai: "Đang làm",
+    luong: "",
     email: "",
     sodienthoai: "",
     ngaysinh: "",
@@ -62,8 +69,7 @@ export default function NhanVienPage() {
     maquanly: "",
   });
 
-  // Địa chỉ theo mô hình TỈNH → XÃ (+ Thôn/Tổ)
-  // AddressVNCompact sẽ set kèm name để không phải fetch lại
+  // Địa chỉ
   const [addr, setAddr] = useState({
     provinceCode: "",
     provinceName: "",
@@ -81,8 +87,8 @@ export default function NhanVienPage() {
           nhanvienService.getAll(),
           chucnangService.getAll(),
         ]);
-        setEmployees(emps);          // emps đã normalize về camelCase trong service
-        setFunctions(funcs || []);   // có thể snake/camel  xử lý khi hiển thị
+        setEmployees(emps);
+        setFunctions(funcs || []);
         setError("");
       } catch (e) {
         console.error(e);
@@ -112,8 +118,12 @@ export default function NhanVienPage() {
     });
   }, [employees, term]);
 
-  // ===== Xoá =====
+  // ===== Xoá (hiện tại UI chưa dùng, nhưng vẫn chặn quyền) =====
   async function handleDelete(id) {
+    if (!canEdit) {
+      alert("Bạn không có quyền xoá nhân viên.");
+      return;
+    }
     if (!window.confirm("Bạn có chắc chắn muốn xóa nhân viên này?")) return;
     try {
       await nhanvienService.delete(id);
@@ -140,6 +150,11 @@ export default function NhanVienPage() {
   // ===== Tạo mới =====
   async function handleCreate(e) {
     e.preventDefault();
+
+    if (!canEdit) {
+      alert("Bạn không có quyền thêm nhân viên.");
+      return;
+    }
 
     // Validate cơ bản
     if (!newEmployee.hoten || !newEmployee.machucnang) {
@@ -175,7 +190,6 @@ export default function NhanVienPage() {
       return;
     }
 
-    // Gộp địa chỉ theo mô hình mới (Thôn/Tổ, Xã/Phường, Tỉnh/TP)
     const diachiText = [addr.hamlet, addr.wardName, addr.provinceName]
       .filter(Boolean)
       .join(", ");
@@ -194,20 +208,13 @@ export default function NhanVienPage() {
         email: newEmployee.email || null,
         sodienthoai: newEmployee.sodienthoai || null,
         ngaysinh: newEmployee.ngaysinh || null,
-        diachi: diachiText || null, // <-- địa chỉ gộp theo mô hình Tỉnh → Xã (+Thôn)
+        diachi: diachiText || null,
         machucnang: newEmployee.machucnang ? Number(newEmployee.machucnang) : null,
         maquanly: newEmployee.maquanly ? Number(newEmployee.maquanly) : null,
-        // Nếu DB của bạn có thêm cột code/name cho province/ward/hamlet thì thêm vào service.buildBody
-        // province_code: addr.provinceCode ? Number(addr.provinceCode) : null,
-        // province_name: addr.provinceName || null,
-        // ward_code: addr.wardCode ? Number(addr.wardCode) : null,
-        // ward_name: addr.wardName || null,
-        // hamlet: addr.hamlet || null,
       });
 
       setEmployees((prev) => [created, ...prev]);
       setShowForm(false);
-      // reset form
       setNewEmployee({
         hoten: "",
         gioitinh: "",
@@ -256,13 +263,15 @@ export default function NhanVienPage() {
             <p className="text-gray-600">Quản lý thông tin nhân viên trong hệ thống</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus size={18} />
-          Thêm nhân viên
-        </button>
+        {canEdit && (
+          <button
+            onClick={() => canEdit && setShowForm(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={18} />
+            Thêm nhân viên
+          </button>
+        )}
       </div>
 
       {/* Search + Error */}
@@ -303,7 +312,11 @@ export default function NhanVienPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ngày sinh</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Giới tính</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Chức năng</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Thao tác</th>
+                {canEdit && (
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                    Thao tác
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -314,17 +327,23 @@ export default function NhanVienPage() {
                   <td className="px-4 py-3 text-sm text-gray-700">{e.email || "N/A"}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{e.soDienThoai || "N/A"}</td>
                   <td className="px-4 py-3 text-sm text-gray-700">{formatDate(e.ngaySinh)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{e.gioiTinh ?? e.gioitinh ?? "N/A"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{getTenChucNang(e.maChucNang)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => navigate(`/nhanvien/${e.maNhanVien}`)}
-                      className="text-green-600 hover:text-green-800 mr-3"
-                      title="Chi tiết"
-                    >
-                      Chi tiết
-                    </button>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {e.gioiTinh ?? e.gioitinh ?? "N/A"}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    {getTenChucNang(e.maChucNang)}
+                  </td>
+                  {canEdit && (
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => navigate(`/nhanvien/${e.maNhanVien}`)}
+                        className="text-green-600 hover:text-green-800"
+                        title="Chi tiết"
+                      >
+                        Chi tiết
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -332,8 +351,8 @@ export default function NhanVienPage() {
         )}
       </div>
 
-      {/* Modal Thêm mới */}
-      {showForm && (
+      {/* Modal Thêm mới (chỉ ADMIN mới mở được) */}
+      {showForm && canEdit && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
             <button
@@ -434,7 +453,9 @@ export default function NhanVienPage() {
                   <label className="block text-sm font-medium mb-1">CCCD</label>
                   <input
                     value={newEmployee.cccd}
-                    onChange={(e) => setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, "") })}
+                    onChange={(e) =>
+                      setNewEmployee({ ...newEmployee, cccd: e.target.value.replace(/\D/g, "") })
+                    }
                     className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="123456789012"
                   />
@@ -510,7 +531,7 @@ export default function NhanVienPage() {
                 />
               </div>
 
-              {/* Địa chỉ: Tỉnh → Xã (+Thôn/Tổ) */}
+              {/* Địa chỉ */}
               <div>
                 <label className="block text-sm font-medium mb-2">Địa chỉ</label>
                 <AddressVNCompact value={addr} onChange={setAddr} />

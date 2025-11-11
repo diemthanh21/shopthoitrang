@@ -63,7 +63,7 @@ const DashboardLayout = () => {
       icon: Users,
       items: [
         { label: "Danh sách nhân viên", link: "/nhanvien" },
-        { label: "Tài khoản nhân viên", link: "/taikhoannv" },
+        { label: "Tài khoản nhân viên", link: "/taikhoannhanvien" },
         { label: "Phân công ca", link: "/phancongca" },
         { label: "Chốt ca", link: "/chotca" },
       ],
@@ -73,13 +73,15 @@ const DashboardLayout = () => {
       icon: Package,
       items: [
         { label: "Danh sách sản phẩm", link: "/sanpham" },
-        { label: "Thương hiệu", link: "/thuonghieu" },
+        { label: "Danh mục", link: "/danhmuc" },
       ],
     },
     {
       label: "Khuyến mãi",
       icon: Tag,
-      items: [{ label: "Chương trình khuyến mãi", link: "/khuyenmai" }],
+      items: [{ label: "Chương trình khuyến mãi", link: "/khuyenmai" },
+        { label: "Voucher giảm giá", link: "/vouchergiamgia" }
+      ],
     },
     {
       label: "Đơn hàng",

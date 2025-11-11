@@ -298,7 +298,7 @@ export default function NhanVienEditPage() {
             <label className="block text-sm font-medium mb-1">Địa chỉ</label>
             <AddressVN value={addr} onChange={setAddr} />
             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-              <MapPin size={14}/> Gộp: { [addr.hamlet, addr.communeName, addr.provinceName].filter(Boolean).join(", ") || (employee?.diaChi || "") }
+              <MapPin size={14}/> Gộp: { [addr.hamlet, addr.communeName, addr.provinceName].filter(Boolean).join(", ") || (employee?.diaChi || "—") }
             </p>
           </div>
 
