@@ -37,7 +37,7 @@ class KhuyenMaiService {
     // Validate tỷ lệ giảm (nếu có)
     if (body.tylegiam !== undefined && body.tylegiam !== null) {
       const v = Number(body.tylegiam);
-      if (!(v > 0 && v <= 100)) {
+      if (!(v >= 0 && v <= 100)) {
         const e = new Error('tylegiam phải trong (0, 100]');
         e.status = 400;
         throw e;
