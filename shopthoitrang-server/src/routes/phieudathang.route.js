@@ -20,7 +20,7 @@ router.use(authenticateToken);
  *     tags: [Phiếu đặt hàng]
  *     parameters:
  *       - in: query
- *         name: makhachhang
+ *         name: manhacungcap
  *         schema: { type: integer }
  *       - in: query
  *         name: trangthai
@@ -68,9 +68,9 @@ router.get('/:id', ctrl.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [makhachhang, tongtien]
+ *             required: [manhacungcap, tongtien]
  *             properties:
- *               makhachhang: { type: integer }
+ *               manhacungcap: { type: integer }
  *               manhanvien: { type: integer, nullable: true }
  *               ngaydatphieu: { type: string, format: date-time }
  *               ngayhendukien: { type: string, format: date }

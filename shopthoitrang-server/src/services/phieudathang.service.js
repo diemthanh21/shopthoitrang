@@ -16,17 +16,9 @@ class PhieuDatHangService {
   }
 
   async create(body) {
-    const required = ['makhachhang', 'tongtien'];
-    for (const field of required) {
-      if (!body[field]) {
-        const e = new Error(`Thiếu thông tin bắt buộc: ${field}`);
-        e.status = 400;
-        throw e;
-      }
-    }
-
+  
     const payload = {
-      makhachhang: body.makhachhang,
+      manhacungcap: body.manhacungcap ?? body.manacungcap ?? null,
       manhanvien: body.manhanvien ?? null,
       ngaydatphieu: body.ngaydatphieu ?? new Date().toISOString(),
       ngayhendukien: body.ngayhendukien ?? null,

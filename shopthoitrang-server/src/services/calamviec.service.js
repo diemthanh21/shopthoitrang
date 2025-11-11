@@ -46,10 +46,6 @@ class CaLamViecService {
       const e = new Error('giobatdau và gioketthuc là bắt buộc');
       e.status = 400; throw e;
     }
-    if (!isStartBeforeEnd(body.giobatdau, body.gioketthuc)) {
-      const e = new Error('giobatdau phải nhỏ hơn gioketthuc (trong cùng ngày)');
-      e.status = 400; throw e;
-    }
 
     const payload = {
       tenca: body.tenca.trim(),
@@ -95,10 +91,7 @@ class CaLamViecService {
         const e = new Error('giobatdau và gioketthuc là bắt buộc');
         e.status = 400; throw e;
       }
-      if (!isStartBeforeEnd(start, end)) {
-        const e = new Error('giobatdau phải nhỏ hơn gioketthuc (trong cùng ngày)');
-        e.status = 400; throw e;
-      }
+    
     }
 
     if (body.mota !== undefined) {

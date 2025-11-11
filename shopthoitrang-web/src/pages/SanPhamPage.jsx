@@ -1,14 +1,33 @@
 import { useEffect, useState } from "react";
-import { Boxes, Plus, Search, Edit, Trash2 } from "lucide-react";
+import { Boxes, Plus, Search, Edit, Eye } from "lucide-react";
+import { Modal, Form, Input, Select, message } from "antd";
+import { useNavigate } from "react-router-dom";
+
 import sanphamService from "../services/sanphamService";
+import danhmucService from "../services/danhmucService";
+import thuonghieuService from "../services/thuonghieuService";
 
 export default function SanPhamPage() {
+  const navigate = useNavigate();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [danhMucList, setDanhMucList] = useState([]);
+  const [thuongHieuList, setThuongHieuList] = useState([]);
 
-  useEffect(() => { fetchData(); }, []);
+  const [danhMucMap, setDanhMucMap] = useState({});
+  const [thuongHieuMap, setThuongHieuMap] = useState({});
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    fetchData();
+    fetchDanhMuc();
+    fetchThuongHieu();
+  }, []);
 
   async function fetchData() {
     try {
@@ -24,16 +43,80 @@ export default function SanPhamPage() {
     }
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm("Xoá sản phẩm này?")) return;
+  async function fetchDanhMuc() {
     try {
-      await sanphamService.delete(id);
-      fetchData();
+      const data = await danhmucService.getAll();
+      setDanhMucList(data);
+      const danhMucMapping = {};
+      data.forEach((dm) => {
+        danhMucMapping[dm.madanhmuc ?? dm.maDanhMuc] =
+          dm.tendanhmuc ?? dm.tenDanhMuc;
+      });
+      setDanhMucMap(danhMucMapping);
     } catch (e) {
       console.error(e);
-      alert("Không thể xoá sản phẩm");
+      message.error("Không thể tải danh sách danh mục");
     }
   }
+
+  async function fetchThuongHieu() {
+    try {
+      const data = await thuonghieuService.getAll();
+      setThuongHieuList(data);
+      const thuongHieuMapping = {};
+      data.forEach((th) => {
+        thuongHieuMapping[th.mathuonghieu ?? th.maThuongHieu] =
+          th.tenthuonghieu ?? th.tenThuongHieu;
+      });
+      setThuongHieuMap(thuongHieuMapping);
+    } catch (e) {
+      console.error("Lỗi khi tải thương hiệu:", e.response || e);
+      message.error(
+        "Không thể tải danh sách thương hiệu: " +
+          (e.response?.data?.message || e.message)
+      );
+    }
+  }
+
+  // Modal handlers
+  const showModal = (record = null) => {
+    setEditingProduct(record);
+    if (record) {
+      form.setFieldsValue({
+        tenSanPham: record.tenSanPham,
+        maDanhMuc: record.maDanhMuc,
+        maThuongHieu: record.maThuongHieu,
+        trangThai: record.trangThai,
+      });
+    } else {
+      form.resetFields();
+    }
+    setModalVisible(true);
+  };
+
+  const handleCancel = () => {
+    setModalVisible(false);
+    setEditingProduct(null);
+    form.resetFields();
+  };
+
+  // Form submission handler
+  const handleSubmit = async (values) => {
+    try {
+      if (editingProduct) {
+        await sanphamService.update(editingProduct.maSanPham, values);
+        message.success("Cập nhật sản phẩm thành công");
+      } else {
+        await sanphamService.create(values);
+        message.success("Thêm sản phẩm mới thành công");
+      }
+      setModalVisible(false);
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      message.error("Có lỗi xảy ra. Vui lòng thử lại.");
+    }
+  };
 
   const term = searchTerm.trim().toLowerCase();
   const filtered = items.filter((sp) => {
@@ -43,7 +126,7 @@ export default function SanPhamPage() {
       sp.tenSanPham ?? "",
       String(sp.maDanhMuc ?? ""),
       String(sp.maThuongHieu ?? ""),
-      String(sp.trangThai ?? "")
+      String(sp.trangThai ?? ""),
     ].map((x) => x.toString().toLowerCase());
     return haystacks.some((x) => x.includes(term));
   });
@@ -63,11 +146,18 @@ export default function SanPhamPage() {
         <div className="flex items-center gap-3">
           <Boxes className="text-blue-600" size={32} />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Quản lý sản phẩm</h1>
-            <p className="text-gray-600">Danh sách sản phẩm trong hệ thống</p>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Quản lý sản phẩm
+            </h1>
+            <p className="text-gray-600">
+              Danh sách sản phẩm trong hệ thống
+            </p>
           </div>
         </div>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+        <button
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          onClick={() => showModal()}
+        >
           <Plus size={20} />
           Thêm sản phẩm
         </button>
@@ -82,7 +172,10 @@ export default function SanPhamPage() {
         )}
         <div className="flex items-center gap-4">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={20}
+            />
             <input
               type="text"
               placeholder="Tìm kiếm theo mọi cột…"
@@ -104,37 +197,78 @@ export default function SanPhamPage() {
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã SP</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tên sản phẩm</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã danh mục</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã thương hiệu</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Mã sản phẩm
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Tên sản phẩm
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Danh mục
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Thương hiệu
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Trạng thái
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Thao tác
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filtered.map((sp) => (
                 <tr key={sp.maSanPham} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{sp.maSanPham}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{sp.tenSanPham}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{sp.maDanhMuc ?? "N/A"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{sp.maThuongHieu ?? "N/A"}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    {sp.maSanPham}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {sp.tenSanPham}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    <span title={`Mã: ${sp.maDanhMuc}`}>
+                      {danhMucMap[sp.maDanhMuc] ?? "N/A"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700">
+                    <span title={`Mã: ${sp.maThuongHieu}`}>
+                      {thuongHieuMap[sp.maThuongHieu] ?? "N/A"}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-sm">
-                    {/* hiển thị đúng giá trị model trả về */}
-                    <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
-                      {sp.trangThai ?? "N/A"}
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${
+                        sp.trangThai
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                      }`}
+                    >
+                      {sp.trangThai ? "Đang bán" : "Ngưng bán"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-sm">
-                    <button className="text-blue-600 hover:text-blue-800 mr-3">
-                      <Edit size={18} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(sp.maSanPham)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                      {/* Xem chi tiết -> chuyển trang */}
+                      <button
+                        onClick={() =>
+                          navigate(`/sanpham/${sp.maSanPham}`)
+                        }
+                        className="text-green-600 hover:text-green-800"
+                        title="Xem chi tiết"
+                      >
+                        <Eye size={18} />
+                      </button>
+                      {/* Sửa sản phẩm */}
+                      <button
+                        onClick={() => showModal(sp)}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Sửa sản phẩm"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      {/* Không có nút xoá theo yêu cầu của bạn */}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -142,6 +276,106 @@ export default function SanPhamPage() {
           </table>
         )}
       </div>
+
+      {/* Form Modal thêm/sửa sản phẩm */}
+      <Modal
+        title={editingProduct ? "Sửa sản phẩm" : "Thêm sản phẩm mới"}
+        open={modalVisible}
+        onCancel={handleCancel}
+        footer={null}
+        width={800}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            trangThai: true,
+          }}
+        >
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item
+              name="tenSanPham"
+              label="Tên sản phẩm"
+              rules={[
+                { required: true, message: "Vui lòng nhập tên sản phẩm!" },
+                { min: 3, message: "Tên sản phẩm phải có ít nhất 3 ký tự!" },
+                {
+                  max: 200,
+                  message: "Tên sản phẩm không được vượt quá 200 ký tự!",
+                },
+                {
+                  whitespace: true,
+                  message: "Tên sản phẩm không được chỉ chứa khoảng trắng!",
+                },
+              ]}
+            >
+              <Input placeholder="Nhập tên sản phẩm" />
+            </Form.Item>
+
+            <Form.Item
+              name="maDanhMuc"
+              label="Danh mục"
+              rules={[{ required: true, message: "Vui lòng chọn danh mục!" }]}
+            >
+              <Select placeholder="Chọn danh mục">
+                {danhMucList.map((dm) => (
+                  <Select.Option
+                    key={dm.madanhmuc ?? dm.maDanhMuc}
+                    value={dm.madanhmuc ?? dm.maDanhMuc}
+                  >
+                    {dm.tendanhmuc ?? dm.tenDanhMuc}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="maThuongHieu"
+              label="Thương hiệu"
+              rules={[
+                { required: true, message: "Vui lòng chọn thương hiệu!" },
+              ]}
+            >
+              <Select placeholder="Chọn thương hiệu">
+                {thuongHieuList.map((th) => (
+                  <Select.Option
+                    key={th.mathuonghieu ?? th.maThuongHieu}
+                    value={th.mathuonghieu ?? th.maThuongHieu}
+                  >
+                    {th.tenthuonghieu ?? th.tenThuongHieu}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item name="trangThai" label="Trạng thái">
+              <Select>
+                <Select.Option value={true}>Đang bán</Select.Option>
+                <Select.Option value={false}>Ngưng bán</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
+
+          <Form.Item className="mb-0">
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {editingProduct ? "Cập nhật" : "Thêm mới"}
+              </button>
+            </div>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

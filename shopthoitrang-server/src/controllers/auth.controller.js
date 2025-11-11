@@ -6,7 +6,7 @@ const AuthController = {
    */
   async registerCustomer(req, res) {
     try {
-      const { email, matkhau, hoten, sodienthoai, tendangnhap, gioitinh, ngaysinh } = req.body;
+      const { email, matkhau, hoten, sodienthoai } = req.body;
 
       // Validate
       if (!email || !matkhau || !hoten) {
@@ -20,10 +20,7 @@ const AuthController = {
         email,
         matkhau,
         hoten,
-        sodienthoai,
-        tendangnhap,
-        gioitinh,
-        ngaysinh
+        sodienthoai
       });
 
       return res.status(201).json({

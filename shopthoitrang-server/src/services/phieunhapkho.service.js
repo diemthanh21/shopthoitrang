@@ -29,7 +29,6 @@ class PhieuNhapKhoService {
       manhanvien: body.manhanvien,
       manhacungcap: body.manhacungcap,
       ngaynhap: body.ngaynhap ?? new Date().toISOString(),
-      thanhtien: body.thanhtien ?? 0,
       ghichu: body.ghichu ?? null
     };
 

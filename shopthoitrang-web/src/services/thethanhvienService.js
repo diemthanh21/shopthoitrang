@@ -1,24 +1,24 @@
-import api from './api';
+import axios from '../configs/axios';
 
 
 const thethanhvienService = {
   getAll: async () => {
-  const response = await api.get('/thethanhvien');
+    const response = await axios.get('/thethanhvien');
     return response.data;
   },
 
   getById: async (mathe) => {
-  const response = await api.get(`/thethanhvien/${mathe}`);
+    const response = await axios.get(`/thethanhvien/${mathe}`);
     return response.data;
   },
 
   getByKhachHang: async (makhachhang) => {
-  const response = await api.get(`/thethanhvien/khachhang/${makhachhang}`);
+    const response = await axios.get(`/thethanhvien/khachhang/${makhachhang}`);
     return response.data;
   },
 
   create: async (data) => {
-  const response = await api.post('/thethanhvien', {
+    const response = await axios.post('/thethanhvien', {
       makhachhang: data.makhachhang,
       mahangthe: data.mahangthe,
       ngaycap: data.ngaycap,
@@ -29,7 +29,7 @@ const thethanhvienService = {
   },
 
   update: async (mathe, data) => {
-  const response = await api.put(`/thethanhvien/${mathe}`, {
+    const response = await axios.put(`/thethanhvien/${mathe}`, {
       makhachhang: data.makhachhang,
       mahangthe: data.mahangthe,
       ngaycap: data.ngaycap,
@@ -40,19 +40,19 @@ const thethanhvienService = {
   },
 
   delete: async (mathe) => {
-  const response = await api.delete(`/thethanhvien/${mathe}`);
+    const response = await axios.delete(`/thethanhvien/${mathe}`);
     return response.data;
   },
 
   // API để kiểm tra thẻ còn hiệu lực hay không
   checkValidity: async (mathe) => {
-  const response = await api.get(`/thethanhvien/check-validity/${mathe}`);
+    const response = await axios.get(`/thethanhvien/check-validity/${mathe}`);
     return response.data;
   },
 
   // API để lấy thông tin hạng thẻ của khách hàng
   getCustomerCardRank: async (makhachhang) => {
-  const response = await api.get(`/thethanhvien/rank/${makhachhang}`);
+    const response = await axios.get(`/thethanhvien/rank/${makhachhang}`);
     return response.data;
   }
 };

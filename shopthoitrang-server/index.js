@@ -10,16 +10,7 @@ const { swaggerUi, specs } = require('./src/swagger');
 
 const app = express();
 
-// CORS config
-app.use(cors({
-  origin: [
-    'http://localhost:5173',    // Vite dev
-    'http://localhost:3000',    // Local test
-    'http://localhost',         // Docker nginx
-    'http://localhost:80'       // Docker nginx explicit
-  ],
-  credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 // Swagger UI hiển thị file đã sinh tự động
@@ -71,8 +62,6 @@ app.use('/api/thuonghieu', require('./src/routes/thuonghieu.route'));
 app.use('/api/tichluy_chitieu', require('./src/routes/tichluy_chitieu.route'));
 app.use('/api/trahang', require('./src/routes/trahang.route'));
 app.use('/api/dashboard', require('./src/routes/dashboard.route'));
-app.use('/api/catalog', require('./src/routes/catalog.route'));
-app.use('/api/cart', require('./src/routes/cart.route'));
 
 
 

@@ -55,12 +55,12 @@ router.get('/:id', controller.getById);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [maphieunhap, machitietsanpham, soluong, dongianhap]
+ *             required: [maphieunhap, machitietsanpham, soluong]
  *             properties:
  *               maphieunhap: { type: integer }
  *               machitietsanpham: { type: integer }
  *               soluong: { type: integer }
- *               dongianhap: { type: number }
+ *               ghichu: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -88,7 +88,7 @@ router.post('/', controller.create);
  *             type: object
  *             properties:
  *               soluong: { type: integer }
- *               dongianhap: { type: number }
+ *               ghichu: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công

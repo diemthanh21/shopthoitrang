@@ -4,14 +4,14 @@ class PhieuNhapKho {
     manhanvien,
     manhacungcap,
     ngaynhap,
-    thanhtien,
+    trangthai,
     ghichu
   }) {
     this.maPhieuNhap = maphieunhap;
     this.maNhanVien = manhanvien;
     this.maNhaCungCap = manhacungcap;
     this.ngayNhap = ngaynhap;
-    this.thanhTien = thanhtien;
+    this.trangThai = trangthai;
     this.ghiChu = ghichu;
   }
 
@@ -21,7 +21,7 @@ class PhieuNhapKho {
       manhanvien: this.maNhanVien,
       manhacungcap: this.maNhaCungCap,
       ngaynhap: this.ngayNhap,
-      thanhtien: this.thanhTien,
+      trangthai: this.trangThai,
       ghichu: this.ghiChu
     };
   }
