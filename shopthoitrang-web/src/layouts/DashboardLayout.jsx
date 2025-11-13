@@ -49,23 +49,18 @@ const DashboardLayout = () => {
       icon: LayoutDashboard,
       link: "/dashboard",
     },
-    {
-      label: "Thông báo",
-      icon: Bell,
-      items: [
-        { label: "Tin nhắn", link: "/tinnhan", icon: MessageSquareText },
-        { label: "Đánh giá", link: "/danhgia" },
-        { label: "Thông báo hệ thống", link: "/thongbao" },
-      ],
-    },
+    
     {
       label: "Nhân viên",
       icon: Users,
       items: [
         { label: "Danh sách nhân viên", link: "/nhanvien" },
         { label: "Tài khoản nhân viên", link: "/taikhoannhanvien" },
+        { label: "Ca làm việc", link: "/calamviec" },
         { label: "Phân công ca", link: "/phancongca" },
         { label: "Chốt ca", link: "/chotca" },
+        
+        
       ],
     },
     {
@@ -73,6 +68,7 @@ const DashboardLayout = () => {
       icon: Package,
       items: [
         { label: "Danh sách sản phẩm", link: "/sanpham" },
+        { label: "Kích thước", link: "/kichthuoc" },
         { label: "Danh mục", link: "/danhmuc" },
       ],
     },
@@ -104,15 +100,25 @@ const DashboardLayout = () => {
       label: "Chứng từ",
       icon: FileText,
       items: [
+        { label: "Nhà cung cấp", link: "/nhacungcap" },
         { label: "Phiếu đặt hàng", link: "/phieudathang" },
         { label: "Phiếu nhập kho", link: "/phieunhapkho" },
+      ],
+    },
+    {
+      label: "Thông báo",
+      icon: Bell,
+      items: [
+        { label: "Tin nhắn", link: "/tinnhan", icon: MessageSquareText },
+        { label: "Đánh giá", link: "/danhgia" },
+        { label: "Thông báo hệ thống", link: "/thongbao" },
       ],
     },
     {
       label: "Khác",
       icon: Building2,
       items: [
-        { label: "Nhà cung cấp", link: "/nhacungcap" },
+        
         { label: "Banner", link: "/banner" },
       ],
     },
@@ -135,7 +141,7 @@ const DashboardLayout = () => {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
         <div className="flex items-center justify-between px-6 py-3" ref={dropdownRef}>
           {/* Logo */}
-          <h2 className="text-xl font-bold text-blue-600">Shop Thời Trang</h2>
+          <h2 className="text-xl font-bold text-blue-600">ELORA</h2>
 
           {/* Menu ngang */}
           <nav className="flex items-center gap-6">

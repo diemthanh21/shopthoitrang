@@ -15,7 +15,7 @@ const fmtCurrency = (v) =>
     maximumFractionDigits: 0,
   }).format(Number(v || 0));
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 function StatusDot({ color }) {
   return <span className={`inline-block w-2 h-2 rounded-full mr-2 ${color}`} />;
@@ -101,7 +101,7 @@ export default function PhieuDatHangPage() {
 
   // ===== Helper: id -> tên nhân viên =====
   function getTenNhanVien(maNhanVien) {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -113,7 +113,7 @@ export default function PhieuDatHangPage() {
 
   // ===== Helper: id -> tên nhà cung cấp =====
   function getTenNhaCungCap(maNCC) {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     
     // Find supplier with exact ID match
     const found = suppliers.find(s => s.maNhaCungCap === maNCC);
@@ -345,7 +345,7 @@ export default function PhieuDatHangPage() {
                     {fmtCurrency(r.conLai ?? r.conlai)}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {r.phuongThucThanhToan ?? r.phuongthucthanhtoan ?? "—"}
+                    {r.phuongThucThanhToan ?? r.phuongthucthanhtoan ?? ""}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <Badge
@@ -365,7 +365,7 @@ export default function PhieuDatHangPage() {
                           : "bg-gray-100 text-gray-700"
                       }
                     >
-                      {r.trangThaiPhieu ?? r.trangthaiphieu ?? "—"}
+                      {r.trangThaiPhieu ?? r.trangthaiphieu ?? ""}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">

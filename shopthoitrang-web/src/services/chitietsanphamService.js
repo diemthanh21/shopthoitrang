@@ -1,32 +1,75 @@
 // src/services/chitietsanphamService.js
 import api from "./api";
 
+const PREFIX = "/chitietsanpham";
+
+const toNumber = (value, fallback = 0) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const normalizeSizes = (raw) => {
+  const source = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.chitietsanpham_kichthuoc)
+    ? raw.chitietsanpham_kichthuoc
+    : [];
+
+  return source.map((item) => {
+    const sizeRow = item?.kichthuocs ?? {};
+    return {
+      id:
+        item?.id ??
+        item?.machitietsanpham_kichthuoc ??
+        item?.bridgeId ??
+        null,
+      maKichThuoc:
+        item?.maKichThuoc ??
+        item?.makichthuoc ??
+        sizeRow?.makichthuoc ??
+        null,
+      tenKichThuoc:
+        item?.tenKichThuoc ??
+        item?.ten_kichthuoc ??
+        sizeRow?.ten_kichthuoc ??
+        "",
+      moTa: item?.moTa ?? item?.mo_ta ?? sizeRow?.mo_ta ?? "",
+      soLuong: toNumber(item?.soLuong ?? item?.so_luong, 0),
+ 
+    };
+  });
+};
+
 // Chuẩn hoá từ DB -> UI
-const normalize = (r) => ({
-  maChiTietSanPham: r.machitietsanpham ?? r.maChiTietSanPham ?? r.id,
-  maSanPham: r.masanpham ?? r.maSanPham ?? null,
-  kichThuoc: r.kichthuoc ?? r.kichThuoc ?? "",
-  mauSac: r.mausac ?? r.mauSac ?? "",
-  chatLieu: r.chatlieu ?? r.chatLieu ?? "",
-  moTa: r.mota ?? r.moTa ?? "",
-  giaBan: r.giaban ?? r.giaBan ?? 0,
-  soLuongTon: r.soluongton ?? r.soLuongTon ?? 0,
-});
+const normalize = (row = {}) => {
+  const sizes = normalizeSizes(row?.sizes ?? row?.chitietsanpham_kichthuoc);
+  const primarySize = sizes.length ? sizes[0].tenKichThuoc : "";
+
+  return {
+    maChiTietSanPham: row.machitietsanpham ?? row.maChiTietSanPham ?? row.id,
+    maSanPham: row.masanpham ?? row.maSanPham ?? null,
+    kichThuoc: row.kichthuoc ?? row.kichThuoc ?? primarySize ?? "",
+    mauSac: row.mausac ?? row.mauSac ?? "",
+    chatLieu: row.chatlieu ?? row.chatLieu ?? "",
+    moTa: row.mota ?? row.moTa ?? "",
+    giaBan: row.giaban ?? row.giaBan ?? 0,
+    soLuongTon: row.soluongton ?? row.soLuongTon ?? 0,
+    sizes,
+  };
+};
 
 // UI -> DB
-const toDB = (d) => ({
+const toDB = (d = {}) => ({
   masanpham: d.maSanPham ?? d.masanpham,
-  kichthuoc: d.kichThuoc ?? d.kichthuoc,
-  mausac: d.mauSac ?? d.mausac,
+  kichthuoc: d.kichThuoc ?? d.kichthuoc ?? null,
+  mausac: d.mauSac ?? d.mausac ?? null,
   chatlieu: d.chatLieu ?? d.chatlieu ?? null,
   mota: d.moTa ?? d.mota ?? null,
   giaban: d.giaBan ?? d.giaban ?? 0,
   soluongton: d.soLuongTon ?? d.soluongton ?? 0,
 });
 
-const PREFIX = "/chitietsanpham";
-
-// Hàm hỗ trợ bóc mảng từ nhiều dạng response khác nhau
+// Hàm hỗ trợ trộn nhiều dạng response khác nhau
 const extractArray = (raw) => {
   if (Array.isArray(raw)) return raw;
   if (Array.isArray(raw?.data)) return raw.data;
@@ -46,80 +89,73 @@ const getById = async (id) => {
   return normalize(res.data);
 };
 
-// ===== FIX: Lấy tất cả chi tiết theo mã sản phẩm =====
+const tryFetchWithParams = async (params) => {
+  const res = await api.get(PREFIX, { params });
+  return extractArray(res.data);
+};
+
 const getByProductId = async (maSanPham) => {
-  console.log("🔍 Fetching variants for product:", maSanPham);
-  
-  // Thử nhiều cách query để tương thích với backend
+  if (!maSanPham) return [];
+
+  const attempts = [
+    { masanpham: maSanPham },
+    { maSanPham },
+  ];
+
+  for (const params of attempts) {
+    try {
+      const arr = await tryFetchWithParams(params);
+      if (arr.length) {
+        return arr.map(normalize);
+      }
+    } catch (err) {
+      console.warn("[chitietsanpham] query failed", params, err);
+    }
+  }
+
+  // Fallback: lấy toàn bộ rồi filter client-side
   try {
-    // Cách 1: Query với param masanpham (lowercase)
-    let res = await api.get(PREFIX, {
-      params: { masanpham: maSanPham },
+    const res = await api.get(PREFIX);
+    const arr = extractArray(res.data).filter((item) => {
+      const value = item.masanpham ?? item.maSanPham;
+      return Number(value) === Number(maSanPham);
     });
-    
-    console.log("📡 API Response (masanpham):", res.data);
-    
-    let arr = extractArray(res.data);
-    
-    // Nếu không có kết quả, thử cách 2
-    if (arr.length === 0) {
-      console.log("⚠️ No results with 'masanpham', trying 'maSanPham'...");
-      res = await api.get(PREFIX, {
-        params: { maSanPham: maSanPham },
-      });
-      console.log("📡 API Response (maSanPham):", res.data);
-      arr = extractArray(res.data);
-    }
-    
-    // Nếu vẫn không có, thử lấy tất cả rồi filter
-    if (arr.length === 0) {
-      console.log("⚠️ No results with params, fetching all and filtering...");
-      res = await api.get(PREFIX);
-      const allArr = extractArray(res.data);
-      console.log("📡 All variants:", allArr.length);
-      
-      // Filter theo maSanPham
-      arr = allArr.filter(item => {
-        const itemMaSP = item.masanpham ?? item.maSanPham;
-        return Number(itemMaSP) === Number(maSanPham);
-      });
-      console.log("📦 Filtered variants:", arr.length);
-    }
-    
-    const normalized = arr.map(normalize);
-    console.log("✅ Returning normalized variants:", normalized);
-    return normalized;
-    
+    return arr.map(normalize);
   } catch (error) {
-    console.error("❌ Error in getByProductId:", error);
+    console.error("[chitietsanpham] fallback fetch error", error);
     throw error;
   }
 };
 
 const create = async (data) => {
-  console.log("➕ Creating variant with data:", data);
   const payload = toDB(data);
-  console.log("➕ Payload to DB:", payload);
-  
   const res = await api.post(PREFIX, payload);
-  console.log("➕ Create response:", res.data);
-  
   return normalize(res.data);
 };
 
 const update = async (id, data) => {
-  console.log("✏️ Updating variant:", id, "with data:", data);
   const payload = toDB(data);
-  console.log("✏️ Payload to DB:", payload);
-  
   const res = await api.put(`${PREFIX}/${id}`, payload);
-  console.log("✏️ Update response:", res.data);
-  
   return normalize(res.data);
 };
 
 const remove = async (id) => {
   const res = await api.delete(`${PREFIX}/${id}`);
+  return res.data;
+};
+
+const getSizes = async (variantId) => {
+  if (!variantId) return [];
+  const res = await api.get(`${PREFIX}/${variantId}/sizes`);
+  if (Array.isArray(res.data)) return res.data;
+  if (Array.isArray(res.data?.sizes)) return res.data.sizes;
+  return [];
+};
+
+const saveSizes = async (variantId, sizes = []) => {
+  if (!variantId) throw new Error("Thiếu mã chi tiết sản phẩm");
+  const payload = Array.isArray(sizes) ? sizes : [];
+  const res = await api.post(`${PREFIX}/${variantId}/sizes`, { sizes: payload });
   return res.data;
 };
 
@@ -129,5 +165,7 @@ export default {
   getByProductId,
   create,
   update,
+  getSizes,
+  saveSizes,
   delete: remove,
 };

@@ -33,6 +33,7 @@ import TinNhanPage from './pages/TinNhanPage';
 import TraHangDetailPage from './pages/TraHangDetailPage';
 import TraHangPage from './pages/TraHangPage';
 import VoucherGiamGiaPage from './pages/VoucherGiamGiaPage';
+import KichThuocPage from './pages/KichThuocPage';
 
 function App() {
   return (
@@ -57,6 +58,7 @@ function App() {
             <Route path="taikhoannhanvien" element={<TaiKhoanNhanVienPage />} />
             <Route path="sanpham" element={<SanPhamPage />} />
             <Route path="sanpham/:id" element={<SanPhamDetailPage />} />
+            <Route path="kichthuoc" element={<KichThuocPage />} />
             <Route path="banner" element={<BannerPage />} />
             <Route path="phancongca" element={<PhanCongCaPage />} />
             <Route path="khuyenmai" element={<KhuyenMaiPage />} />

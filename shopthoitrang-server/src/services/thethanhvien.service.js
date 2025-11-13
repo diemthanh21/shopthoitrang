@@ -1,6 +1,6 @@
 const repo = require('../repositories/thethanhvien.repository');
 const hangTheRepo = require('../repositories/hangthe.repository');
-const membershipWorkflow = require('./membership.workflow');
+const membershipService = require('./membership.service');
 const supabase = require('../../config/db');
 
 const addOneYear = (dateInput) => {
@@ -120,7 +120,7 @@ class TheThanhVienService {
     for (const row of customers || []) {
       const latest = await repo.findLatestActiveByKhachHang(row.makhachhang);
       if (!latest) {
-        const card = await membershipWorkflow.ensureDefaultCard(row.makhachhang);
+        const card = await membershipService.ensureDefaultCard(row.makhachhang);
         if (card) created += 1;
       }
     }

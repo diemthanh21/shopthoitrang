@@ -1,6 +1,6 @@
 const repo = require('../repositories/donhang.repository');
 const chitietdonhangService = require('./chitietdonhang.service');
-const membershipWorkflow = require('./membership.workflow');
+const membershipService = require('./membership.service');
 const supabase = require('../../config/db');
 
 const normalizeStatus = (value = '') =>
@@ -485,7 +485,7 @@ class DonHangService {
       const prevStatus = existing ? normalizeStatus(existing.trangthaidonhang || '') : '';
       const nextStatus = normalizeStatus(updated.trangthaidonhang || body?.trangthaidonhang || '');
       if (nextStatus.includes('DA GIAO') && !prevStatus.includes('DA GIAO')) {
-        await membershipWorkflow.recordOrderSpending(updated);
+        await membershipService.recordOrderSpending(updated);
       }
     } catch (err) {
       console.error('[DonHangService] Membership accrual failed:', err?.message || err);

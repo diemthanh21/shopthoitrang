@@ -6,7 +6,7 @@ import nhanvienService from "../services/nhanvienService";
 import { useAuth } from "../contexts/AuthContext"; // chỉnh path nếu khác
 
 const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString("vi-VN") : "—";
+  iso ? new Date(iso).toLocaleDateString("vi-VN") : "";
 
 export default function MaGiamGiaPage() {
   const { user } = useAuth(); // user đang login
@@ -50,7 +50,7 @@ export default function MaGiamGiaPage() {
 
   // ===== Helpers: id -> tên nhân viên =====
   const getTenNhanVien = (maNV) => {
-    if (!maNV) return "—";
+    if (!maNV) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNV ||
@@ -372,7 +372,7 @@ export default function MaGiamGiaPage() {
                       {v.maCode}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {v.moTa || "—"}
+                      {v.moTa || ""}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {v.giaTriGiam}

@@ -43,7 +43,7 @@ const daysGrid = (ym) => {
 };
 
 const fmtVNDate = (s) => {
-  if (!s) return "—";
+  if (!s) return "";
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleDateString("vi-VN");
@@ -60,7 +60,7 @@ function StatusBadge({ value }) {
       : "bg-gray-100 text-gray-700";
   return (
     <span className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${cls}`}>
-      {value || "—"}
+      {value || ""}
     </span>
   );
 }

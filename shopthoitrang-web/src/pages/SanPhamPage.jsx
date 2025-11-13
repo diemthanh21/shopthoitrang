@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { Boxes, Plus, Search, Edit, Eye } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, Plus, Search, Eye } from "lucide-react";
 import { Modal, Form, Input, Select, message } from "antd";
 import { useNavigate } from "react-router-dom";
 
 import sanphamService from "../services/sanphamService";
 import danhmucService from "../services/danhmucService";
-import thuonghieuService from "../services/thuonghieuService";
+
+const PAGE_SIZE = 10;
 
 export default function SanPhamPage() {
   const navigate = useNavigate();
@@ -17,16 +18,15 @@ export default function SanPhamPage() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [danhMucList, setDanhMucList] = useState([]);
-  const [thuongHieuList, setThuongHieuList] = useState([]);
 
   const [danhMucMap, setDanhMucMap] = useState({});
-  const [thuongHieuMap, setThuongHieuMap] = useState({});
   const [form] = Form.useForm();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageInput, setPageInput] = useState("1");
 
   useEffect(() => {
     fetchData();
     fetchDanhMuc();
-    fetchThuongHieu();
   }, []);
 
   async function fetchData() {
@@ -59,25 +59,6 @@ export default function SanPhamPage() {
     }
   }
 
-  async function fetchThuongHieu() {
-    try {
-      const data = await thuonghieuService.getAll();
-      setThuongHieuList(data);
-      const thuongHieuMapping = {};
-      data.forEach((th) => {
-        thuongHieuMapping[th.mathuonghieu ?? th.maThuongHieu] =
-          th.tenthuonghieu ?? th.tenThuongHieu;
-      });
-      setThuongHieuMap(thuongHieuMapping);
-    } catch (e) {
-      console.error("Lỗi khi tải thương hiệu:", e.response || e);
-      message.error(
-        "Không thể tải danh sách thương hiệu: " +
-          (e.response?.data?.message || e.message)
-      );
-    }
-  }
-
   // Modal handlers
   const showModal = (record = null) => {
     setEditingProduct(record);
@@ -85,7 +66,6 @@ export default function SanPhamPage() {
       form.setFieldsValue({
         tenSanPham: record.tenSanPham,
         maDanhMuc: record.maDanhMuc,
-        maThuongHieu: record.maThuongHieu,
         trangThai: record.trangThai,
       });
     } else {
@@ -118,18 +98,53 @@ export default function SanPhamPage() {
     }
   };
 
-  const term = searchTerm.trim().toLowerCase();
-  const filtered = items.filter((sp) => {
-    if (!term) return true;
-    const haystacks = [
-      String(sp.maSanPham ?? ""),
-      sp.tenSanPham ?? "",
-      String(sp.maDanhMuc ?? ""),
-      String(sp.maThuongHieu ?? ""),
-      String(sp.trangThai ?? ""),
-    ].map((x) => x.toString().toLowerCase());
-    return haystacks.some((x) => x.includes(term));
-  });
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const filtered = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return items.filter((sp) => {
+      if (!term) return true;
+      const haystacks = [
+        String(sp.maSanPham ?? ""),
+        sp.tenSanPham ?? "",
+        String(sp.maDanhMuc ?? ""),
+        String(sp.trangThai ?? ""),
+      ].map((x) => x.toString().toLowerCase());
+      return haystacks.some((x) => x.includes(term));
+    });
+  }, [items, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE) || 1);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  useEffect(() => {
+    setPageInput(String(currentPage));
+  }, [currentPage]);
+
+  const startIndex = (currentPage - 1) * PAGE_SIZE;
+  const paginated = filtered.slice(startIndex, startIndex + PAGE_SIZE);
+
+  const handlePageInputBlur = () => {
+    const num = Number(pageInput);
+    if (!Number.isNaN(num) && num >= 1 && num <= totalPages) {
+      setCurrentPage(num);
+    } else {
+      setPageInput(String(currentPage));
+    }
+  };
+
+  const handlePageInputKey = (e) => {
+    if (e.key === "Enter") {
+      handlePageInputBlur();
+    }
+  };
 
   if (loading) {
     return (
@@ -191,7 +206,9 @@ export default function SanPhamPage() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            {term ? "Không tìm thấy sản phẩm" : "Chưa có sản phẩm nào"}
+            {searchTerm.trim()
+              ? "Không tìm thấy sản phẩm"
+              : "Chưa có sản phẩm nào"}
           </div>
         ) : (
           <table className="min-w-full">
@@ -207,9 +224,6 @@ export default function SanPhamPage() {
                   Danh mục
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Thương hiệu
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Trạng thái
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -218,7 +232,7 @@ export default function SanPhamPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.map((sp) => (
+              {paginated.map((sp) => (
                 <tr key={sp.maSanPham} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {sp.maSanPham}
@@ -229,11 +243,6 @@ export default function SanPhamPage() {
                   <td className="px-4 py-3 text-sm text-gray-700">
                     <span title={`Mã: ${sp.maDanhMuc}`}>
                       {danhMucMap[sp.maDanhMuc] ?? "N/A"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    <span title={`Mã: ${sp.maThuongHieu}`}>
-                      {thuongHieuMap[sp.maThuongHieu] ?? "N/A"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm">
@@ -249,7 +258,6 @@ export default function SanPhamPage() {
                   </td>
                   <td className="px-4 py-3 text-right text-sm">
                     <div className="flex justify-end gap-2">
-                      {/* Xem chi tiết -> chuyển trang */}
                       <button
                         onClick={() =>
                           navigate(`/sanpham/${sp.maSanPham}`)
@@ -259,15 +267,6 @@ export default function SanPhamPage() {
                       >
                         <Eye size={18} />
                       </button>
-                      {/* Sửa sản phẩm */}
-                      <button
-                        onClick={() => showModal(sp)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Sửa sản phẩm"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      {/* Không có nút xoá theo yêu cầu của bạn */}
                     </div>
                   </td>
                 </tr>
@@ -276,6 +275,44 @@ export default function SanPhamPage() {
           </table>
         )}
       </div>
+
+      {filtered.length > 0 && (
+        <div className="flex flex-col md:flex-row items-center justify-between gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <span className="text-sm text-gray-600">
+            Trang {currentPage}/{totalPages} · Tổng {filtered.length} sản phẩm
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-1 rounded-lg border text-sm hover:bg-blue-50 disabled:opacity-40"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              Trước
+            </button>
+            <div className="flex items-center gap-1 text-sm text-gray-600">
+              <span>Trang</span>
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+                onBlur={handlePageInputBlur}
+                onKeyDown={handlePageInputKey}
+                className="w-16 px-2 py-1 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center"
+              />
+              <span>/ {totalPages}</span>
+            </div>
+            <button
+              className="px-3 py-1 rounded-lg border text-sm hover:bg-blue-50 disabled:opacity-40"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Form Modal thêm/sửa sản phẩm */}
       <Modal
@@ -293,7 +330,7 @@ export default function SanPhamPage() {
             trangThai: true,
           }}
         >
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
             <Form.Item
               name="tenSanPham"
               label="Tên sản phẩm"
@@ -313,51 +350,38 @@ export default function SanPhamPage() {
               <Input placeholder="Nhập tên sản phẩm" />
             </Form.Item>
 
-            <Form.Item
-              name="maDanhMuc"
-              label="Danh mục"
-              rules={[{ required: true, message: "Vui lòng chọn danh mục!" }]}
-            >
-              <Select placeholder="Chọn danh mục">
-                {danhMucList.map((dm) => (
-                  <Select.Option
-                    key={dm.madanhmuc ?? dm.maDanhMuc}
-                    value={dm.madanhmuc ?? dm.maDanhMuc}
-                  >
-                    {dm.tendanhmuc ?? dm.tenDanhMuc}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Form.Item
+                name="maDanhMuc"
+                label="Danh mục"
+                rules={[{ required: true, message: "Vui lòng chọn danh mục!" }]}
+              >
+                <Select placeholder="Chọn danh mục">
+                  {danhMucList.map((dm) => (
+                    <Select.Option
+                      key={dm.madanhmuc ?? dm.maDanhMuc}
+                      value={dm.madanhmuc ?? dm.maDanhMuc}
+                    >
+                      {dm.tendanhmuc ?? dm.tenDanhMuc}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-            <Form.Item
-              name="maThuongHieu"
-              label="Thương hiệu"
-              rules={[
-                { required: true, message: "Vui lòng chọn thương hiệu!" },
-              ]}
-            >
-              <Select placeholder="Chọn thương hiệu">
-                {thuongHieuList.map((th) => (
-                  <Select.Option
-                    key={th.mathuonghieu ?? th.maThuongHieu}
-                    value={th.mathuonghieu ?? th.maThuongHieu}
-                  >
-                    {th.tenthuonghieu ?? th.tenThuongHieu}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+              <Form.Item name="trangThai" label="Trạng thái">
+                <Select>
+                  <Select.Option value={true}>Đang bán</Select.Option>
+                  <Select.Option value={false}>Ngừng bán</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
 
-            <Form.Item name="trangThai" label="Trạng thái">
-              <Select>
-                <Select.Option value={true}>Đang bán</Select.Option>
-                <Select.Option value={false}>Ngưng bán</Select.Option>
-              </Select>
+            <Form.Item name="moTa" label="Mô tả">
+              <Input.TextArea rows={3} placeholder="Mô tả ngắn cho sản phẩm..." />
             </Form.Item>
           </div>
 
-          <Form.Item className="mb-0">
+          <Form.Item className="mb-0 mt-6">
             <div className="flex justify-end space-x-4">
               <button
                 type="button"

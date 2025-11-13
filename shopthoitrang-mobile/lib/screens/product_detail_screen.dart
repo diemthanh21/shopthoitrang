@@ -1073,7 +1073,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               if (variant?.color != null &&
                                   variant!.color!.isNotEmpty)
                                 _detailRow('Màu sắc', variant.color!),
-                              if (variant?.size != null &&
+                              if (variant != null &&
+                                  variant!.sizes.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Kích thước',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: variant!.sizes
+                                            .map(
+                                              (sz) => Chip(
+                                                label: Text(
+                                                  sz.name.isNotEmpty
+                                                      ? sz.name
+                                                      : '',
+                                                ),
+                                                avatar: sz.stock > 0
+                                                    ? null
+                                                    : const Icon(
+                                                        Icons
+                                                            .warning_amber_rounded,
+                                                        size: 16,
+                                                        color: Colors.orange,
+                                                      ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (variant?.size != null &&
                                   variant!.size!.isNotEmpty)
                                 _detailRow('Kích thước', variant.size!),
                               if (variant?.desc != null &&

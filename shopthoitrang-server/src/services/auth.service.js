@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const { generateToken } = require('../utils/jwt');
 const TaiKhoanKhachHangRepository = require('../repositories/taikhoankhachhang.repository');
 const TaiKhoanNhanVienRepository = require('../repositories/taikhoannhanvien.repository');
-const membershipWorkflow = require('./membership.workflow');
+const membershipService = require('./membership.service');
 
 const SALT_ROUNDS = 10;
 
@@ -69,7 +69,7 @@ const AuthService = {
     // Tạo tài khoản mới
     const newCustomer = await TaiKhoanKhachHangRepository.create(insertPayload);
     try {
-      await membershipWorkflow.ensureDefaultCard(newCustomer.makhachhang);
+      await membershipService.ensureDefaultCard(newCustomer.makhachhang);
     } catch (err) {
       console.error('[AuthService] Khong the khoi tao the thanh vien mac dinh:', err?.message || err);
     }

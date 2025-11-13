@@ -29,7 +29,7 @@ const fmtCurrency = (v) =>
     maximumFractionDigits: 0,
   }).format(Number(v || 0));
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 // Chuẩn hoá trạng thái: bỏ dấu, thường hoá
 const normalizeStatus = (s = "") =>
@@ -54,7 +54,7 @@ export default function ChiTietPhieuDatHangPage() {
 
   // Helper function to get supplier name
   const getTenNhaCungCap = (maNCC) => {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -66,7 +66,7 @@ export default function ChiTietPhieuDatHangPage() {
 
   // Helper function to get employee name
   const getTenNhanVien = (maNhanVien) => {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -236,7 +236,7 @@ export default function ChiTietPhieuDatHangPage() {
     const tenSP =
       sanPham?.tenSanPham ??
       sanPham?.tensanpham ??
-      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "—");
+      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "");
 
     const kichThuocRow = row.kichThuoc ?? row.kichthuoc;
     const mauSacRow = row.mauSac ?? row.mausac;
@@ -688,7 +688,7 @@ const colorOptions = useMemo(() => {
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
-                {trangThai || "—"}
+                {trangThai || ""}
               </span>
             </div>
           </div>
@@ -767,11 +767,11 @@ const colorOptions = useMemo(() => {
             <div className="space-y-2">
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhà cung cấp:</span>
-                <span>{tenNCC || "—"}</span>
+                <span>{tenNCC || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhân viên:</span>
-                <span>{tenNV || "—"}</span>
+                <span>{tenNV || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Ngày đặt:</span>
@@ -804,7 +804,7 @@ const colorOptions = useMemo(() => {
                       : "bg-green-50 text-green-700"
                   }`}
                 >
-                  {trangThai || "—"}
+                  {trangThai || ""}
                 </span>
               </div>
             </div>
@@ -853,7 +853,7 @@ const colorOptions = useMemo(() => {
                     <option value="Thẻ tín dụng">Thẻ tín dụng</option>
                   </select>
                 ) : (
-                  <span>{ptThanhToan || "—"}</span>
+                  <span>{ptThanhToan || ""}</span>
                 )}
               </div>
               <div className="py-1 border-b">
@@ -1025,10 +1025,10 @@ const colorOptions = useMemo(() => {
                         {tenSanPham}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {kichThuoc ?? "—"}
+                        {kichThuoc ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {mauSac ?? "—"}
+                        {mauSac ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">
                         {soLuong}
@@ -1040,7 +1040,7 @@ const colorOptions = useMemo(() => {
                         {fmtCurrency(thanhTien)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {it.ghiChu ?? it.ghichu ?? "—"}
+                        {it.ghiChu ?? it.ghichu ?? ""}
                       </td>
                       {canEdit && (
                         <td className="px-4 py-3 text-center">

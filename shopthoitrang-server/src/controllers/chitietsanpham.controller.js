@@ -15,7 +15,9 @@ const ChiTietSanPhamController = {
         orderDir,
       });
       res.json({ items: items.map((i) => i.toJSON()), total });
-    } catch (err) { next(err); }
+    } catch (err) {
+      next(err);
+    }
   },
 
   async getById(req, res) {
@@ -23,7 +25,7 @@ const ChiTietSanPhamController = {
       const item = await service.get(req.params.id);
       res.json(item.toJSON());
     } catch (err) {
-      res.status(err.status || 404).json({ message: err.message || 'Không tìm thấy' });
+      res.status(err.status || 404).json({ message: err.message || 'Khong tim thay' });
     }
   },
 
@@ -32,7 +34,7 @@ const ChiTietSanPhamController = {
       const item = await service.create(req.body);
       res.status(201).json(item.toJSON());
     } catch (err) {
-      res.status(err.status || 400).json({ message: err.message || 'Tạo thất bại' });
+      res.status(err.status || 400).json({ message: err.message || 'Tao that bai' });
     }
   },
 
@@ -41,7 +43,7 @@ const ChiTietSanPhamController = {
       const item = await service.update(req.params.id, req.body);
       res.json(item.toJSON());
     } catch (err) {
-      res.status(err.status || 400).json({ message: err.message || 'Cập nhật thất bại' });
+      res.status(err.status || 400).json({ message: err.message || 'Cap nhat that bai' });
     }
   },
 
@@ -50,7 +52,25 @@ const ChiTietSanPhamController = {
       const result = await service.remove(req.params.id);
       res.json(result);
     } catch (err) {
-      res.status(err.status || 400).json({ message: err.message || 'Xoá thất bại' });
+      res.status(err.status || 400).json({ message: err.message || 'Xoa that bai' });
+    }
+  },
+
+  async getSizes(req, res) {
+    try {
+      const data = await service.getSizes(req.params.id);
+      res.json(data);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Khong tim thay size' });
+    }
+  },
+
+  async saveSizes(req, res) {
+    try {
+      const data = await service.replaceSizes(req.params.id, req.body);
+      res.json(data);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message || 'Cap nhat size that bai' });
     }
   },
 };

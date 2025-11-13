@@ -8,7 +8,7 @@ import nhanvienService from "../services/nhanvienService";
 import { useAuth } from "../contexts/AuthContext"; // chỉnh path nếu khác
 
 const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString("vi-VN") : "—";
+  iso ? new Date(iso).toLocaleDateString("vi-VN") : "";
 
 export default function KhuyenMaiPage() {
   const { user } = useAuth();
@@ -55,7 +55,7 @@ export default function KhuyenMaiPage() {
 
   // ===== Helper: id -> tên sản phẩm =====
   const getTenSanPham = (maSP) => {
-    if (!maSP) return "—";
+    if (!maSP) return "";
     const found = products.find(
       (p) =>
         p.maSanPham === maSP ||
@@ -67,7 +67,7 @@ export default function KhuyenMaiPage() {
 
   // ===== Helper: id -> tên nhân viên =====
   const getTenNhanVien = (maNV) => {
-    if (!maNV) return "—";
+    if (!maNV) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNV ||
@@ -421,7 +421,7 @@ export default function KhuyenMaiPage() {
                       {tenCT}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {loai || "—"}
+                      {loai || ""}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
                       {tenSP}

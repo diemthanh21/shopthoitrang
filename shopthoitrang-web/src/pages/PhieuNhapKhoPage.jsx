@@ -9,7 +9,7 @@ import nhacungcapService from "../services/nhacungcapService";
 
 // Format helpers
 const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString("vi-VN") : "—";
+  iso ? new Date(iso).toLocaleDateString("vi-VN") : "";
 
 function StatusDot({ color }) {
   return <span className={`inline-block w-2 h-2 rounded-full mr-2 ${color}`} />;
@@ -73,7 +73,7 @@ export default function PhieuNhapKhoPage() {
 
   // ===== Helper: id -> tên nhân viên =====
   function getTenNhanVien(maNhanVien) {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -85,7 +85,7 @@ export default function PhieuNhapKhoPage() {
 
   // ===== Helper: id -> tên nhà cung cấp =====
   function getTenNhaCungCap(maNCC) {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -285,7 +285,7 @@ export default function PhieuNhapKhoPage() {
                       <Badge color={badgeColor}>{status}</Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
-                      {r.ghiChu ?? "—"}
+                      {r.ghiChu ?? ""}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button

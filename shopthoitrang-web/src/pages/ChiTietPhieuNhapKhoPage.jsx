@@ -24,7 +24,7 @@ import nhacungcapService from "../services/nhacungcapService";
 import nhanvienService from "../services/nhanvienService";
 import { useAuth } from "../contexts/AuthContext";
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 // Chuẩn hoá trạng thái: bỏ dấu, lowercase
 const normalizeStatus = (s = "") =>
@@ -72,7 +72,7 @@ export default function ChiTietPhieuNhapKhoPage() {
 
   // ===== Helper: id -> tên NCC / NV =====
   const getTenNhaCungCap = (maNCC) => {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -83,7 +83,7 @@ export default function ChiTietPhieuNhapKhoPage() {
   };
 
   const getTenNhanVien = (maNV) => {
-    if (!maNV) return "—";
+    if (!maNV) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNV ||
@@ -230,7 +230,7 @@ export default function ChiTietPhieuNhapKhoPage() {
     const tenSP =
       sanPham?.tenSanPham ??
       sanPham?.tensanpham ??
-      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "—");
+      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "");
 
     const kichThuoc = chiTiet?.kichThuoc ?? chiTiet?.kichthuoc ?? null;
     const mauSac = chiTiet?.mauSac ?? chiTiet?.mausac ?? null;
@@ -810,7 +810,7 @@ export default function ChiTietPhieuNhapKhoPage() {
                     : "bg-gray-100 text-gray-700"
                 }`}
               >
-                {trangThai || "—"}
+                {trangThai || ""}
               </span>
             </div>
           </div>
@@ -889,11 +889,11 @@ export default function ChiTietPhieuNhapKhoPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhà cung cấp:</span>
-                <span>{tenNCC || "—"}</span>
+                <span>{tenNCC || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhân viên nhập:</span>
-                <span>{tenNV || "—"}</span>
+                <span>{tenNV || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Ngày nhập:</span>
@@ -1067,16 +1067,16 @@ export default function ChiTietPhieuNhapKhoPage() {
                         {tenSanPham}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {kichThuoc ?? "—"}
+                        {kichThuoc ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {mauSac ?? "—"}
+                        {mauSac ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">
                         {soLuongNhap}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {it.ghiChu ?? it.ghichu ?? "—"}
+                        {it.ghiChu ?? it.ghichu ?? ""}
                       </td>
                       {canEdit && (
                         <td className="px-4 py-3 text-center">

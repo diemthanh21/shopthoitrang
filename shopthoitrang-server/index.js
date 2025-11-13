@@ -55,6 +55,7 @@ app.use('/api/noidungchat', require('./src/routes/noidungchat.route'));
 app.use('/api/chat', require('./src/routes/chat.route'));
 app.use('/api/membership', require('./src/routes/membership.route'));
 app.use('/api/loyalty', require('./src/routes/loyalty.route'));
+app.use('/api/kichthuocs', require('./src/routes/kichthuoc.route'));
 app.use('/api/phancongca', require('./src/routes/phancongca.route'));
 app.use('/api/phieudathang', require('./src/routes/phieudathang.route'));
 app.use('/api/phieunhapkho', require('./src/routes/phieunhapkho.route'));
