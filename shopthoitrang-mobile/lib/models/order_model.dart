@@ -1,17 +1,18 @@
-/// Model đơn hàng (donhang table)
+/// Models for orders and order items.
 import 'membership_model.dart';
 
+/// Order model (donhang table)
 class Order {
   final int? id; // madonhang
   final int customerId; // makhachhang
   final DateTime orderDate; // ngaydathang
-  final DateTime? deliveredDate; // ngaygiaohang - thời điểm xác nhận đã giao
+  final DateTime? deliveredDate; // ngaygiaohang
   final double total; // thanhtien
   final String paymentMethod; // phuongthucthanhtoan
   final String paymentStatus; // trangthaithanhtoan
   final String orderStatus; // trangthaidonhang
   final List<OrderItem> items; // chitietdonhang
-  final DiaChiKhachHang? shippingAddress; // địa chỉ giao đã chọn lúc checkout
+  final DiaChiKhachHang? shippingAddress; // dia chi giao hang
 
   Order({
     this.id,
@@ -38,7 +39,8 @@ class Order {
           : null,
       total: (json['thanhtien'] ?? 0).toDouble(),
       paymentMethod: json['phuongthucthanhtoan'] ?? json['paymentMethod'] ?? '',
-      paymentStatus: json['trangthaithanhtoan'] ?? json['paymentStatus'] ?? '',
+      paymentStatus:
+          json['trangthaithanhtoan'] ?? json['paymentStatus'] ?? '',
       orderStatus: json['trangthaidonhang'] ?? json['orderStatus'] ?? '',
       items: (json['items'] as List<dynamic>?)
               ?.map((item) => OrderItem.fromJson(item))
@@ -89,17 +91,18 @@ class Order {
   }
 }
 
-/// Model chi tiết đơn hàng (chitietdonhang table)
+/// Order item model (chitietdonhang table)
 class OrderItem {
   final int? id; // machitietdonhang
   final int? orderId; // madonhang
   final int variantId; // machitietsanpham
-  final int? productId; // masanpham (từ join)
+  final int? productId; // masanpham (join)
   final int quantity; // soluong
   final double price; // dongia
-  final String? productName; // tensanpham (từ join)
-  final String? variantName; // tên phân loại (từ join)
-  final String? imageUrl; // hinhanh (từ join)
+  final String? productName; // tensanpham (join)
+  final String? variantName; // phan loai (join)
+  final String? imageUrl; // hinhanh (join)
+  final int? sizeBridgeId; // chitietsize_id (chitietsanpham_kichthuoc.id)
 
   OrderItem({
     this.id,
@@ -111,6 +114,7 @@ class OrderItem {
     this.productName,
     this.variantName,
     this.imageUrl,
+    this.sizeBridgeId,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -129,13 +133,8 @@ class OrderItem {
       }
     }
 
-    // Server trả về productId từ variant enrichment
-    // Nếu không có thì cần query riêng (nhưng thường có)
-    int? productId = json['masanpham'] ?? json['productId'];
-
-    // WORKAROUND: Nếu server không trả productId, cần lấy từ API khác
-    // Hoặc yêu cầu server thêm masanpham vào response items
-    // Tạm thời để null nếu không có
+    // productId might come from enriched variant
+    final int? productId = json['masanpham'] ?? json['productId'];
 
     return OrderItem(
       id: json['machitietdonhang'] ?? json['id'],
@@ -147,6 +146,9 @@ class OrderItem {
       productName: json['productName'] ?? json['tensanpham'],
       variantName: variantText ?? json['variantName'],
       imageUrl: json['imageUrl'] ?? json['hinhanh'],
+      sizeBridgeId: json['sizeBridgeId'] ??
+          json['chitietsize_id'] ??
+          json['chitietsizeId'],
     );
   }
 
@@ -161,13 +163,14 @@ class OrderItem {
       if (productName != null) 'tensanpham': productName,
       if (variantName != null) 'variantName': variantName,
       if (imageUrl != null) 'hinhanh': imageUrl,
+      if (sizeBridgeId != null) 'chitietsizeId': sizeBridgeId,
     };
   }
 
   double get total => price * quantity;
 }
 
-/// Model địa chỉ khách hàng (diachikhachhang table)
+/// Simple shipping address model (legacy; main address type is DiaChiKhachHang)
 class ShippingAddress {
   final int? id; // madiachi
   final int customerId; // makhachhang
@@ -195,3 +198,4 @@ class ShippingAddress {
     };
   }
 }
+

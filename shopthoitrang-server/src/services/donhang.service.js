@@ -410,17 +410,50 @@ class DonHangService {
         try {
           console.log(`[DonHangService.create] Processing item:`, item);
           
-          // Map field names: mobile sends machitietsanpham/soluong/dongia
+          // Map field names: mobile/web sends machitietsanpham/soluong/dongia + optional size bridge
           const variantId = item.machitietsanpham || item.variantId;
           const quantity = item.soluong || item.quantity;
           const price = item.dongia || item.price;
+          // Size bridge: id của bảng chitietsanpham_kichthuoc
+          let sizeBridgeId =
+            item.chitietsizeId ||
+            item.chitietsize_id ||
+            item.sizeBridgeId ||
+            null;
+          // Hoặc client chỉ gửi makichthuoc
+          const sizeId =
+            item.makichthuoc ||
+            item.sizeId ||
+            item.kichthuocId ||
+            null;
           
           console.log(`[DonHangService.create] Mapped values:`, {
             variantId,
             quantity,
             price,
+            sizeBridgeId,
+            sizeId,
             madonhang: order.madonhang
           });
+
+          // Nếu chưa có bridge id nhưng có makichthuoc => tìm dòng size tương ứng
+          if (!sizeBridgeId && variantId && sizeId) {
+            try {
+              const { data: sizeRow, error: sizeErr } = await supabase
+                .from('chitietsanpham_kichthuoc')
+                .select('id')
+                .eq('machitietsanpham', variantId)
+                .eq('makichthuoc', sizeId)
+                .maybeSingle();
+              if (sizeErr) {
+                console.error('[DonHangService.create] Lookup size row failed:', sizeErr);
+              } else if (sizeRow?.id) {
+                sizeBridgeId = sizeRow.id;
+              }
+            } catch (lookupErr) {
+              console.error('[DonHangService.create] Lookup size row exception:', lookupErr);
+            }
+          }
           
           // Create order item
           await chitietdonhangService.taoMoi({
@@ -428,32 +461,36 @@ class DonHangService {
             machitietsanpham: variantId,
             soluong: quantity,
             dongia: price,
+            chitietsize_id: sizeBridgeId || null,
           });
-          console.log(`[DonHangService.create] Created order item: variant=${variantId}, qty=${quantity}, price=${price}`);
-          
-          // Update stock: reduce soluongton
-          const { data: variant, error: fetchError } = await supabase
-            .from('chitietsanpham')
-            .select('soluongton')
-            .eq('machitietsanpham', variantId)
-            .single();
-          
-          if (fetchError) {
-            console.error(`[DonHangService.create] Error fetching variant ${variantId}:`, fetchError);
-            continue;
-          }
-          
-          if (variant) {
-            const newStock = Math.max(0, variant.soluongton - quantity);
-            const { error: updateError } = await supabase
-              .from('chitietsanpham')
-              .update({ soluongton: newStock })
-              .eq('machitietsanpham', variantId);
-            
-            if (updateError) {
-              console.error(`[DonHangService.create] Error updating stock for variant ${variantId}:`, updateError);
-            } else {
-              console.log(`[DonHangService.create] Updated stock for variant ${variantId}: ${variant.soluongton} -> ${newStock}`);
+          console.log(`[DonHangService.create] Created order item: variant=${variantId}, qty=${quantity}, price=${price}, chitietsize_id=${sizeBridgeId || 'null'}`);
+
+          // Trừ tồn kho theo đúng dòng size nếu biết
+          if (sizeBridgeId && quantity > 0) {
+            try {
+              const { data: sizeRow, error: sizeFetchErr } = await supabase
+                .from('chitietsanpham_kichthuoc')
+                .select('so_luong')
+                .eq('id', sizeBridgeId)
+                .maybeSingle();
+
+              if (sizeFetchErr) {
+                console.error('[DonHangService.create] Error fetching size stock for id', sizeBridgeId, sizeFetchErr);
+              } else if (sizeRow) {
+                const current = Number(sizeRow.so_luong) || 0;
+                const newQty = Math.max(0, current - Number(quantity || 0));
+                const { error: sizeUpdErr } = await supabase
+                  .from('chitietsanpham_kichthuoc')
+                  .update({ so_luong: newQty })
+                  .eq('id', sizeBridgeId);
+                if (sizeUpdErr) {
+                  console.error('[DonHangService.create] Error updating size stock for id', sizeBridgeId, sizeUpdErr);
+                } else {
+                  console.log(`[DonHangService.create] Updated size stock id=${sizeBridgeId}: ${current} -> ${newQty}`);
+                }
+              }
+            } catch (stockErr) {
+              console.error('[DonHangService.create] Size stock update exception:', stockErr);
             }
           }
           
@@ -469,9 +506,16 @@ class DonHangService {
 
   async update(id, body) {
     const existing = await repo.getById(id);
-    // If status set to '??A? giao', stamp delivery date so mobile can enforce return window
-    if (body && body.trangthaidonhang && body.trangthaidonhang === '??A? giao') {
+
+    // If status set to 'Đã giao', stamp delivery date so mobile can enforce return window
+    if (body && body.trangthaidonhang && body.trangthaidonhang === 'Đã giao') {
       if (!body.ngaygiaohang) body.ngaygiaohang = new Date().toISOString();
+
+      // Business rule: for COD orders, 'Đã giao' means 'Đã thanh toán'
+      const paymentMethod = body.phuongthucthanhtoan || existing?.phuongthucthanhtoan;
+      if (paymentMethod === 'COD' && !body.trangthaithanhtoan) {
+        body.trangthaithanhtoan = 'Đã thanh toán';
+      }
     }
 
     const updated = await repo.update(id, body);
@@ -484,11 +528,64 @@ class DonHangService {
     try {
       const prevStatus = existing ? normalizeStatus(existing.trangthaidonhang || '') : '';
       const nextStatus = normalizeStatus(updated.trangthaidonhang || body?.trangthaidonhang || '');
+
+      // Khi đơn mới chuyển sang 'Đã giao' lần đầu -> cộng điểm thành viên
       if (nextStatus.includes('DA GIAO') && !prevStatus.includes('DA GIAO')) {
         await membershipService.recordOrderSpending(updated);
       }
+
+      // Khi đơn bị hủy trước khi giao -> cộng trả tồn kho
+      const justCancelled =
+        nextStatus.includes('DA HUY') && !prevStatus.includes('DA HUY');
+      const wasDeliveredBefore = prevStatus.includes('DA GIAO');
+
+      if (justCancelled && !wasDeliveredBefore) {
+        try {
+          const { data: items, error: itemsErr } = await supabase
+            .from('chitietdonhang')
+            .select('chitietsize_id, soluong')
+            .eq('madonhang', id);
+
+          if (itemsErr) {
+            console.error('[DonHangService.update] Error fetching order items for restock:', itemsErr);
+          } else if (Array.isArray(items)) {
+            for (const it of items) {
+              const sizeBridgeId = it.chitietsize_id;
+              const quantity = Number(it.soluong) || 0;
+              if (!sizeBridgeId || quantity <= 0) continue;
+
+              const { data: sizeRow, error: fetchErr } = await supabase
+                .from('chitietsanpham_kichthuoc')
+                .select('so_luong')
+                .eq('id', sizeBridgeId)
+                .maybeSingle();
+
+              if (fetchErr) {
+                console.error('[DonHangService.update] Error fetching size stock for id', sizeBridgeId, fetchErr);
+                continue;
+              }
+
+              const currentStock = Number(sizeRow?.so_luong) || 0;
+              const newStock = currentStock + quantity;
+
+              const { error: updErr } = await supabase
+                .from('chitietsanpham_kichthuoc')
+                .update({ so_luong: newStock })
+                .eq('id', sizeBridgeId);
+
+              if (updErr) {
+                console.error('[DonHangService.update] Error restocking size id', sizeBridgeId, updErr);
+              } else {
+                console.log(`[DonHangService.update] Restocked size id=${sizeBridgeId}: ${currentStock} -> ${newStock}`);
+              }
+            }
+          }
+        } catch (stockErr) {
+          console.error('[DonHangService.update] Restock on cancel failed:', stockErr);
+        }
+      }
     } catch (err) {
-      console.error('[DonHangService] Membership accrual failed:', err?.message || err);
+      console.error('[DonHangService] Membership / stock update failed:', err?.message || err);
     }
 
     return updated;

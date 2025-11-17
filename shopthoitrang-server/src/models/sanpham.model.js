@@ -6,6 +6,7 @@ class SanPham {
     mathuonghieu,
     trangthai,
     hinhanh,
+    bangsize,
   }) {
     this.maSanPham = masanpham;
     this.tenSanPham = tensanpham;
@@ -13,6 +14,7 @@ class SanPham {
     this.maThuongHieu = mathuonghieu;
     this.trangThai = trangthai;
     this.hinhAnh = hinhanh ?? null;
+     this.bangSize = bangsize ?? null;
   }
 
   toJSON() {
@@ -23,6 +25,7 @@ class SanPham {
       mathuonghieu: this.maThuongHieu,
       trangthai: this.trangThai,
       hinhanh: this.hinhAnh,
+      bangsize: this.bangSize,
     };
   }
 }

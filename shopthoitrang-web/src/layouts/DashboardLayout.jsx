@@ -73,10 +73,11 @@ const DashboardLayout = () => {
       ],
     },
     {
-      label: "Khuyến mãi",
+      label: "Khuyen mai",
       icon: Tag,
-      items: [{ label: "Chương trình khuyến mãi", link: "/khuyenmai" },
-        { label: "Voucher giảm giá", link: "/vouchergiamgia" }
+      items: [
+        { label: "Chuong trinh khuyen mai", link: "/khuyenmai" },
+        { label: "Ma giam gia", link: "/magiamgia" }
       ],
     },
     {

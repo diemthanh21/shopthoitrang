@@ -1,11 +1,13 @@
+// src/controllers/magiamgia.controller.js
 const service = require('../services/magiamgia.service');
 
 const MaGiamGiaController = {
   async getAll(req, res) {
     try {
       const data = await service.list(req.query);
-      res.json(data.map(r => r.toJSON()));
+      res.json(data.map((r) => r.toJSON()));
     } catch (err) {
+      console.error('GET /magiamgia error:', err);
       res.status(500).json({ message: err.message });
     }
   },
@@ -15,6 +17,7 @@ const MaGiamGiaController = {
       const item = await service.get(req.params.id);
       res.json(item.toJSON());
     } catch (err) {
+      console.error('GET /magiamgia/:id error:', err);
       res.status(err.status || 404).json({ message: err.message });
     }
   },
@@ -24,6 +27,7 @@ const MaGiamGiaController = {
       const item = await service.create(req.body);
       res.status(201).json(item.toJSON());
     } catch (err) {
+      console.error('POST /magiamgia error:', err);
       res.status(err.status || 400).json({ message: err.message });
     }
   },
@@ -33,6 +37,7 @@ const MaGiamGiaController = {
       const item = await service.update(req.params.id, req.body);
       res.json(item.toJSON());
     } catch (err) {
+      console.error('PUT /magiamgia/:id error:', err);
       res.status(err.status || 400).json({ message: err.message });
     }
   },
@@ -42,9 +47,10 @@ const MaGiamGiaController = {
       const result = await service.delete(req.params.id);
       res.json(result);
     } catch (err) {
+      console.error('DELETE /magiamgia/:id error:', err);
       res.status(err.status || 400).json({ message: err.message });
     }
-  }
+  },
 };
 
 module.exports = MaGiamGiaController;

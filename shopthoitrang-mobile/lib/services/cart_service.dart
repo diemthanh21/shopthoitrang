@@ -66,6 +66,7 @@ class CartService {
     required int variantId,
     required double price,
     int quantity = 1,
+    int? sizeBridgeId,
   }) async {
     try {
       final token = await _getToken();
@@ -84,6 +85,7 @@ class CartService {
           'variantId': variantId,
           'quantity': quantity,
           'price': price,
+          if (sizeBridgeId != null) 'chitietsizeId': sizeBridgeId,
         }),
       );
 
@@ -133,6 +135,51 @@ class CartService {
       return response.statusCode == 200;
     } catch (e) {
       print('Error updating quantity: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateGiftSelection({
+    required int itemId,
+    required int variantId,
+    int? sizeBridgeId,
+  }) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Ch��a �`��ng nh��-p';
+        throw Exception('Ch��a �`��ng nh��-p');
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/gift/$itemId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'variantId': variantId,
+          if (sizeBridgeId != null) 'sizeBridgeId': sizeBridgeId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        lastError = null;
+        return true;
+      }
+
+      final body = response.body;
+      try {
+        final jsonBody = json.decode(body);
+        lastError =
+            (jsonBody['message'] ?? jsonBody['error'] ?? body).toString();
+      } catch (_) {
+        lastError = 'YA�u c��u th���t b���i (${response.statusCode})';
+      }
+      return false;
+    } catch (e) {
+      lastError = e.toString();
+      print('Error updating gift selection: $e');
       return false;
     }
   }

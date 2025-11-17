@@ -158,6 +158,14 @@ class CatalogService {
   }
 
   async countProducts({ categoryName, minPrice, maxPrice, onlyFiveStar }) {
+    const minNumeric =
+      minPrice !== undefined && minPrice !== null
+        ? Number(minPrice)
+        : undefined;
+    const maxNumeric =
+      maxPrice !== undefined && maxPrice !== null
+        ? Number(maxPrice)
+        : undefined;
     // Reuse filtering without limit/offset to compute count efficiently
     let spQuery = supabase.from('sanpham').select('masanpham');
     if (categoryName && categoryName.trim()) {
@@ -175,10 +183,10 @@ class CatalogService {
     let spIds = (spData || []).map((s) => s.masanpham);
     if (spIds.length === 0) return 0;
 
-    if (minPrice != null || maxPrice != null) {
+    if (minNumeric != null || maxNumeric != null) {
       let ctQuery = supabase.from('chitietsanpham').select('masanpham, giaban');
-      if (minPrice != null) ctQuery = ctQuery.gte('giaban', minPrice);
-      if (maxPrice != null) ctQuery = ctQuery.lte('giaban', maxPrice);
+      if (minNumeric != null) ctQuery = ctQuery.gte('giaban', minNumeric);
+      if (maxNumeric != null) ctQuery = ctQuery.lte('giaban', maxNumeric);
       const { data: ctData, error: ctErr } = await ctQuery;
       if (ctErr) throw ctErr;
       const spIdsByPrice = new Set((ctData || []).map((c) => c.masanpham));

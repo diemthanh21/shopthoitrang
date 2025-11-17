@@ -20,20 +20,26 @@ class ApiClient {
       [http.Client? httpClient, this.timeout = const Duration(seconds: 15)])
       : _http = httpClient ?? http.Client();
 
-  Future<Map<String, dynamic>> get(String path,
-      {Map<String, String>? headers, Map<String, String>? query}) async {
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? headers,
+    Map<String, String>? query,
+    Map<String, String>? queryParameters,
+  }) async {
     final base = await _headers();
     final merged = {
       ...base,
       if (headers != null) ...headers,
     };
     Uri uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
-    if (query != null && query.isNotEmpty) {
+    final effectiveQuery = <String, String>{
+      ...uri.queryParameters,
+      if (query != null) ...query,
+      if (queryParameters != null) ...queryParameters,
+    };
+    if (effectiveQuery.isNotEmpty) {
       uri = uri.replace(
-        queryParameters: {
-          ...uri.queryParameters,
-          ...query,
-        },
+        queryParameters: effectiveQuery,
       );
     }
     try {

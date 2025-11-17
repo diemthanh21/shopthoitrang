@@ -72,12 +72,18 @@ export default function SanPhamDetailPage() {
   });
   const [variantSizes, setVariantSizes] = useState(() => [createEmptySizeRow()]);
   const [variantFiles, setVariantFiles] = useState([]); // { id, file, preview }
+  const [originalVariantImages, setOriginalVariantImages] = useState([]);
+  const [existingVariantImages, setExistingVariantImages] = useState([]);
+  const [imagesMarkedForDelete, setImagesMarkedForDelete] = useState([]);
+  const [sizeSelection, setSizeSelection] = useState({});
   const [saving, setSaving] = useState(false);
   const [sizeCatalog, setSizeCatalog] = useState([]);
   const [loadingSizes, setLoadingSizes] = useState(false);
   const [sizeErr, setSizeErr] = useState("");
   const [coverUploading, setCoverUploading] = useState(false);
   const coverInputRef = useRef(null);
+  const [sizeChartUploading, setSizeChartUploading] = useState(false);
+  const sizeChartInputRef = useRef(null);
   const [showOverview, setShowOverview] = useState(true);
 
   const loadSizeCatalog = useCallback(async () => {
@@ -136,6 +142,76 @@ export default function SanPhamDetailPage() {
     });
   }, []);
 
+  const fetchImagesForVariants = useCallback(async (variantList = []) => {
+    const tasks = variantList.map(async (variant) => {
+      const maCT =
+        (typeof variant === "object"
+          ? variant.maChiTietSanPham ?? variant.machitietsanpham ?? variant.id
+          : variant) ?? null;
+      if (!maCT) return [];
+      try {
+        const resp = await hinhanhsanphamService.getByChiTietSanPham(maCT);
+        const arr = Array.isArray(resp) ? resp : resp?.data ?? [];
+        return arr.map((img) => ({
+          ...img,
+          maChiTietSanPham:
+            img.maChiTietSanPham ??
+            img.machitietsanpham ??
+            img.maChitiet ??
+            maCT,
+        }));
+      } catch (err) {
+        console.warn("Không thể tải ảnh cho biến thể", maCT, err);
+        return [];
+      }
+    });
+
+    const nested = await Promise.all(tasks);
+    return nested.flat();
+  }, []);
+
+  const resetVariantImagesState = useCallback(() => {
+    setOriginalVariantImages([]);
+    setExistingVariantImages([]);
+    setImagesMarkedForDelete([]);
+  }, []);
+
+  useEffect(() => {
+    setSizeSelection((prev) => {
+      const next = {};
+      variants.forEach((v) => {
+        const maCT = v.maChiTietSanPham ?? v.machitietsanpham ?? v.id;
+        if (!maCT) return;
+        if (prev[maCT]) {
+          next[maCT] = prev[maCT];
+        }
+      });
+      return next;
+    });
+  }, [variants]);
+
+  const getImageId = useCallback((img) => {
+    if (!img) return null;
+    return (
+      img.maHinhAnh ??
+      img.mahinhanh ??
+      img.id ??
+      img.ID ??
+      img.maHinh ?? null
+    );
+  }, []);
+
+  const handleRemoveExistingImage = useCallback((img) => {
+    const id = getImageId(img);
+    if (!id) return;
+    setImagesMarkedForDelete((prev) =>
+      prev.includes(id) ? prev : [...prev, id]
+    );
+    setExistingVariantImages((list) =>
+      list.filter((item) => getImageId(item) !== id)
+    );
+  }, [getImageId]);
+
   const handleRemoveVariantFile = useCallback((id) => {
     setVariantFiles((items) => {
       const target = items.find((item) => item.id === id);
@@ -189,8 +265,22 @@ export default function SanPhamDetailPage() {
       });
       setDanhMucMap(dmMap);
 
-      const imgList = Array.isArray(imgRes) ? imgRes : imgRes?.data ?? [];
-      setImages(imgList);
+      const variantImages = await fetchImagesForVariants(ctsps);
+      if (variantImages.length > 0) {
+        setImages(variantImages);
+      } else {
+        const imgList = Array.isArray(imgRes) ? imgRes : imgRes?.data ?? [];
+        setImages(
+          imgList.map((img) => ({
+            ...img,
+            maChiTietSanPham:
+              img.maChiTietSanPham ??
+              img.machitietsanpham ??
+              img.maChitiet ??
+              null,
+          }))
+        );
+      }
     } catch (e) {
       console.error("Lỗi load chi tiết sản phẩm:", e);
       const message =
@@ -226,14 +316,15 @@ export default function SanPhamDetailPage() {
     );
 
     images.forEach((img) => {
-      const maCT = img.maChiTietSanPham ?? img.machitietsanpham;
-      if (!maCT) return;
+      const maCTRaw = img.maChiTietSanPham ?? img.machitietsanpham;
+      if (maCTRaw === undefined || maCTRaw === null) return;
+      const normalizedKey = String(maCTRaw);
       const belongs = variantIds.some(
-        (idCT) => Number(idCT) === Number(maCT)
+        (idCT) => Number(idCT) === Number(maCTRaw)
       );
       if (!belongs) return;
-      if (!map.has(maCT)) map.set(maCT, []);
-      map.get(maCT).push(img);
+      if (!map.has(normalizedKey)) map.set(normalizedKey, []);
+      map.get(normalizedKey).push(img);
     });
 
     return map;
@@ -253,7 +344,12 @@ export default function SanPhamDetailPage() {
       .replace(/\s+/g, "-")
       .toLowerCase()
       .slice(0, 40);
-    const folder = variantId ? `variants/${variantId}` : "cover";
+    let folder = "cover";
+    if (variantId) {
+      folder = `variants/${variantId}`;
+    } else if (file._isSizeChart) {
+      folder = "size-chart";
+    }
     const filePath = `${productId}/${folder}/${Date.now()}-${base}.${ext}`;
 
     const { data, error } = await supabase.storage
@@ -282,6 +378,7 @@ export default function SanPhamDetailPage() {
         maDanhMuc: Number(headerForm.maDanhMuc) || null,
         trangThai: headerForm.trangThai,
         moTa: headerForm.moTa,
+        bangSize: product.bangSize ?? product.bangsize ?? null,
       };
 
       const maSP = product.maSanPham ?? product.masanpham ?? id;
@@ -298,7 +395,7 @@ export default function SanPhamDetailPage() {
   };
 
   // ===== mở / đóng modal biến thể =====
-  const openVariantForm = (variant = null) => {
+  const openVariantForm = async (variant = null) => {
     if (variant) {
       const v = variant;
       setEditingVariant(v);
@@ -317,6 +414,29 @@ export default function SanPhamDetailPage() {
             }))
           : [createEmptySizeRow()];
       setVariantSizes(sizeRows);
+
+      const maCT =
+        v.maChiTietSanPham ?? v.machitietsanpham ?? v.id ?? null;
+      const mapKey = maCT !== null && maCT !== undefined ? String(maCT) : null;
+      let existingImgs = mapKey
+        ? imagesByVariant.get(mapKey) ?? []
+        : [];
+
+      if (maCT && existingImgs.length === 0) {
+        try {
+          const remoteImgs = await hinhanhsanphamService.getByChiTietSanPham(
+            maCT
+          );
+          existingImgs = Array.isArray(remoteImgs) ? remoteImgs : [];
+        } catch (err) {
+          console.warn("Không thể tải ảnh biến thể", maCT, err);
+          existingImgs = [];
+        }
+      }
+
+      setOriginalVariantImages(existingImgs);
+      setExistingVariantImages(existingImgs);
+      setImagesMarkedForDelete([]);
     } else {
       setEditingVariant(null);
       setVariantForm({
@@ -326,6 +446,7 @@ export default function SanPhamDetailPage() {
         moTa: "",
       });
       setVariantSizes([createEmptySizeRow()]);
+      resetVariantImagesState();
     }
     clearVariantFiles();
     setShowVariantForm(true);
@@ -336,6 +457,7 @@ export default function SanPhamDetailPage() {
     setEditingVariant(null);
     clearVariantFiles();
     setVariantSizes([createEmptySizeRow()]);
+    resetVariantImagesState();
   };
 
   const handleVariantFilesChange = (e) => {
@@ -392,6 +514,47 @@ export default function SanPhamDetailPage() {
     }
   };
 
+  const handleSizeChartFileChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !product) return;
+    event.target.value = "";
+
+    try {
+      setSizeChartUploading(true);
+      const maSP = product.maSanPham ?? product.masanpham ?? id;
+      file._isSizeChart = true;
+      const publicUrl = await uploadImageToSupabase(file, maSP, null);
+      await sanphamService.update(maSP, { bangSize: publicUrl });
+      await loadData();
+      alert("Đã cập nhật bảng size cho sản phẩm!");
+    } catch (error) {
+      console.error("Lỗi khi cập nhật bảng size:", error);
+      alert("Không thể cập nhật bảng size. Vui lòng thử lại.");
+    } finally {
+      setSizeChartUploading(false);
+    }
+  };
+
+  const handleRemoveSizeChart = async () => {
+    if (!product) return;
+    const currentChart = product.bangSize ?? product.bangsize;
+    if (!currentChart) return;
+    if (!window.confirm("Bạn chắc chắn muốn gỡ bảng size hiện tại?")) return;
+
+    try {
+      setSizeChartUploading(true);
+      const maSP = product.maSanPham ?? product.masanpham ?? id;
+      await sanphamService.update(maSP, { bangSize: null });
+      await loadData();
+      alert("Đã gỡ bảng size.");
+    } catch (error) {
+      console.error("Lỗi khi gỡ bảng size:", error);
+      alert("Không thể gỡ bảng size. Vui lòng thử lại.");
+    } finally {
+      setSizeChartUploading(false);
+    }
+  };
+
   // ===== lưu chi tiết sản phẩm + upload ảnh =====
   const handleSaveVariant = async (e) => {
   e.preventDefault();
@@ -424,8 +587,19 @@ export default function SanPhamDetailPage() {
     return;
   }
 
-  if (variantFiles.length === 0) {
-    alert("Vui lòng chọn ít nhất một hình ảnh cho biến thể.");
+  const imagesToDeleteSet = new Set(imagesMarkedForDelete.filter(Boolean));
+  const remainingExistingImages = editingVariant
+    ? existingVariantImages.filter(
+        (img) => !imagesToDeleteSet.has(getImageId(img))
+      )
+    : [];
+
+  const totalImagesAfterSave =
+    (editingVariant ? remainingExistingImages.length : 0) +
+    variantFiles.length;
+
+  if (totalImagesAfterSave === 0) {
+    alert("Vui lòng giữ lại hoặc tải lên ít nhất một hình ảnh cho biến thể.");
     return;
   }
 
@@ -437,17 +611,12 @@ export default function SanPhamDetailPage() {
       (sum, item) => sum + (item.soLuong || 0),
       0
     );
-    const primarySizeName =
-      sizeLabelMap.get(String(sizePayload[0].maKichThuoc)) ?? null;
-
     const payload = {
       maSanPham: Number(maSP),
-      kichThuoc: primarySizeName,
       mauSac: variantForm.mauSac,
       chatLieu: variantForm.chatLieu,
       moTa: variantForm.moTa,
       giaBan: Number(variantForm.giaBan) || 0,
-      soLuongTon: totalStock,
     };
 
     let savedVariant = null;
@@ -479,6 +648,17 @@ export default function SanPhamDetailPage() {
       await chitietsanphamService.saveSizes(maCTSaved, sizePayload);
     }
 
+    if (maCTSaved && imagesToDeleteSet.size > 0) {
+      for (const id of imagesToDeleteSet) {
+        if (!id) continue;
+        try {
+          await hinhanhsanphamService.delete(id);
+        } catch (err) {
+          console.warn("Không thể xóa ảnh cũ", id, err);
+        }
+      }
+    }
+
     if (maCTSaved && variantFiles.length > 0) {
       console.log(`Uploading ${variantFiles.length} images for variant ${maCTSaved}...`);
       for (const item of variantFiles) {
@@ -496,8 +676,6 @@ export default function SanPhamDetailPage() {
       }
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
     const freshCtspRes = await chitietsanphamService.getByProductId(maSP);
 
     let freshCtsps = [];
@@ -513,27 +691,53 @@ export default function SanPhamDetailPage() {
 
     setVariants(freshCtsps);
 
-    if (variantFiles.length > 0) {
-      const freshImgRes = await hinhanhsanphamService.getAll();
-      const freshImgList = Array.isArray(freshImgRes)
-        ? freshImgRes
-        : freshImgRes?.data ?? [];
-      setImages(freshImgList);
+    if (maCTSaved) {
+      try {
+        const refreshedImages = await fetchImagesForVariants([maCTSaved]);
+        const variantKey = String(maCTSaved);
+        setImages((prev) => {
+          const filtered = Array.isArray(prev)
+            ? prev.filter(
+                (img) =>
+                  String(
+                    img.maChiTietSanPham ??
+                      img.machitietsanpham ??
+                      img.maChitiet ??
+                      ""
+                  ) !== variantKey
+              )
+            : [];
+          return [...filtered, ...refreshedImages];
+        });
+      } catch (err) {
+        console.warn("Không thể tải ảnh vừa lưu cho biến thể", maCTSaved, err);
+      }
+    } else {
+      try {
+        const allImgs = await hinhanhsanphamService.getAll();
+        const normalizedImgs = Array.isArray(allImgs)
+          ? allImgs
+          : allImgs?.data ?? [];
+        setImages(normalizedImgs);
+      } catch (err) {
+        console.warn("Không thể tải lại toàn bộ ảnh sau khi lưu", err);
+      }
     }
 
     closeVariantForm();
 
     alert(
       editingVariant
-        ? "Variant updated successfully!"
-        : "Variant created successfully!"
+        ? "Chỉnh sửa biến thể thành công!"
+        : "Tạo biến thể thành công!"
     );
   } catch (error) {
     console.error("Error when saving variant:", error);
-    alert(
-      "Failed to save variant: " +
-        (error.message || "")
-    );
+    const serverMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Unknown error";
+    alert(`Failed to save variant: ${serverMessage}`);
   } finally {
     setSaving(false);
   }
@@ -574,6 +778,7 @@ export default function SanPhamDetailPage() {
   const trangThai = headerForm.trangThai;
   const tenDanhMuc = danhMucMap[maDM] ?? (maDM != null ? `#${maDM}` : "");
   const coverUrl = product?.hinhAnh ?? product?.hinhanh ?? "";
+  const sizeChartUrl = product?.bangSize ?? product?.bangsize ?? "";
 
   return (
     <div className="space-y-6">
@@ -590,13 +795,7 @@ export default function SanPhamDetailPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft size={16} />
-          Quay lại
-        </button>
+       
       </div>
 
       {/* Tong quan san pham + cover */}
@@ -672,6 +871,31 @@ export default function SanPhamDetailPage() {
                       <p className="mt-1 text-sm font-semibold text-gray-900">{tenSP}</p>
                     </div>
                   </div>
+                  
+                  {sizeChartUrl && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 flex flex-col gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                        Bảng size
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <div className="h-16 w-32 rounded-lg border border-dashed border-emerald-200 bg-white flex items-center justify-center overflow-hidden">
+                          <img
+                            src={sizeChartUrl}
+                            alt="Bảng size"
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
+                        <a
+                          href={sizeChartUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+                        >
+                          Xem ảnh
+                        </a>
+                      </div>
+                    </div>
+                  )}
                   <div className="rounded-xl border border-dashed border-gray-200 bg-white/70 p-4">
                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                       Mô tả
@@ -743,19 +967,70 @@ export default function SanPhamDetailPage() {
                         <option value="false">Ngừng bán</option>
                       </select>
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="mb-1 block text-xs font-semibold uppercase text-gray-600">
-                        Mô tả
-                      </label>
-                      <textarea
-                        value={headerForm.moTa}
-                        onChange={(e) =>
-                          setHeaderForm((f) => ({ ...f, moTa: e.target.value }))
-                        }
-                        rows={3}
-                        className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
-                      />
-                    </div>
+                    <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+  {/* Mô tả (nhỏ lại) */}
+  <div className="flex flex-col gap-1">
+    <label className="mb-1 block text-xs font-semibold uppercase text-gray-600">
+      Mô tả
+    </label>
+    <textarea
+      value={headerForm.moTa}
+      onChange={(e) =>
+        setHeaderForm((f) => ({ ...f, moTa: e.target.value }))
+      }
+      rows={2}
+      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+    />
+  </div>
+
+  {/* Bảng size nhỏ */}
+  <div className="flex flex-col gap-1">
+    <label className="mb-1 block text-xs font-semibold uppercase text-gray-600">
+      Bảng size
+    </label>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => sizeChartInputRef.current?.click()}
+        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+        disabled={sizeChartUploading}
+      >
+        {sizeChartUploading ? "Đang tải..." : "Chọn ảnh"}
+      </button>
+      {sizeChartUrl && (
+        <button
+          type="button"
+          onClick={handleRemoveSizeChart}
+          className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-white disabled:opacity-50"
+          disabled={sizeChartUploading}
+        >
+          Gỡ
+        </button>
+      )}
+    </div>
+    <div className="mt-1 h-16 w-full rounded-lg border border-dashed border-emerald-200 bg-emerald-50/40 flex items-center justify-center overflow-hidden">
+      {sizeChartUrl ? (
+        <img
+          src={sizeChartUrl}
+          alt="Bang size"
+          className="h-full w-full object-contain"
+        />
+      ) : (
+        <span className="text-[11px] text-emerald-700">
+          Chưa chọn bảng size
+        </span>
+      )}
+    </div>
+    <input
+      ref={sizeChartInputRef}
+      type="file"
+      accept="image/*"
+      className="hidden"
+      onChange={handleSizeChartFileChange}
+    />
+  </div>
+</div>
+
                   </div>
                   <div className="mt-4 flex flex-wrap justify-end gap-2">
                     <button
@@ -774,7 +1049,7 @@ export default function SanPhamDetailPage() {
                       }}
                       className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition hover:bg-white"
                     >
-                      Huy
+                      Hủy
                     </button>
                     <button
                       type="button"
@@ -783,7 +1058,7 @@ export default function SanPhamDetailPage() {
                       className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
                     >
                       <Save size={16} />
-                      {saving ? "Dang luu..." : "Luu thay doi"}
+                      {saving ? "Đang lưu..." : "Lưu thay đổi"}
                     </button>
                   </div>
                 </div>
@@ -874,38 +1149,29 @@ export default function SanPhamDetailPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-blue-50 border-b border-blue-100">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    STT
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-blue-700">
                     Mã chi tiết
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Size
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-blue-700">
+                    Phiên bản (Size / Màu / Chất liệu)
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Màu sắc
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Chất liệu
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-blue-700">
                     Giá bán
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-blue-700">
                     Tồn kho
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
+                  <th className="px-4 py-3 text-center text-xs font-semibold uppercase text-blue-700">
                     Hình ảnh
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase">
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-blue-700">
                     Thao tác
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-blue-50">
                 {variants.map((v, idx) => {
                   const maCT = v.maChiTietSanPham ?? v.machitietsanpham;
                   const size = v.kichThuoc ?? v.kichthuoc;
@@ -914,71 +1180,131 @@ export default function SanPhamDetailPage() {
                   const chatLieu = v.chatLieu ?? v.chatlieu;
                   const giaBan = v.giaBan ?? v.giaban;
                   const tonKho = v.soLuongTon ?? v.soluongton ?? 0;
-                  const computedStock =
+                  const defaultSizeId =
                     sizeOptions.length > 0
-                      ? sizeOptions.reduce(
-                          (sum, sz) => sum + (Number(sz.soLuong) || 0),
-                          0
+                      ? String(
+                          sizeOptions[0].maKichThuoc ??
+                            sizeOptions[0].makichthuoc ??
+                            sizeOptions[0].id ??
+                            0
                         )
-                      : tonKho;
+                      : null;
+                  const selectedSizeId =
+                    sizeSelection[maCT] ?? defaultSizeId;
+                  const selectedSize =
+                    sizeOptions.find(
+                      (sz) =>
+                        String(
+                          sz.maKichThuoc ??
+                            sz.makichthuoc ??
+                            sz.id ??
+                            ""
+                        ) === String(selectedSizeId)
+                    ) ?? null;
+                  const displayedStock = selectedSize
+                    ? Number(selectedSize.soLuong ?? selectedSize.so_luong ?? 0)
+                    : sizeOptions.length > 0
+                    ? Number(
+                        sizeOptions[0].soLuong ?? sizeOptions[0].so_luong ?? 0
+                      )
+                    : tonKho;
 
-                  const imgs = imagesByVariant.get(maCT) || [];
+                  const mapKey = maCT !== null && maCT !== undefined ? String(maCT) : null;
+                  const imgs = mapKey ? imagesByVariant.get(mapKey) || [] : [];
                   const thumbUrl =
                     imgs[0]?.duongDanHinhAnh ?? imgs[0]?.duongdanhinhanh;
 
                   return (
-                    <tr key={maCT} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {idx + 1}
+                    <tr key={maCT} className="hover:bg-blue-50/30 transition">
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-semibold text-gray-900">
+                            #{maCT || "??"}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Biến thể {idx + 1}
+                          </span>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {maCT}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {sizeOptions.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {sizeOptions.map((sz) => (
-                              <span
-                                key={`${maCT}-${sz.id ?? sz.maKichThuoc ?? sz.tenKichThuoc}`}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded-full border border-gray-200 text-xs text-gray-700 bg-gray-50"
-                              >
-                                {sz.tenKichThuoc || size || ""}
-                              </span>
-                            ))}
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col gap-2">
+                          {sizeOptions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {sizeOptions.map((sz) => {
+                                const optionId = String(
+                                  sz.maKichThuoc ??
+                                    sz.makichthuoc ??
+                                    sz.id ??
+                                    ""
+                                );
+                                const isActive =
+                                  String(selectedSizeId) === optionId;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`${maCT}-${optionId}`}
+                                    onClick={() =>
+                                      setSizeSelection((prev) => ({
+                                        ...prev,
+                                        [maCT]: optionId,
+                                      }))
+                                    }
+                                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium shadow-sm transition ${
+                                      isActive
+                                        ? "bg-blue-600 text-white"
+                                        : "bg-white text-gray-600 border border-gray-200 hover:border-blue-300"
+                                    }`}
+                                  >
+                                    {sz.tenKichThuoc ||
+                                      sz.ten_kichthuoc ||
+                                      size ||
+                                      ""}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-gray-200 bg-white px-3 py-1 text-xs text-gray-600">
+                              {size || "Khong co size"}
+                            </span>
+                          )}
+                          <div className="flex flex-wrap gap-4 text-xs text-gray-600">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+                              <span className="h-2 w-2 rounded-full bg-blue-600" />
+                              {color || "Chua cap nhat mau"}
+                            </span>
+                            <span className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1">
+                              <span className="h-2 w-2 rounded-full bg-gray-400" />
+                              {chatLieu || "Chua cap nhat chat lieu"}
+                            </span>
                           </div>
-                        ) : (
-                          size || ""
-                        )}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {color || ""}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">
-                        {chatLieu || ""}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">
+                      <td className="px-4 py-4 text-right text-sm font-semibold text-blue-700">
                         {fmtCurrency(giaBan)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right text-gray-700">
-                        {computedStock}
+                      <td className="px-4 py-4 text-right">
+                        <span className="inline-flex items-center justify-end gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                          {displayedStock} sp
+                        </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-center text-gray-700">
+                      <td className="px-4 py-4 text-center">
                         {thumbUrl ? (
                           <img
                             src={thumbUrl}
                             alt={`CTSP ${maCT}`}
-                            className="h-14 w-14 object-cover inline-block rounded border"
+                            className="mx-auto h-16 w-16 rounded-lg border border-blue-100 object-cover shadow-sm"
                           />
                         ) : (
-                          <span className="text-gray-400 text-xs">
+                          <span className="text-xs text-gray-400">
                             Không có ảnh
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-4 text-right">
                         <button
                           onClick={() => openVariantForm(v)}
-                          className="text-blue-600 hover:text-blue-800 text-sm inline-flex items-center gap-1"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-800"
                         >
                           <Edit2 size={16} />
                           Sửa
@@ -988,6 +1314,7 @@ export default function SanPhamDetailPage() {
                   );
                 })}
               </tbody>
+
             </table>
           </div>
         )}
@@ -1179,16 +1506,58 @@ export default function SanPhamDetailPage() {
                 />
               </div>
 
-              {/* upload ảnh */}
+              {/* upload ?nh */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Hình ảnh biến thể <span className="text-red-500">*</span>
                 </label>
+
+                {editingVariant && existingVariantImages.length > 0 && (
+                  <div className="mb-4">
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {existingVariantImages.map((img) => {
+                        const id = getImageId(img);
+                        const src =
+                          img.duongDanHinhAnh ??
+                          img.duongdanhinhanh ??
+                          img.url ??
+                          '';
+                        const name =
+                          img.tenFile ??
+                          img.tenfile ??
+                          img.fileName ??
+                          src.split('/').pop() ??
+                          '';
+                        return (
+                          <div key={id || src} className="relative">
+                            <img
+                              src={src}
+                              alt={name}
+                              className="w-full h-24 object-cover rounded-lg border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExistingImage(img)}
+                              className="absolute top-1 right-1 bg-white/80 text-red-600 rounded-full p-1 shadow hover:bg-white"
+                            >
+                              <X size={14} />
+                            </button>
+                            <p className="mt-1 text-xs text-gray-600 line-clamp-2 text-center">
+                              {name || 'Ảnh hiện có'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg px-4 py-6 cursor-pointer hover:border-blue-400 bg-white">
                   <span className="text-sm text-blue-600 font-medium">
-                    Chọn ảnh 
+                    Chọn ảnh
                   </span>
-                
+               
                   <input
                     type="file"
                     multiple
@@ -1197,7 +1566,7 @@ export default function SanPhamDetailPage() {
                     onChange={handleVariantFilesChange}
                   />
                 </label>
-                {variantFiles.length > 0 ? (
+                {variantFiles.length > 0 && (
                   <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {variantFiles.map((item) => (
                       <div key={item.id} className="relative">
@@ -1219,9 +1588,11 @@ export default function SanPhamDetailPage() {
                       </div>
                     ))}
                   </div>
-                ) : (
+                )}
+
+                {!editingVariant && variantFiles.length === 0 && (
                   <p className="mt-2 text-xs text-red-500">
-                    Chưa chọn ảnh nào cho biến thể này.
+                    Chưa có ảnh nào được chọn.
                   </p>
                 )}
               </div>

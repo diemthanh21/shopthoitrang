@@ -40,6 +40,7 @@ app.use('/api/ctbanner', require('./src/routes/ctbanner.route'));
 app.use('/api/danhgia', require('./src/routes/danhgia.route'));
 app.use('/api/danhmucsanpham', require('./src/routes/danhmucsanpham.route'));
 app.use('/api/diachikhachhang', require('./src/routes/diachikhachhang.route'));
+app.use('/api/cart', require('./src/routes/cart.route'));
 app.use('/api/doihang', require('./src/routes/doihang.route'));
 app.use('/api/donhang', require('./src/routes/donhang.route'));
 app.use('/api/hangthe', require('./src/routes/hangthe.route'));

@@ -32,7 +32,7 @@ import ThongBaoPage from './pages/ThongBaoPage';
 import TinNhanPage from './pages/TinNhanPage';
 import TraHangDetailPage from './pages/TraHangDetailPage';
 import TraHangPage from './pages/TraHangPage';
-import VoucherGiamGiaPage from './pages/VoucherGiamGiaPage';
+import MaGiamGiaPage from './pages/MaGiamGiaPage';
 import KichThuocPage from './pages/KichThuocPage';
 
 function App() {
@@ -62,7 +62,7 @@ function App() {
             <Route path="banner" element={<BannerPage />} />
             <Route path="phancongca" element={<PhanCongCaPage />} />
             <Route path="khuyenmai" element={<KhuyenMaiPage />} />
-            <Route path="vouchergiamgia" element={<VoucherGiamGiaPage />} />
+            <Route path="magiamgia" element={<MaGiamGiaPage />} />
             <Route path="donhang" element={<DonHangPage />} />
             <Route path="donhang/:id" element={<DonHangDetailPage />} />
             <Route path="phieudathang" element={<PhieuDatHangPage />} />

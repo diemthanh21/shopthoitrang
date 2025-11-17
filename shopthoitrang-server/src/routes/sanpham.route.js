@@ -36,6 +36,7 @@ router.use(authenticateToken);
  *         description: Thành công
  */
 router.get('/', ctrl.getAll);
+router.get('/count', ctrl.count);
 
 /**
  * @swagger
@@ -54,6 +55,7 @@ router.get('/', ctrl.getAll);
  *       404:
  *         description: Không tìm thấy
  */
+router.get('/:id/stats', ctrl.getStats);
 router.get('/:id', ctrl.getById);
 
 /**

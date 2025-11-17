@@ -181,28 +181,7 @@ export default function DonHangPage() {
           <h1 className="text-3xl font-bold text-gray-900">Quản lý đơn hàng</h1>
           <p className="text-gray-600">Quản lý các đơn hàng của khách hàng</p>
         </div>
-        <div className="ml-auto">
-          <button
-            onClick={async () => {
-              setReturnsOpen(true);
-              setReturnsLoading(true);
-              setReturnsErr("");
-              try {
-                const rows = await trahangService.getAll();
-                setReturnsRows(rows);
-              } catch (e) {
-                console.error(e);
-                setReturnsErr(e?.response?.data?.message || 'Không thể tải yêu cầu trả hàng');
-                setReturnsRows([]);
-              } finally {
-                setReturnsLoading(false);
-              }
-            }}
-            className="px-3 py-2 border rounded-md bg-white hover:bg-gray-50"
-          >
-            Yêu cầu trả hàng
-          </button>
-        </div>
+        
       </div>
 
       {/* Stats quick cards (clickable) */}

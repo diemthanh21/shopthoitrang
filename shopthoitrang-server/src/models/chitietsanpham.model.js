@@ -14,11 +14,7 @@ const normalizeSizes = (raw) => {
         sizeRow?.ten_kichthuoc ??
         null;
       return {
-        id:
-          row?.id ??
-          row?.machitietsanpham_kichthuoc ??
-          row?.bridgeId ??
-          null,
+        id: row?.id ?? row?.machitietsanpham_kichthuoc ?? row?.bridgeId ?? null,
         maKichThuoc:
           row?.maKichThuoc ??
           row?.makichthuoc ??
@@ -27,10 +23,34 @@ const normalizeSizes = (raw) => {
         tenKichThuoc,
         moTa: row?.moTa ?? row?.mo_ta ?? sizeRow?.mo_ta ?? null,
         soLuong: toNumber(row?.soLuong ?? row?.so_luong, 0),
-
+        giaThem: toNumber(row?.giaThem ?? row?.gia_them, 0),
       };
     })
     .filter((s) => !!s.maKichThuoc || !!s.tenKichThuoc);
+};
+
+const normalizeImages = (raw) => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((img) => ({
+      mahinhanh:
+        img?.mahinhanh ??
+        img?.maHinhAnh ??
+        img?.id ??
+        img?.MAHINHANH ??
+        null,
+      machitietsanpham:
+        img?.machitietsanpham ??
+        img?.maChiTietSanPham ??
+        img?.MACHITIETSANPHAM ??
+        null,
+      duongdanhinhanh:
+        img?.duongdanhinhanh ??
+        img?.duongDanHinhAnh ??
+        img?.DUONGDANHINHANH ??
+        "",
+    }))
+    .filter((img) => !!img.duongdanhinhanh);
 };
 
 class ChiTietSanPham {
@@ -45,6 +65,7 @@ class ChiTietSanPham {
     soluongton,
     sizes,
     chitietsanpham_kichthuoc,
+    hinhanhsanpham,
   }) {
     this.machitietsanpham = machitietsanpham;
     this.masanpham = masanpham;
@@ -56,6 +77,7 @@ class ChiTietSanPham {
     this.mota = mota ?? null;
     this.giaban = giaban;
     this.soluongton = soluongton ?? 0;
+    this.hinhanhsanpham = normalizeImages(hinhanhsanpham);
   }
 
   toJSON() {
@@ -69,6 +91,7 @@ class ChiTietSanPham {
       giaban: this.giaban,
       soluongton: this.soluongton,
       sizes: this.sizes,
+      hinhanhsanpham: this.hinhanhsanpham,
     };
   }
 }

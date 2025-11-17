@@ -8,10 +8,12 @@ import '../services/trahang_service.dart';
 import '../services/doihang_service.dart';
 import '../services/review_service.dart';
 import '../providers/auth_provider.dart';
+import '../services/cart_service.dart';
 import 'order_detail_screen.dart';
 import 'review_screen.dart';
 import 'exchange_request_screen.dart';
 import 'return_request_screen.dart';
+import 'cart_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
   const OrdersScreen({super.key});
@@ -651,7 +653,16 @@ class _OrdersScreenState extends State<OrdersScreen>
         builder: (c) => ReturnRequestScreen(order: order),
       ),
     );
-    if (result != null && mounted) await _loadOrders();
+    if (result == true && mounted) {
+      await _loadOrders();
+      // Sau khi tạo yêu cầu trả hàng thành công thì chuyển sang tab "Tr��� hA�ng"
+      final idx = _statuses.indexWhere(
+        (s) => s.toLowerCase() == 'tr��� hA�ng'.toLowerCase(),
+      );
+      if (idx >= 0) {
+        _tabController.animateTo(idx);
+      }
+    }
   }
 
   void _openReviewForOrder(Order order) async {

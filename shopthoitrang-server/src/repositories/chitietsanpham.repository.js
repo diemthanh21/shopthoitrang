@@ -16,7 +16,7 @@ const SIZE_SELECT = `
   )
 `;
 
-const BASE_SELECT = `*, chitietsanpham_kichthuoc (${SIZE_SELECT})`;
+const BASE_SELECT = `*, chitietsanpham_kichthuoc (${SIZE_SELECT}), hinhanhsanpham (*)`;
 
 const ChiTietSanPhamRepository = {
   async getAll({

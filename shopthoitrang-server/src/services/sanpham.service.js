@@ -17,9 +17,9 @@ class SanPhamService {
 
   async create(body) {
     const required = ['tensanpham', 'madanhmuc'];
-    for (const f of required) {
-      if (!body[f]) {
-        const e = new Error(`Thiếu thông tin bắt buộc: ${f}`);
+    for (const field of required) {
+      if (!body[field]) {
+        const e = new Error(`Thi���u thA'ng tin b��_t bu��Tc: ${field}`);
         e.status = 400;
         throw e;
       }
@@ -29,8 +29,9 @@ class SanPhamService {
       tensanpham: body.tensanpham,
       madanhmuc: body.madanhmuc,
       mathuonghieu: body.mathuonghieu ?? null,
-      trangthai: body.trangthai ?? 'Đang kinh doanh',
+      trangthai: body.trangthai ?? '�?ang kinh doanh',
       hinhanh: body.hinhanh ?? null,
+      bangsize: body.bangsize ?? null,
     };
 
     return repo.create(payload);
@@ -44,6 +45,7 @@ class SanPhamService {
     if (body.mathuonghieu !== undefined) fields.mathuonghieu = body.mathuonghieu ?? null;
     if (body.trangthai !== undefined) fields.trangthai = body.trangthai;
     if (body.hinhanh !== undefined) fields.hinhanh = body.hinhanh ?? null;
+    if (body.bangsize !== undefined) fields.bangsize = body.bangsize ?? null;
 
     const updated = await repo.update(id, fields);
     if (!updated) {
@@ -57,11 +59,19 @@ class SanPhamService {
   async delete(id) {
     const deleted = await repo.remove(id);
     if (!deleted) {
-      const e = new Error('Không tìm thấy sản phẩm để xoá');
+      const e = new Error('Không tìm thấy sản phẩm để xóa');
       e.status = 404;
       throw e;
     }
-    return { message: 'Đã xoá sản phẩm thành công' };
+    return { message: 'Đã xóa sản phẩm thành công' };
+  }
+
+  async stats(id) {
+    return repo.getStats(Number(id));
+  }
+
+  async count() {
+    return repo.count();
   }
 }
 
