@@ -24,8 +24,11 @@ const supabase = createClient(
 app.set('supabase', supabase);
 
 // Router
+const testOrderRoutes = require('./src/routes/test-order.route');
+app.use('/api', testOrderRoutes);
 
 // Authentication routes (không cần token)
+https://elora-s2rc.onrender.com/api/sepay/test-order
 app.use('/api/auth', require('./src/routes/auth.route'));
 app.use('/api/banner', require('./src/routes/banner.route'));
 app.use('/api/calamviec', require('./src/routes/calamviec.route'));
