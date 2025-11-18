@@ -29,7 +29,7 @@ const fmtCurrency = (v) =>
     maximumFractionDigits: 0,
   }).format(Number(v || 0));
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 // Chuẩn hoá trạng thái: bỏ dấu, thường hoá
 const normalizeStatus = (s = "") =>
@@ -39,6 +39,56 @@ const normalizeStatus = (s = "") =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
+
+const normalizeSizeLabel = (value) =>
+  value?.toString().trim().toLowerCase() ?? "";
+
+const extractVariantSizeNames = (detail = {}) => {
+  const source =
+    Array.isArray(detail?.sizes) && detail.sizes.length
+      ? detail.sizes
+      : Array.isArray(detail?.chitietsanpham_kichthuoc)
+      ? detail.chitietsanpham_kichthuoc
+      : [];
+
+  const map = new Map();
+  const pushLabel = (label) => {
+    const normalized = normalizeSizeLabel(label);
+    if (!normalized) return;
+    if (!map.has(normalized)) {
+      map.set(normalized, label);
+    }
+  };
+
+  source.forEach((size) => {
+    pushLabel(
+      size?.tenKichThuoc ??
+        size?.ten_kichthuoc ??
+        size?.kichthuocs?.ten_kichthuoc ??
+        size?.kichthuocs?.tenKichThuoc ??
+        ""
+    );
+  });
+
+  pushLabel(detail?.kichThuoc ?? detail?.kichthuoc ?? null);
+
+  return Array.from(map.values());
+};
+
+const variantMatchesSize = (detail, targetSize) => {
+  if (!targetSize) return true;
+  const normalized = normalizeSizeLabel(targetSize);
+  return extractVariantSizeNames(detail).some(
+    (label) => normalizeSizeLabel(label) === normalized
+  );
+};
+
+const resolveSizeLabel = (row, detail) => {
+  const rowSize = row?.kichThuoc ?? row?.kichthuoc;
+  if (rowSize) return rowSize;
+  const sizes = extractVariantSizeNames(detail);
+  return sizes[0] ?? "";
+};
 
 export default function ChiTietPhieuDatHangPage() {
   const { id } = useParams();
@@ -54,7 +104,7 @@ export default function ChiTietPhieuDatHangPage() {
 
   // Helper function to get supplier name
   const getTenNhaCungCap = (maNCC) => {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -66,7 +116,7 @@ export default function ChiTietPhieuDatHangPage() {
 
   // Helper function to get employee name
   const getTenNhanVien = (maNhanVien) => {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -90,6 +140,7 @@ export default function ChiTietPhieuDatHangPage() {
     soLuong: 1,
     donGia: 0,
     ghiChu: "",
+    chatLieu: "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -236,16 +287,10 @@ export default function ChiTietPhieuDatHangPage() {
     const tenSP =
       sanPham?.tenSanPham ??
       sanPham?.tensanpham ??
-      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "—");
+      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "");
 
-    const kichThuocRow = row.kichThuoc ?? row.kichthuoc;
+    const kichThuoc = resolveSizeLabel(row, chiTiet);
     const mauSacRow = row.mauSac ?? row.mausac;
-
-    const kichThuoc =
-      kichThuocRow ??
-      chiTiet?.kichThuoc ??
-      chiTiet?.kichthuoc ??
-      null;
 
     const mauSac =
       mauSacRow ??
@@ -253,7 +298,14 @@ export default function ChiTietPhieuDatHangPage() {
       chiTiet?.mausac ??
       null;
 
-    return { tenSanPham: tenSP, kichThuoc, mauSac };
+    const chatLieu =
+      row.chatLieu ??
+      row.chatlieu ??
+      chiTiet?.chatLieu ??
+      chiTiet?.chatlieu ??
+      "";
+
+    return { tenSanPham: tenSP, kichThuoc, mauSac, chatLieu };
   };
 
   const summary = useMemo(() => {
@@ -282,14 +334,28 @@ export default function ChiTietPhieuDatHangPage() {
 
     const updateTongTien = async () => {
       try {
+        // Tính lại tiền còn lại = tổng - cọc (không âm)
+        const deposit = Number(phieu.tienCoc ?? phieu.tiencoc ?? 0);
+        const newConLai = Math.max(0, newTong - deposit);
+
         await phieuDatHangService.update(maPhieu, {
           ...phieu,
           tongTien: newTong,
           tongtien: newTong,
+          conLai: newConLai,
+          conlai: newConLai,
         });
 
         setPhieu((prev) =>
-          prev ? { ...prev, tongTien: newTong, tongtien: newTong } : prev
+          prev
+            ? {
+                ...prev,
+                tongTien: newTong,
+                tongtien: newTong,
+                conLai: newConLai,
+                conlai: newConLai,
+              }
+            : prev
         );
       } catch (e) {
         console.error("Lỗi cập nhật tổng tiền phiếu:", e);
@@ -302,18 +368,24 @@ export default function ChiTietPhieuDatHangPage() {
   // ========== Form thêm / sửa chi tiết ==========
 
   const sizeOptions = useMemo(() => {
-  if (!formData.maSanPham) return [];
-  const sizes = productDetails
-    .filter(
-      (pd) =>
-        Number(pd.maSanPham ?? pd.masanpham) ===
-        Number(formData.maSanPham)
-    )
-    .map((pd) => pd.kichThuoc ?? pd.kichthuoc)
-    .filter(Boolean);
-  // unique
-  return Array.from(new Set(sizes));
-}, [formData.maSanPham, productDetails]);
+    if (!formData.maSanPham) return [];
+    const map = new Map();
+    productDetails
+      .filter(
+        (pd) =>
+          Number(pd.maSanPham ?? pd.masanpham) ===
+          Number(formData.maSanPham)
+      )
+      .forEach((pd) => {
+        extractVariantSizeNames(pd).forEach((label) => {
+          const key = normalizeSizeLabel(label);
+          if (key && !map.has(key)) {
+            map.set(key, label);
+          }
+        });
+      });
+    return Array.from(map.values());
+  }, [formData.maSanPham, productDetails]);
 
 const colorOptions = useMemo(() => {
   if (!formData.maSanPham) return [];
@@ -321,12 +393,39 @@ const colorOptions = useMemo(() => {
     .filter(
       (pd) =>
         Number(pd.maSanPham ?? pd.masanpham) ===
-        Number(formData.maSanPham)
+        Number(formData.maSanPham) &&
+        variantMatchesSize(pd, formData.kichThuoc)
     )
     .map((pd) => pd.mauSac ?? pd.mausac)
     .filter(Boolean);
   return Array.from(new Set(colors));
-}, [formData.maSanPham, productDetails]);
+}, [formData.maSanPham, formData.kichThuoc, productDetails]);
+
+  const chatLieuOptions = useMemo(() => {
+    if (!formData.maSanPham) return [];
+    const materials = productDetails
+      .filter((pd) => {
+        const maSP = pd.maSanPham ?? pd.masanpham;
+        if (Number(maSP) !== Number(formData.maSanPham)) return false;
+        if (!variantMatchesSize(pd, formData.kichThuoc)) return false;
+        const color = pd.mauSac ?? pd.mausac;
+        if (formData.mauSac && color !== formData.mauSac) return false;
+        return true;
+      })
+      .map((pd) => pd.chatLieu ?? pd.chatlieu)
+      .filter(Boolean);
+    return Array.from(new Set(materials));
+  }, [productDetails, formData.maSanPham, formData.kichThuoc, formData.mauSac]);
+
+  useEffect(() => {
+    if (
+      formData.chatLieu &&
+      chatLieuOptions.length &&
+      !chatLieuOptions.includes(formData.chatLieu)
+    ) {
+      setFormData((prev) => ({ ...prev, chatLieu: "" }));
+    }
+  }, [chatLieuOptions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOpenForm = (item = null) => {
     if (!canEdit) return; // an toàn thêm: nếu không được sửa thì bỏ qua
@@ -344,12 +443,7 @@ const colorOptions = useMemo(() => {
 
       setFormData({
         maSanPham: maSP ? String(maSP) : "",
-        kichThuoc:
-          item.kichThuoc ??
-          item.kichthuoc ??
-          chiTiet?.kichThuoc ??
-          chiTiet?.kichthuoc ??
-          "",
+        kichThuoc: resolveSizeLabel(item, chiTiet),
         mauSac:
           item.mauSac ??
           item.mausac ??
@@ -359,6 +453,12 @@ const colorOptions = useMemo(() => {
         soLuong: Number(item.soLuong ?? item.soluong ?? 1),
         donGia: Number(item.donGia ?? item.dongia ?? 0),
         ghiChu: item.ghiChu ?? item.ghichu ?? "",
+        chatLieu:
+          item.chatLieu ??
+          item.chatlieu ??
+          chiTiet?.chatLieu ??
+          chiTiet?.chatlieu ??
+          "",
       });
     } else {
       setEditingItem(null);
@@ -369,6 +469,7 @@ const colorOptions = useMemo(() => {
         soLuong: 1,
         donGia: 0,
         ghiChu: "",
+        chatLieu: "",
       });
     }
     setShowForm(true);
@@ -384,6 +485,7 @@ const colorOptions = useMemo(() => {
       soLuong: 1,
       donGia: 0,
       ghiChu: "",
+      chatLieu: "",
     });
   };
 
@@ -394,6 +496,7 @@ const colorOptions = useMemo(() => {
       maSanPham,
       kichThuoc: "",
       mauSac: "",
+      chatLieu: "",
     }));
   };
 
@@ -417,11 +520,10 @@ const colorOptions = useMemo(() => {
     // Tìm đúng ChiTietSanPham theo SP + size + màu
     const chiTiet = productDetails.find((pd) => {
       const maSP = pd.maSanPham ?? pd.masanpham;
-      const size = pd.kichThuoc ?? pd.kichthuoc;
       const mau = pd.mauSac ?? pd.mausac;
       return (
         Number(maSP) === Number(formData.maSanPham) &&
-        (!formData.kichThuoc || size === formData.kichThuoc) &&
+        variantMatchesSize(pd, formData.kichThuoc) &&
         (!formData.mauSac || mau === formData.mauSac)
       );
     });
@@ -439,6 +541,11 @@ const colorOptions = useMemo(() => {
     setSaving(true);
     try {
       const thanhTien = Number(formData.soLuong) * Number(formData.donGia);
+      const chatLieuValue =
+        formData.chatLieu ||
+        chiTiet.chatLieu ||
+        chiTiet.chatlieu ||
+        "";
 
       const payload = {
         maPhieuDatHang: Number(id),
@@ -449,6 +556,7 @@ const colorOptions = useMemo(() => {
         ghiChu: formData.ghiChu || "",
         kichThuoc: formData.kichThuoc || "",
         mauSac: formData.mauSac || "",
+        chatLieu: chatLieuValue,
       };
 
       if (editingItem) {
@@ -499,12 +607,21 @@ const colorOptions = useMemo(() => {
 
     try {
       setSaving(true);
+      // Tính lại tiền còn lại dựa trên tổng hiện tại và tiền cọc mới
+      const tong = Number(phieu.tongTien ?? phieu.tongtien ?? summary.tongThanhTien ?? 0);
+      const deposit = Number(headerForm.tienCoc) || 0;
+      const conLaiNew = Math.max(0, tong - deposit);
       const payload = {
         ...phieu,
         ngayHenDuKien: headerForm.ngayHenDuKien || null,
         tienCoc: Number(headerForm.tienCoc) || 0,
         phuongThucThanhToan: headerForm.phuongThucThanhToan || null,
         ghiChu: headerForm.ghiChu || null,
+        // đồng bộ các khóa kiểu snake_case
+        tongTien: tong,
+        tongtien: tong,
+        conLai: conLaiNew,
+        conlai: conLaiNew,
       };
 
       const maPhieu = phieu?.maPhieuDatHang ?? phieu?.maphieudathang ?? id;
@@ -647,7 +764,11 @@ const colorOptions = useMemo(() => {
   const ngayHen = phieu.ngayHenDuKien ?? phieu.ngayhendukien;
   const tongTien = phieu.tongTien ?? phieu.tongtien;
   const tienCoc = phieu.tienCoc ?? phieu.tiencoc;
-  const conLai = phieu.conLai ?? phieu.conlai;
+  // Hiển thị còn lại theo giá trị đang chỉnh nếu đang edit, ngược lại lấy từ phiếu
+  const conLaiDisplay = Math.max(
+    0,
+    Number(tongTien || 0) - Number((editingHeader ? headerForm.tienCoc : tienCoc) || 0)
+  );
   const trangThai = phieu.trangThaiPhieu ?? phieu.trangthaiphieu;
   const ghiChu = phieu.ghiChu ?? phieu.ghichu;
   const ptThanhToan = phieu.phuongThucThanhToan ?? phieu.phuongthucthanhtoan;
@@ -673,22 +794,22 @@ const colorOptions = useMemo(() => {
           <div>
             <div className="flex items-baseline gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
-                Phiếu đặt hàng #{maPhieu}
+                Phiếu đặt hàng {maPhieu}
               </h1>
               <span
                 className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
                   trangThai?.toLowerCase().includes("hủy")
                     ? "bg-red-100 text-red-700"
                     : trangThai?.toLowerCase().includes("hoàn")
-                    ? "bg-green-100 text-green-700"
+                    ? "bg-purple-100 text-purple-700"
                     : trangThai?.toLowerCase().includes("duyệt")
-                    ? "bg-blue-100 text-blue-700"
+                    ? "bg-green-100 text-green-700"
                     : trangThai?.toLowerCase().includes("chờ")
                     ? "bg-yellow-100 text-yellow-700"
-                    : "bg-gray-100 text-gray-700"
+                    : "bg-blue-100 text-blue-700"
                 }`}
               >
-                {trangThai || "—"}
+                {trangThai || ""}
               </span>
             </div>
           </div>
@@ -767,11 +888,11 @@ const colorOptions = useMemo(() => {
             <div className="space-y-2">
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhà cung cấp:</span>
-                <span>{tenNCC || "—"}</span>
+                <span>{tenNCC || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Nhân viên:</span>
-                <span>{tenNV || "—"}</span>
+                <span>{tenNV || ""}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Ngày đặt:</span>
@@ -794,18 +915,6 @@ const colorOptions = useMemo(() => {
                 ) : (
                   <span>{fmtDate(ngayHen)}</span>
                 )}
-              </div>
-              <div className="flex justify-between items-center py-1 border-b">
-                <span className="font-medium">Trạng thái:</span>
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
-                    canEdit
-                      ? "bg-yellow-50 text-yellow-700"
-                      : "bg-green-50 text-green-700"
-                  }`}
-                >
-                  {trangThai || "—"}
-                </span>
               </div>
             </div>
 
@@ -832,7 +941,7 @@ const colorOptions = useMemo(() => {
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">Còn lại:</span>
-                <span>{fmtCurrency(conLai)}</span>
+                <span>{fmtCurrency(conLaiDisplay)}</span>
               </div>
               <div className="flex justify-between items-center py-1 border-b">
                 <span className="font-medium">PT thanh toán:</span>
@@ -853,7 +962,7 @@ const colorOptions = useMemo(() => {
                     <option value="Thẻ tín dụng">Thẻ tín dụng</option>
                   </select>
                 ) : (
-                  <span>{ptThanhToan || "—"}</span>
+                  <span>{ptThanhToan || ""}</span>
                 )}
               </div>
               <div className="py-1 border-b">
@@ -980,6 +1089,9 @@ const colorOptions = useMemo(() => {
                     Kích thước
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Chất liệu
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Màu sắc
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
@@ -1003,7 +1115,7 @@ const colorOptions = useMemo(() => {
               </thead>
               <tbody className="divide-y">
                 {items.map((it, idx) => {
-                  const { tenSanPham, kichThuoc, mauSac } =
+                  const { tenSanPham, kichThuoc, mauSac, chatLieu } =
                     getProductInfoFromRow(it);
 
                   const soLuong = Number(it.soLuong ?? it.soluong ?? 0);
@@ -1025,10 +1137,13 @@ const colorOptions = useMemo(() => {
                         {tenSanPham}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {kichThuoc ?? "—"}
+                        {kichThuoc ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {mauSac ?? "—"}
+                        {chatLieu || ""}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-700">
+                        {mauSac ?? ""}
                       </td>
                       <td className="px-4 py-3 text-sm text-right text-gray-700">
                         {soLuong}
@@ -1040,7 +1155,7 @@ const colorOptions = useMemo(() => {
                         {fmtCurrency(thanhTien)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {it.ghiChu ?? it.ghichu ?? "—"}
+                        {it.ghiChu ?? it.ghichu ?? ""}
                       </td>
                       {canEdit && (
                         <td className="px-4 py-3 text-center">
@@ -1149,6 +1264,29 @@ const colorOptions = useMemo(() => {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Chất liệu
+                </label>
+                <select
+                  value={formData.chatLieu}
+                  onChange={(e) =>
+                    setFormData({ ...formData, chatLieu: e.target.value })
+                  }
+                  disabled={!chatLieuOptions.length}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:text-gray-400"
+                >
+                  <option value="">
+                    {chatLieuOptions.length ? "-- Chọn chất liệu --" : "Không có dữ liệu"}
+                  </option>
+                  {chatLieuOptions.map((chatLieu) => (
+                    <option key={chatLieu} value={chatLieu}>
+                      {chatLieu}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

@@ -24,7 +24,7 @@ import nhacungcapService from "../services/nhacungcapService";
 import nhanvienService from "../services/nhanvienService";
 import { useAuth } from "../contexts/AuthContext";
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 // Chuẩn hoá trạng thái: bỏ dấu, lowercase
 const normalizeStatus = (s = "") =>
@@ -44,6 +44,8 @@ export default function ChiTietPhieuNhapKhoPage() {
   const [items, setItems] = useState([]);
   const [orderDetails, setOrderDetails] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [allReceiptItems, setAllReceiptItems] = useState([]); // Tất cả chi tiết phiếu nhập
+  const [allReceipts, setAllReceipts] = useState([]); // Tất cả phiếu nhập
   const [products, setProducts] = useState([]);
   const [productDetails, setProductDetails] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -70,9 +72,41 @@ export default function ChiTietPhieuNhapKhoPage() {
     ghiChu: "",
   });
 
+  const currentOrderId = useMemo(() => {
+    if (!phieu) return null;
+    const raw = phieu.maPhieuDatHang ?? phieu.maphieudathang;
+    if (raw == null) return null;
+    const num = Number(raw);
+    return Number.isNaN(num) ? null : num;
+  }, [phieu]);
+
+  const currentPurchaseOrder = useMemo(() => {
+    if (!currentOrderId) return null;
+    return (
+      purchaseOrders.find(
+        (p) =>
+          Number(p.maPhieuDatHang ?? p.maphieudathang) === currentOrderId
+      ) ?? null
+    );
+  }, [currentOrderId, purchaseOrders]);
+
+  const supplierIdForPhieu = useMemo(() => {
+    if (phieu?.maNhaCungCap ?? phieu?.manhacungcap) {
+      return phieu.maNhaCungCap ?? phieu.manhacungcap;
+    }
+    if (currentPurchaseOrder) {
+      return (
+        currentPurchaseOrder.maNhaCungCap ??
+        currentPurchaseOrder.manhacungcap ??
+        null
+      );
+    }
+    return null;
+  }, [phieu, currentPurchaseOrder]);
+
   // ===== Helper: id -> tên NCC / NV =====
   const getTenNhaCungCap = (maNCC) => {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -83,7 +117,7 @@ export default function ChiTietPhieuNhapKhoPage() {
   };
 
   const getTenNhanVien = (maNV) => {
-    if (!maNV) return "—";
+    if (!maNV) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNV ||
@@ -129,12 +163,16 @@ export default function ChiTietPhieuNhapKhoPage() {
         productDetailRes,
         orderDetailRes,
         purchaseOrdersRes,
+        allReceiptItemsRes,
+        allReceiptsRes,
       ] = await Promise.allSettled([
         chitietphieunhapService.getByPhieu(id),
         sanphamService.getAll(),
         chitietsanphamService.getAll(),
         chitietphieudathangService.getAll(),
         phieuDatHangService.getAll(),
+        chitietphieunhapService.getAll(), // Lấy tất cả chi tiết phiếu nhập
+        phieuNhapKhoService.getAll(), // Lấy tất cả phiếu nhập
       ]);
 
       // chi tiết nhập
@@ -187,6 +225,26 @@ export default function ChiTietPhieuNhapKhoPage() {
         console.error("Lỗi load phiếu đặt hàng:", purchaseOrdersRes.reason);
         setPurchaseOrders([]);
       }
+
+      // tất cả chi tiết phiếu nhập
+      if (allReceiptItemsRes.status === "fulfilled") {
+        const d = allReceiptItemsRes.value;
+        const arr = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+        setAllReceiptItems(arr);
+      } else {
+        console.error("Lỗi load tất cả chi tiết phiếu nhập:", allReceiptItemsRes.reason);
+        setAllReceiptItems([]);
+      }
+
+      // tất cả phiếu nhập
+      if (allReceiptsRes.status === "fulfilled") {
+        const d = allReceiptsRes.value;
+        const arr = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : [];
+        setAllReceipts(arr);
+      } else {
+        console.error("Lỗi load tất cả phiếu nhập:", allReceiptsRes.reason);
+        setAllReceipts([]);
+      }
     } catch (e) {
       console.error("Lỗi bất ngờ:", e);
       if (!subErr) setSubErr("Có lỗi khi tải dữ liệu chi tiết.");
@@ -230,7 +288,7 @@ export default function ChiTietPhieuNhapKhoPage() {
     const tenSP =
       sanPham?.tenSanPham ??
       sanPham?.tensanpham ??
-      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "—");
+      (maSP != null ? `SP#${maSP}` : maCT != null ? `#${maCT}` : "");
 
     const kichThuoc = chiTiet?.kichThuoc ?? chiTiet?.kichthuoc ?? null;
     const mauSac = chiTiet?.mauSac ?? chiTiet?.mausac ?? null;
@@ -244,19 +302,15 @@ export default function ChiTietPhieuNhapKhoPage() {
     };
   };
 
-  // ===== Tổng số lượng ĐẶT cho 1 CTSP (chỉ đơn ĐÃ DUYỆT của đúng NCC) =====
+  // ===== Tổng số lượng ĐẶT cho 1 CTSP (chỉ từ phiếu đặt hàng hiện tại) =====
   const getSoLuongDat = (maChiTietSanPham) => {
     if (
       !maChiTietSanPham ||
       !orderDetails.length ||
-      !purchaseOrders.length ||
-      !phieu
+      !currentOrderId
     ) {
       return 0;
     }
-
-    const maNCCPhieu = phieu.maNhaCungCap ?? phieu.manhacungcap ?? null;
-    if (!maNCCPhieu) return 0;
 
     return orderDetails
       .filter((od) => {
@@ -264,26 +318,8 @@ export default function ChiTietPhieuNhapKhoPage() {
         if (Number(maCT) !== Number(maChiTietSanPham)) return false;
 
         const maPDH = od.maPhieuDatHang ?? od.maphieudathang;
-        if (!maPDH) return false;
-
-        const phieuDH = purchaseOrders.find(
-          (p) =>
-            Number(p.maPhieuDatHang ?? p.maphieudathang) === Number(maPDH)
-        );
-        if (!phieuDH) return false;
-
-        const status = (
-          phieuDH.trangThaiPhieu ??
-          phieuDH.trangthaiphieu ??
-          ""
-        )
-          .toString()
-          .toLowerCase()
-          .trim();
-        if (!status.includes("duyệt")) return false;
-
-        const nccPDH = phieuDH.maNhaCungCap ?? phieuDH.manhacungcap;
-        return Number(nccPDH) === Number(maNCCPhieu);
+        // Chỉ lấy từ phiếu đặt hàng hiện tại
+        return Number(maPDH) === Number(currentOrderId);
       })
       .reduce((sum, od) => sum + Number(od.soLuong ?? od.soluong ?? 0), 0);
   };
@@ -300,11 +336,43 @@ export default function ChiTietPhieuNhapKhoPage() {
       .reduce((sum, it) => sum + Number(it.soLuong ?? it.soluong ?? 0), 0);
   };
 
+  // ===== Tổng số lượng đã nhập từ TẤT CẢ phiếu nhập đã duyệt cho cùng phiếu đặt hàng =====
+  const getTongSoLuongDaNhapChoPhieuDat = (maChiTietSanPham) => {
+    if (!maChiTietSanPham || !currentOrderId || !allReceipts.length || !allReceiptItems.length) return 0;
+    
+    // Lấy tất cả phiếu nhập kho đã duyệt cho phiếu đặt hàng này
+    const approvedReceiptsForPO = allReceipts.filter(receipt => {
+      const receiptPOId = receipt.maPhieuDatHang ?? receipt.maphieudathang;
+      const status = normalizeStatus(receipt.trangThai ?? receipt.trangthai ?? '');
+      return Number(receiptPOId) === currentOrderId && status.includes('duyet');
+    });
+    
+    // Tính tổng số lượng đã nhập từ tất cả phiếu nhập đã duyệt
+    let totalReceived = 0;
+    for (const receipt of approvedReceiptsForPO) {
+      const receiptId = receipt.maPhieuNhap ?? receipt.maphieunhap;
+      const itemsInThisReceipt = allReceiptItems.filter(item => {
+        const itemReceiptId = item.maPhieuNhap ?? item.maphieunhap;
+        const itemProductId = item.maChiTietSanPham ?? item.machitietsanpham;
+        return Number(itemReceiptId) === Number(receiptId) && 
+               Number(itemProductId) === Number(maChiTietSanPham);
+      });
+      
+      for (const item of itemsInThisReceipt) {
+        totalReceived += Number(item.soLuong ?? item.soluong ?? 0);
+      }
+    }
+    
+    return totalReceived;
+  };
+
   const getSoLuongCanNhap = (maChiTietSanPham) => {
     const soLuongDat = getSoLuongDat(maChiTietSanPham);
     if (soLuongDat === 0) return 0;
-    const tongNhap = getTongSoLuongNhapForProduct(maChiTietSanPham);
-    const rs = soLuongDat - tongNhap;
+    
+    // Trừ đi số lượng đã nhập từ tất cả phiếu nhập đã duyệt
+    const tongDaNhap = getTongSoLuongDaNhapChoPhieuDat(maChiTietSanPham);
+    const rs = soLuongDat - tongDaNhap;
     return rs > 0 ? rs : 0;
   };
 
@@ -316,51 +384,26 @@ export default function ChiTietPhieuNhapKhoPage() {
     return { tongSoLuong };
   }, [items]);
 
-  // ===== CTSP có thể chọn: chỉ từ ĐƠN ĐÃ DUYỆT của đúng NCC & còn cần nhập =====
+  // ===== CTSP có thể chọn: chỉ từ ĐÚNG PHIẾU ĐẶT HÀNG này & còn cần nhập =====
   const selectableProductDetails = useMemo(() => {
     if (
       !productDetails.length ||
       !orderDetails.length ||
       !purchaseOrders.length ||
-      !phieu
+      !phieu ||
+      !currentOrderId
     ) {
       return [];
     }
 
-    const maNCCPhieu = phieu.maNhaCungCap ?? phieu.manhacungcap ?? null;
-    if (!maNCCPhieu) return [];
-
-    const mapPhieuDatHang = new Map();
-    purchaseOrders.forEach((p) => {
-      const idPDH = p.maPhieuDatHang ?? p.maphieudathang;
-      if (!idPDH) return;
-
-      const status = (
-        p.trangThaiPhieu ??
-        p.trangthaiphieu ??
-        ""
-      )
-        .toString()
-        .toLowerCase()
-        .trim();
-      if (!status.includes("duyệt")) return;
-
-      mapPhieuDatHang.set(Number(idPDH), p);
-    });
-
+    // Chỉ lấy chi tiết từ phiếu đặt hàng hiện tại (currentOrderId)
     const orderedMap = new Map();
     orderDetails.forEach((od) => {
       const maCT = od.maChiTietSanPham ?? od.machitietsanpham;
       if (!maCT) return;
 
       const maPDH = od.maPhieuDatHang ?? od.maphieudathang;
-      if (!maPDH) return;
-
-      const phieuDH = mapPhieuDatHang.get(Number(maPDH));
-      if (!phieuDH) return;
-
-      const nccPDH = phieuDH.maNhaCungCap ?? phieuDH.manhacungcap;
-      if (Number(nccPDH) !== Number(maNCCPhieu)) return;
+      if (!maPDH || Number(maPDH) !== currentOrderId) return;
 
       const sl = Number(od.soLuong ?? od.soluong ?? 0) || 0;
       orderedMap.set(maCT, (orderedMap.get(maCT) || 0) + sl);
@@ -395,7 +438,7 @@ export default function ChiTietPhieuNhapKhoPage() {
     }
 
     return list;
-  }, [productDetails, orderDetails, purchaseOrders, items, phieu, editingItem]);
+  }, [productDetails, orderDetails, currentOrderId, items, phieu, editingItem]);
 
   // ===== Options cho dropdown =====
   const productOptions = useMemo(() => {
@@ -571,7 +614,8 @@ export default function ChiTietPhieuNhapKhoPage() {
     // kiểm tra không vượt số lượng ĐẶT (chỉ tính đơn đã duyệt)
     const soLuongDat = getSoLuongDat(maChiTietSanPham);
     if (soLuongDat > 0) {
-      const tongNhapHienTai = getTongSoLuongNhapForProduct(maChiTietSanPham);
+      const tongDaNhapTatCa = getTongSoLuongDaNhapChoPhieuDat(maChiTietSanPham);
+      const tongNhapPhieuHienTai = getTongSoLuongNhapForProduct(maChiTietSanPham);
 
       let soLuongCu = 0;
       if (
@@ -583,11 +627,11 @@ export default function ChiTietPhieuNhapKhoPage() {
       }
 
       const tongNhapSauKhiLuu =
-        tongNhapHienTai - soLuongCu + Number(formData.soLuong);
+        tongDaNhapTatCa + (tongNhapPhieuHienTai - soLuongCu) + Number(formData.soLuong);
 
       if (tongNhapSauKhiLuu > soLuongDat) {
         alert(
-          `Số lượng nhập (${tongNhapSauKhiLuu}) vượt quá số lượng đặt (${soLuongDat}) cho sản phẩm này!\nVui lòng kiểm tra lại.`
+          `Số lượng nhập (${tongNhapSauKhiLuu}) vượt quá số lượng đặt (${soLuongDat}) cho sản phẩm này!\nĐã nhập từ phiếu khác: ${tongDaNhapTatCa}\nVui lòng kiểm tra lại.`
         );
         return;
       }
@@ -686,7 +730,6 @@ export default function ChiTietPhieuNhapKhoPage() {
 
       await loadData();
       alert("Đã gửi phiếu nhập kho cho quản lý xác nhận.");
-      // TODO: thông báo cho quản lý
     } catch (error) {
       console.error("Lỗi khi gửi phiếu nhập:", error);
       alert("Có lỗi xảy ra khi gửi phiếu nhập kho!");
@@ -709,9 +752,8 @@ export default function ChiTietPhieuNhapKhoPage() {
         trangThai: "Đã duyệt",
       });
 
-      await loadData();
-      alert("Đã duyệt phiếu nhập kho.");
-      // TODO: thông báo cho nhân viên tạo phiếu
+      await loadData(); // Reload để cập nhật trạng thái phiếu đặt hàng
+      alert("Đã duyệt phiếu nhập kho.\n\nHệ thống đã tự động kiểm tra và cập nhật trạng thái phiếu đặt hàng nếu đã nhập đủ hàng.");
     } catch (error) {
       console.error("Lỗi khi duyệt phiếu nhập:", error);
       alert("Có lỗi xảy ra khi duyệt phiếu nhập kho!");
@@ -736,13 +778,10 @@ export default function ChiTietPhieuNhapKhoPage() {
       await phieuNhapKhoService.update(maPhieu, {
         ...phieu,
         trangThai: "Đã hủy",
-        // nếu DB có cột lý do hủy thì thêm ở đây
-        // lyDoHuy: reason,
       });
 
       await loadData();
       alert(`Đã hủy phiếu nhập kho.\nLý do: ${reason}`);
-      // TODO: gửi thông báo cho nhân viên tạo phiếu kèm lý do hủy
     } catch (error) {
       console.error("Lỗi khi hủy phiếu nhập:", error);
       alert("Có lỗi xảy ra khi hủy phiếu nhập kho!");
@@ -781,15 +820,20 @@ export default function ChiTietPhieuNhapKhoPage() {
   }
 
   const maPhieu = phieu.maPhieuNhap ?? phieu.maphieunhap;
-  const maNCC = phieu.maNhaCungCap ?? phieu.manhacungcap;
+  const maNCC = supplierIdForPhieu;
   const maNV = phieu.maNhanVien ?? phieu.manhanvien;
   const tenNCC = getTenNhaCungCap(maNCC);
   const tenNV = getTenNhanVien(maNV);
+  const maPhieuDatHangDisplay =
+    currentOrderId ??
+    phieu.maPhieuDatHang ??
+    phieu.maphieudathang ??
+    null;
   const ngayNhap = phieu.ngayNhap ?? phieu.ngaynhap;
   const ghiChuPhieu = phieu.ghiChu ?? phieu.ghichu;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1">
@@ -797,7 +841,7 @@ export default function ChiTietPhieuNhapKhoPage() {
           <div>
             <div className="flex items-baseline gap-3">
               <h1 className="text-2xl font-bold text-gray-900">
-                Phiếu nhập kho #{maPhieu}
+                Phiếu nhập kho  {maPhieu}
               </h1>
               <span
                 className={`px-2 py-1 text-xs rounded-full whitespace-nowrap ${
@@ -807,12 +851,19 @@ export default function ChiTietPhieuNhapKhoPage() {
                     ? "bg-green-100 text-green-700"
                     : trangThai?.toLowerCase().includes("chờ")
                     ? "bg-yellow-100 text-yellow-700"
-                    : "bg-gray-100 text-gray-700"
+                    : trangThai?.toLowerCase().includes("hoàn thành")
+                    ? "bg-purple-100 text-purple-700"
+                    : "bg-blue-100 text-blue-700"
                 }`}
               >
-                {trangThai || "—"}
+                {trangThai || ""}
               </span>
             </div>
+            {maPhieuDatHangDisplay && (
+              <div className="text-sm text-gray-500">
+                Phiếu đặt hàng: {maPhieuDatHangDisplay}
+              </div>
+            )}
           </div>
         </div>
 
@@ -869,7 +920,7 @@ export default function ChiTietPhieuNhapKhoPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Thông tin phiếu nhập */}
         <div className="bg-white border rounded-xl p-4 md:col-span-2">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-3">
             <h2 className="text-sm font-semibold text-gray-500 uppercase">
               Thông tin phiếu nhập
             </h2>
@@ -885,17 +936,17 @@ export default function ChiTietPhieuNhapKhoPage() {
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm text-gray-700">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center py-1 border-b">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center py-2 border-b">
                 <span className="font-medium">Nhà cung cấp:</span>
                 <span>{tenNCC || "—"}</span>
               </div>
-              <div className="flex justify-between items-center py-1 border-b">
+              <div className="flex justify-between items-center py-2 border-b">
                 <span className="font-medium">Nhân viên nhập:</span>
                 <span>{tenNV || "—"}</span>
               </div>
-              <div className="flex justify-between items-center py-1 border-b">
+              <div className="flex justify-between items-center py-2 border-b">
                 <span className="font-medium">Ngày nhập:</span>
                 {editingHeader ? (
                   <input
@@ -914,10 +965,9 @@ export default function ChiTietPhieuNhapKhoPage() {
                 )}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <div className="py-1 border-b">
-                <span className="font-medium">Ghi chú:</span>
+            <div className="space-y-3">
+              <div className="py-2 border-b">
+                <span className="font-medium block mb-1">Ghi chú:</span>
                 {editingHeader ? (
                   <textarea
                     value={headerForm.ghiChu}
@@ -925,10 +975,10 @@ export default function ChiTietPhieuNhapKhoPage() {
                       setHeaderForm((f) => ({ ...f, ghiChu: e.target.value }))
                     }
                     rows={3}
-                    className="mt-1 w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 ) : (
-                  <div className="mt-1 text-gray-700">
+                  <div className="text-gray-700">
                     {ghiChuPhieu || (
                       <span className="text-gray-400">Không có</span>
                     )}
@@ -939,7 +989,7 @@ export default function ChiTietPhieuNhapKhoPage() {
           </div>
 
           {editingHeader && canEdit && (
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end gap-3 pt-4 mt-4 border-t">
               <button
                 type="button"
                 onClick={() => {
@@ -971,17 +1021,17 @@ export default function ChiTietPhieuNhapKhoPage() {
 
         {/* Thống kê */}
         <div className="bg-white border rounded-xl p-4">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-2">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase mb-3">
             Thống kê
           </h2>
-          <div className="space-y-1 text-sm text-gray-700">
-            <div>
-              <span className="font-medium">Số dòng chi tiết: </span>
-              {items.length}
+          <div className="space-y-2 text-sm text-gray-700">
+            <div className="flex justify-between py-2 border-b">
+              <span className="font-medium">Số dòng chi tiết:</span>
+              <span className="font-semibold">{items.length}</span>
             </div>
-            <div>
-              <span className="font-medium">Tổng số lượng nhập: </span>
-              {summary.tongSoLuong}
+            <div className="flex justify-between py-2 border-b">
+              <span className="font-medium">Tổng số lượng nhập:</span>
+              <span className="font-semibold">{summary.tongSoLuong}</span>
             </div>
           </div>
         </div>
@@ -1076,7 +1126,7 @@ export default function ChiTietPhieuNhapKhoPage() {
                         {soLuongNhap}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700">
-                        {it.ghiChu ?? it.ghichu ?? "—"}
+                        {it.ghiChu ?? it.ghichu ?? ""}
                       </td>
                       {canEdit && (
                         <td className="px-4 py-3 text-center">

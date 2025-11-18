@@ -1,6 +1,6 @@
 // src/pages/PhieuDatHangPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Search, Eye, Plus, X, Save } from "lucide-react";
+import { FileText, Search, Eye, Plus, X, Save, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import phieuDatHangService from "../services/phieuDatHangService";
@@ -15,7 +15,7 @@ const fmtCurrency = (v) =>
     maximumFractionDigits: 0,
   }).format(Number(v || 0));
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "—");
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString("vi-VN") : "");
 
 function StatusDot({ color }) {
   return <span className={`inline-block w-2 h-2 rounded-full mr-2 ${color}`} />;
@@ -40,6 +40,11 @@ export default function PhieuDatHangPage() {
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addFormData, setAddFormData] = useState({
@@ -101,7 +106,7 @@ export default function PhieuDatHangPage() {
 
   // ===== Helper: id -> tên nhân viên =====
   function getTenNhanVien(maNhanVien) {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -113,7 +118,7 @@ export default function PhieuDatHangPage() {
 
   // ===== Helper: id -> tên nhà cung cấp =====
   function getTenNhaCungCap(maNCC) {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     
     // Find supplier with exact ID match
     const found = suppliers.find(s => s.maNhaCungCap === maNCC);
@@ -132,7 +137,7 @@ export default function PhieuDatHangPage() {
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
 
-    return rows.filter((r) => {
+    let filtered = rows.filter((r) => {
       const okSt = statusFilter ? r.trangThaiPhieu === statusFilter : true;
       if (!okSt) return false;
 
@@ -151,11 +156,30 @@ export default function PhieuDatHangPage() {
 
       return hay.includes(term);
     });
+    
+    // Sắp xếp theo mã phiếu đặt hàng giảm dần
+    filtered.sort((a, b) => {
+      const maA = a.maPhieuDatHang ?? a.maphieudathang ?? 0;
+      const maB = b.maPhieuDatHang ?? b.maphieudathang ?? 0;
+      return Number(maB) - Number(maA);
+    });
+    
+    return filtered;
   }, [rows, q, statusFilter, employees, suppliers]);
+  
+  // ===== Pagination =====
+  const totalPages = Math.ceil(list.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = list.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset về trang 1 khi search hoặc filter
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, statusFilter]);
 
   // ===== Thống kê theo trạng thái phiếu =====
   const stats = useMemo(() => {
-    const s = { cho: 0, daduyet: 0, daxong: 0, dahuy: 0 };
+    const s = { cho: 0, daduyet: 0, daxong: 0, dahuy: 0};
 
     for (const r of rows) {
       const v = (r.trangThaiPhieu || r.trangthaiphieu || "").toLowerCase();
@@ -184,7 +208,6 @@ export default function PhieuDatHangPage() {
           <FileText className="text-blue-600" size={32} />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Quản lý phiếu đặt hàng</h1>
-            <p className="text-gray-600">Theo dõi các phiếu đặt hàng từ nhà cung cấp</p>
           </div>
         </div>
         <button
@@ -211,19 +234,19 @@ export default function PhieuDatHangPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border rounded-xl p-4">
           <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-yellow-500" /> Chờ xử lý
+            <StatusDot color="bg-yellow-500" /> Chờ xác nhận
           </div>
           <div className="mt-2 text-3xl font-bold">{stats.cho}</div>
         </div>
         <div className="bg-white border rounded-xl p-4">
           <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-blue-500" /> Đã duyệt / Đang xử lý
+            <StatusDot color="bg-green-500" /> Đã duyệt
           </div>
           <div className="mt-2 text-3xl font-bold">{stats.daduyet}</div>
         </div>
         <div className="bg-white border rounded-xl p-4">
           <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-green-500" /> Hoàn thành
+            <StatusDot color="bg-purple-500" /> Hoàn thành
           </div>
           <div className="mt-2 text-3xl font-bold">{stats.daxong}</div>
         </div>
@@ -318,7 +341,7 @@ export default function PhieuDatHangPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {list.map((r) => (
+              {paginatedData.map((r) => (
                 <tr key={r.maPhieuDatHang ?? r.maphieudathang} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {r.maPhieuDatHang ?? r.maphieudathang}
@@ -345,7 +368,7 @@ export default function PhieuDatHangPage() {
                     {fmtCurrency(r.conLai ?? r.conlai)}
                   </td>
                   <td className="px-4 py-3 text-sm">
-                    {r.phuongThucThanhToan ?? r.phuongthucthanhtoan ?? "—"}
+                    {r.phuongThucThanhToan ?? r.phuongthucthanhtoan ?? ""}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <Badge
@@ -357,15 +380,19 @@ export default function PhieuDatHangPage() {
                           : (r.trangThaiPhieu ?? r.trangthaiphieu ?? "")
                               .toLowerCase()
                               .includes("hoàn")
-                          ? "bg-green-100 text-green-700"
+                          ? "bg-purple-100 text-purple-700"
                           : (r.trangThaiPhieu ?? r.trangthaiphieu ?? "")
                               .toLowerCase()
                               .includes("duyệt")
-                          ? "bg-blue-100 text-blue-700"
-                          : "bg-gray-100 text-gray-700"
+                          ? "bg-green-100 text-green-700"
+                          : (r.trangThaiPhieu ?? r.trangthaiphieu ?? "")
+                              .toLowerCase()
+                              .includes("chờ")
+                          ? "bg-yellow-100 text-yellow-700"
+                          : "bg-blue-100 text-blue-700"
                       }
                     >
-                      {r.trangThaiPhieu ?? r.trangthaiphieu ?? "—"}
+                      {r.trangThaiPhieu ?? r.trangthaiphieu ?? ""}
                     </Badge>
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -381,6 +408,64 @@ export default function PhieuDatHangPage() {
               ))}
             </tbody>
           </table>
+        )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Trang {currentPage} / {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+                Trước
+              </button>
+              
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    const distance = Math.abs(page - currentPage);
+                    return distance <= 1 || page === 1 || page === totalPages;
+                  })
+                  .map((page, index, array) => {
+                    const prevPage = array[index - 1];
+                    const showDots = prevPage && page - prevPage > 1;
+                    return (
+                      <div key={page} className="flex items-center gap-1">
+                        {showDots && (
+                          <span className="px-2 py-1 text-gray-400">...</span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md ${
+                            currentPage === page
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Tiếp
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

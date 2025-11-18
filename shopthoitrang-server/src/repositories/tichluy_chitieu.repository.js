@@ -33,6 +33,29 @@ const TichLuyChiTieuRepository = {
     const { data, error } = await supabase.from(TABLE).delete().eq('id', id).select('*').maybeSingle();
     if (error) throw error;
     return data ? new TichLuyChiTieu(data) : null;
+  },
+
+  async findByCustomerAndYear(makh, year) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('makh', makh)
+      .eq('nam', year)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TichLuyChiTieu(data) : null;
+  },
+
+  async findLatestByCustomer(makh) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('makh', makh)
+      .order('nam', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TichLuyChiTieu(data) : null;
   }
 };
 

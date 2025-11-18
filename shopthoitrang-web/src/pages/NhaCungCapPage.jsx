@@ -273,6 +273,13 @@ export default function NhaCungCapPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
                       {r.diaChi || "—"}
+                      {r.email || ""}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {r.soDienThoai || ""}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
+                      {r.diaChi || ""}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="inline-flex items-center gap-2">

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Image picker cache directory -->
+    <cache-path name="cache" path="." />
+    
+    <!-- External storage for images -->
+    <external-path name="external" path="." />
+    
+    <!-- Internal storage for images -->
+    <files-path name="files" path="." />
+    
+    <!-- External cache for temporary files -->
+    <external-cache-path name="external_cache" path="." />
+</paths>

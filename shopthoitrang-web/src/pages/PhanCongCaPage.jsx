@@ -8,6 +8,7 @@ import nhanvienService from "../services/nhanvienService";
 import calamviecService from "../services/calamviecService";
 
 // ====== utils ======
+const DEFAULT_STATUS = "Phân công";
 const startOfMonthStr = (ym) => `${ym}-01`; // ym = 'YYYY-MM'
 const endOfMonthStr = (ym) => {
   const [y, m] = ym.split("-").map(Number);
@@ -43,7 +44,7 @@ const daysGrid = (ym) => {
 };
 
 const fmtVNDate = (s) => {
-  if (!s) return "—";
+  if (!s) return "";
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return s;
   return d.toLocaleDateString("vi-VN");
@@ -60,40 +61,80 @@ function StatusBadge({ value }) {
       : "bg-gray-100 text-gray-700";
   return (
     <span className={`px-2 py-0.5 text-xs rounded-full whitespace-nowrap ${cls}`}>
-      {value || "—"}
+      {value || ""}
     </span>
   );
 }
 
-// ====== MÀU CHO TỪNG CA ======
-// Mỗi maCa luôn map vào 1 màu ổn định, không phụ thuộc tên ca,
-// dùng hash nhỏ trên chuỗi maCa để tránh phụ thuộc số tăng dần.
+// ====== MÀU CHO TỪNG CA (ỔN ĐỊNH, KHÔNG TRÙNG) ======
+// - Duy trì map maCa -> index trong localStorage để tránh trùng màu khi thêm mới
+// - Ưu tiên palette các màu tương phản, đủ đa dạng
 const CA_COLOR_PALETTE = [
-  "border-blue-200 bg-blue-50",
-  "border-emerald-200 bg-emerald-50",
-  "border-amber-200 bg-amber-50",
-  "border-purple-200 bg-purple-50",
-  "border-rose-200 bg-rose-50",
-  "border-teal-200 bg-teal-50",
-  "border-pink-200 bg-pink-50",
-  "border-indigo-200 bg-indigo-50",
+  "border-red-700 bg-red-200",
+  "border-orange-700 bg-orange-200",
+  "border-amber-700 bg-amber-200",
+  "border-yellow-700 bg-yellow-200",
+  "border-lime-700 bg-lime-200",
+  "border-green-700 bg-green-200",
+  "border-emerald-700 bg-emerald-200",
+  "border-teal-700 bg-teal-200",
+  "border-cyan-700 bg-cyan-200",
+  "border-sky-700 bg-sky-200",
+  "border-blue-700 bg-blue-200",
+  "border-indigo-700 bg-indigo-200",
+  "border-violet-700 bg-violet-200",
+  "border-purple-700 bg-purple-200",
+  "border-fuchsia-700 bg-fuchsia-200",
+  "border-pink-700 bg-pink-200",
+  "border-rose-700 bg-rose-200",
+  "border-teal-800 bg-teal-200",
+  "border-cyan-800 bg-cyan-200",
+  "border-sky-800 bg-sky-200",
+  "border-indigo-800 bg-indigo-200",
+  "border-violet-800 bg-violet-200",
+  "border-emerald-800 bg-emerald-200",
+  "border-lime-800 bg-lime-200",
+  "border-orange-800 bg-orange-200",
+  "border-amber-800 bg-amber-200",
+  "border-fuchsia-800 bg-fuchsia-200",
+  "border-rose-800 bg-rose-200",
+  "border-green-800 bg-green-200",
+  "border-blue-800 bg-blue-200",
+  "border-purple-800 bg-purple-200",
 ];
 
-function hashString(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) | 0;
+const COLOR_MAP_KEY = "phancong_ca_color_map_v1";
+
+function loadColorMap() {
+  try {
+    const raw = localStorage.getItem(COLOR_MAP_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
   }
-  return Math.abs(h);
 }
 
-const caColorClass = (maCa) => {
-  if (!maCa) return "border-gray-200 bg-gray-50";
-  const key = String(maCa);
-  const h = hashString(key);
-  const idx = h % CA_COLOR_PALETTE.length;
-  return CA_COLOR_PALETTE[idx];
-};
+function saveColorMap(map) {
+  try {
+    localStorage.setItem(COLOR_MAP_KEY, JSON.stringify(map));
+  } catch {}
+}
+
+function hslFromIndex(i) {
+  // Fallback màu đậm hơn nếu vượt quá palette: phân bố đều theo góc vàng
+  const k = i - CA_COLOR_PALETTE.length;
+  const hue = Math.round((k * 137.508) % 360);
+  const bg = `hsl(${hue} 95% 85%)`;
+  const border = `hsl(${hue} 85% 35%)`;
+  return { className: "", style: { backgroundColor: bg, border: `1px solid ${border}` } };
+}
+
+function colorTokenFromIndex(i) {
+  if (i < CA_COLOR_PALETTE.length) {
+    return { className: CA_COLOR_PALETTE[i], style: undefined };
+  }
+  return hslFromIndex(i);
+}
 
 export default function PhanCongCaPage() {
   const { user } = useAuth();
@@ -117,6 +158,8 @@ export default function PhanCongCaPage() {
   // master data
   const [nhanVienList, setNhanVienList] = useState([]);
   const [caList, setCaList] = useState([]);
+  // map maCa -> index màu ổn định
+  const [colorMap, setColorMap] = useState(() => loadColorMap());
 
   // panel chi tiết bên phải
   const [selected, setSelected] = useState(null);
@@ -128,7 +171,7 @@ export default function PhanCongCaPage() {
     maNhanVien: "",
     maCa: "",
     ngayLamViec: "",
-    trangThai: "Phân công",
+    trangThai: DEFAULT_STATUS,
     ghiChu: "",
   });
 
@@ -156,6 +199,30 @@ export default function PhanCongCaPage() {
       }
     })();
   }, []);
+
+  // Đảm bảo mỗi ca có 1 màu duy nhất, ổn định
+  useEffect(() => {
+    if (!Array.isArray(caList) || !caList.length) return;
+    setColorMap((prev) => {
+      const next = { ...prev };
+      const used = new Set(Object.values(next));
+      let changed = false;
+      const sorted = [...caList]
+        .map((c) => String(c.maCa))
+        .sort((a, b) => Number(a) - Number(b));
+      for (const key of sorted) {
+        if (next[key] == null) {
+          let idx = 0;
+          while (used.has(idx)) idx++;
+          next[key] = idx;
+          used.add(idx);
+          changed = true;
+        }
+      }
+      if (changed) saveColorMap(next);
+      return next;
+    });
+  }, [caList]);
 
   const nhanVienMap = useMemo(() => {
     const m = {};
@@ -258,7 +325,7 @@ export default function PhanCongCaPage() {
       maNhanVien: "",
       maCa: "",
       ngayLamViec: todayStr,
-      trangThai: "Phân công",
+      trangThai: DEFAULT_STATUS,
       ghiChu: "",
     });
     setShowModal(true);
@@ -271,7 +338,7 @@ export default function PhanCongCaPage() {
       maNhanVien: row.maNhanVien ?? "",
       maCa: row.maCa ?? "",
       ngayLamViec: row.ngayLamViec ?? new Date().toISOString().slice(0, 10),
-      trangThai: row.trangThai ?? "Phân công",
+      trangThai: row.trangThai ?? DEFAULT_STATUS,
       ghiChu: row.ghiChu ?? "",
     });
     setShowModal(true);
@@ -319,6 +386,15 @@ export default function PhanCongCaPage() {
       const data = await phancongService.getByDateRange(from, to);
       cacheRef.current.set(`${from}|${to}`, data);
       setRows(data);
+      
+      // Cập nhật selected object nếu đang chỉnh sửa
+      if (editing && selected?.maPhanCong === editing.maPhanCong) {
+        const updatedItem = data.find(item => item.maPhanCong === editing.maPhanCong);
+        if (updatedItem) {
+          setSelected(updatedItem);
+        }
+      }
+      
       alert(
         editing
           ? "Cập nhật phân công thành công!"
@@ -461,12 +537,14 @@ export default function PhanCongCaPage() {
                         const nvName =
                           nhanVienMap[it.maNhanVien] || `NV #${it.maNhanVien}`;
                         const tenCa = caNameMap[it.maCa] || `Ca #${it.maCa}`;
-                        const colorClass = caColorClass(it.maCa);
+                        const idx = colorMap?.[String(it.maCa)] ?? 0;
+                        const colorToken = colorTokenFromIndex(idx);
 
                         return (
                           <div
                             key={it.maPhanCong}
-                            className={`border rounded-lg p-2 text-xs ${colorClass}`}
+                            className={`border rounded-lg p-2 text-xs ${colorToken.className ?? ""}`}
+                            style={colorToken.style}
                           >
                             {/* chỉ hiển thị tên ca + tên NV + nút Chi tiết */}
                             <div className="font-semibold">{tenCa}</div>
@@ -688,23 +766,25 @@ export default function PhanCongCaPage() {
                   />
                 </div>
 
-                {/* Trạng thái */}
-                <div>
-                  <label className="block text-gray-700 font-medium mb-1">
-                    Trạng thái
-                  </label>
-                  <select
-                    value={form.trangThai}
-                    onChange={(e) =>
-                      handleChangeField("trangThai", e.target.value)
-                    }
-                    className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option>Phân công</option>
-                    <option>Đã hoàn thành</option>
-                    <option>Vắng mặt</option>
-                  </select>
-                </div>
+                {/* Trạng thái - chỉ hiển thị khi chỉnh sửa */}
+                {editing && (
+                  <div>
+                    <label className="block text-gray-700 font-medium mb-1">
+                      Trạng thái
+                    </label>
+                    <select
+                      value={form.trangThai}
+                      onChange={(e) =>
+                        handleChangeField("trangThai", e.target.value)
+                      }
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="Phân công">Phân công</option>
+                      <option value="Đã hoàn thành">Đã hoàn thành</option>
+                      <option value="Vắng mặt">Vắng mặt</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               {/* Ghi chú */}

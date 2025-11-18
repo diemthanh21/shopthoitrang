@@ -6,7 +6,8 @@ class ChiTietPhieuDatHang {
     soluong,
     dongia,
     thanhtien,
-    ghichu
+    ghichu,
+    chatlieu
   }) {
     this.machitietphieudathang = machitietphieudathang;
     this.maphieudathang = maphieudathang;
@@ -15,6 +16,7 @@ class ChiTietPhieuDatHang {
     this.dongia = dongia;
     this.thanhtien = thanhtien;
     this.ghichu = ghichu;
+    this.chatlieu = chatlieu ?? null;
   }
 
   toJSON() {
@@ -26,6 +28,7 @@ class ChiTietPhieuDatHang {
       dongia: this.dongia,
       thanhtien: this.thanhtien,
       ghichu: this.ghichu,
+      chatlieu: this.chatlieu,
     };
   }
 }

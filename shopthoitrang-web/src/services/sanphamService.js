@@ -1,22 +1,25 @@
 import api from "./api";
 
-// Map snake_case (DB) -> camelCase (UI)
-const normalize = (r) => ({
+const normalize = (r = {}) => ({
   maSanPham: r.masanpham ?? r.maSanPham ?? r.id,
   tenSanPham: r.tensanpham ?? r.tenSanPham ?? "",
   maDanhMuc: r.madanhmuc ?? r.maDanhMuc ?? null,
   maThuongHieu: r.mathuonghieu ?? r.maThuongHieu ?? null,
-  trangThai: r.trangthai ?? r.trangThai ?? null, // model có trường này
+  trangThai: r.trangthai ?? r.trangThai ?? null,
+  hinhAnh: r.hinhanh ?? r.hinhAnh ?? null,
 });
 
-// Map camelCase (UI) -> snake_case (DB)
-const toDB = (data) => ({
-  masanpham: data.maSanPham ?? undefined, // thường auto-increment
-  tensanpham: data.tenSanPham,
-  madanhmuc: data.maDanhMuc,
-  mathuonghieu: data.maThuongHieu,
-  trangthai: data.trangThai,
-});
+const toDB = (data = {}) => {
+  const payload = {};
+  if (data.maSanPham !== undefined) payload.masanpham = data.maSanPham;
+  if (data.tenSanPham !== undefined) payload.tensanpham = data.tenSanPham;
+  if (data.maDanhMuc !== undefined) payload.madanhmuc = data.maDanhMuc;
+  if (data.maThuongHieu !== undefined)
+    payload.mathuonghieu = data.maThuongHieu;
+  if (data.trangThai !== undefined) payload.trangthai = data.trangThai;
+  if (data.hinhAnh !== undefined) payload.hinhanh = data.hinhAnh ?? null;
+  return payload;
+};
 
 const PREFIX = "/sanpham";
 

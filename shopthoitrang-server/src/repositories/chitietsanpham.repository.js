@@ -4,6 +4,20 @@ const ChiTietSanPham = require('../models/chitietsanpham.model');
 const supabase = require('../../config/db');
 const TABLE = 'chitietsanpham';
 
+const SIZE_SELECT = `
+  id,
+  machitietsanpham,
+  makichthuoc,
+  so_luong,
+  kichthuocs (
+    makichthuoc,
+    ten_kichthuoc,
+    mo_ta
+  )
+`;
+
+const BASE_SELECT = `*, chitietsanpham_kichthuoc (${SIZE_SELECT})`;
+
 const ChiTietSanPhamRepository = {
   async getAll({
     masanpham,
@@ -15,7 +29,7 @@ const ChiTietSanPhamRepository = {
     orderBy = 'machitietsanpham',
     orderDir = 'asc',
   } = {}) {
-    let q = supabase.from(TABLE).select('*', { count: 'exact' });
+    let q = supabase.from(TABLE).select(BASE_SELECT, { count: 'exact' });
 
     if (masanpham) q = q.eq('masanpham', Number(masanpham));
     if (search && search.trim()) {
@@ -41,7 +55,7 @@ const ChiTietSanPhamRepository = {
   async getById(id) {
     const { data, error } = await supabase
       .from(TABLE)
-      .select('*')
+      .select(BASE_SELECT)
       .eq('machitietsanpham', id)
       .maybeSingle();
     if (error) throw error;
@@ -49,7 +63,11 @@ const ChiTietSanPhamRepository = {
   },
 
   async create(payload) {
-    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert([payload])
+      .select(BASE_SELECT)
+      .single();
     if (error) throw error;
     return new ChiTietSanPham(data);
   },
@@ -59,7 +77,7 @@ const ChiTietSanPhamRepository = {
       .from(TABLE)
       .update(fields)
       .eq('machitietsanpham', id)
-      .select('*')
+      .select(BASE_SELECT)
       .maybeSingle();
     if (error) throw error;
     return data ? new ChiTietSanPham(data) : null;

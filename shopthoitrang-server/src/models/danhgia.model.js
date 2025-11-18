@@ -1,28 +1,7 @@
 class DanhGia {
-  constructor({
-    madanhgia,
-    masanpham,
-    makhachhang,
-    manhanvien,
-    machitietdonhang,
-    diemdanhgia,
-    binhluan,
-    hinhanh,
-    phanhoitushop,
-    ngaydanhgia,
-  }) {
-    Object.assign(this, {
-      madanhgia,
-      masanpham,
-      makhachhang,
-      manhanvien,
-      machitietdonhang,
-      diemdanhgia,
-      binhluan,
-      hinhanh,
-      phanhoitushop,
-      ngaydanhgia,
-    });
+  constructor(data) {
+    // Dynamically assign all fields (allows enriched fields like madonhang, customer, product info)
+    Object.assign(this, data);
   }
 
   toJSON() {

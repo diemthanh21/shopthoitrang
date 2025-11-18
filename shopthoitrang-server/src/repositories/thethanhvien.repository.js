@@ -15,9 +15,23 @@ const TheThanhVienRepository = {
     const { data, error } = await supabase
       .from(TABLE)
       .select('*')
-      .eq('makhachhang', makhachhang);
+      .eq('makhachhang', makhachhang)
+      .order('ngaycap', { ascending: false });
     if (error) throw error;
     return data.map(row => new TheThanhVien(row));
+  },
+
+  async findLatestActiveByKhachHang(makhachhang) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .eq('makhachhang', makhachhang)
+      .eq('trangthai', true)
+      .order('ngaycap', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? new TheThanhVien(data) : null;
   },
 
   async getById(mathe) {
@@ -60,6 +74,16 @@ const TheThanhVienRepository = {
       .maybeSingle();
     if (error) throw error;
     return data ? new TheThanhVien(data) : null;
+  },
+
+  async deactivateAll(makhachhang) {
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ trangthai: false, ngayhethan: now })
+      .eq('makhachhang', makhachhang)
+      .eq('trangthai', true);
+    if (error) throw error;
   }
 };
 

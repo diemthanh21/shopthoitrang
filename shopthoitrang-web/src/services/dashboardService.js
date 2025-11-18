@@ -31,7 +31,7 @@ export async function getDashboardData(opts = {}) {
     id: r.id ?? r.madonhang ?? r.maDonHang,
     customerName: r.customer_name ?? r.tenkhachhang ?? r.makhachhang ?? "Khách hàng",
     totalAmount: +(r.total_amount ?? r.thanhtien ?? r.total ?? 0),
-    status: r.status ?? r.trangthaidonhang ?? r.trangthai ?? "—",
+    status: r.status ?? r.trangthaidonhang ?? r.trangthai ?? "",
   }));
 
   const topProducts = pick(topProductsRaw).map(p => ({

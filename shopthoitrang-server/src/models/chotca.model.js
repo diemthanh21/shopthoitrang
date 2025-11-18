@@ -1,15 +1,11 @@
 class ChotCa {
   constructor({
     machotca,
-    maphancong,
     manhanvien,
-    maca,
     ngaychotca,
-    giobatdau,
-    gioketthuc,
     tongthu,
-    tongchi,
     tienmat,
+    tienchi,
     tienchuyenkhoan,
     soluongdonhang,
     chenhlechtienmat,
@@ -20,15 +16,11 @@ class ChotCa {
   }) {
     Object.assign(this, {
       machotca,
-      maphancong,
       manhanvien,
-      maca,
       ngaychotca,
-      giobatdau,
-      gioketthuc,
       tongthu,
-      tongchi,
       tienmat,
+      tienchi,
       tienchuyenkhoan,
       soluongdonhang,
       chenhlechtienmat,

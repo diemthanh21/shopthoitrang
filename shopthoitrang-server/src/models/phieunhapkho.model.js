@@ -2,14 +2,14 @@ class PhieuNhapKho {
   constructor({
     maphieunhap,
     manhanvien,
-    manhacungcap,
+    maphieudathang,
     ngaynhap,
     trangthai,
     ghichu
   }) {
     this.maPhieuNhap = maphieunhap;
     this.maNhanVien = manhanvien;
-    this.maNhaCungCap = manhacungcap;
+    this.maPhieuDatHang = maphieudathang;
     this.ngayNhap = ngaynhap;
     this.trangThai = trangthai;
     this.ghiChu = ghichu;
@@ -19,7 +19,7 @@ class PhieuNhapKho {
     return {
       maphieunhap: this.maPhieuNhap,
       manhanvien: this.maNhanVien,
-      manhacungcap: this.maNhaCungCap,
+      maphieudathang: this.maPhieuDatHang,
       ngaynhap: this.ngayNhap,
       trangthai: this.trangThai,
       ghichu: this.ghiChu

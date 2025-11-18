@@ -1,5 +1,6 @@
 const repo = require('../repositories/taikhoankhachhang.repository');
 const bcrypt = require('bcryptjs');
+const membershipService = require('./membership.service');
 
 class TaiKhoanKhachHangService {
   async list(filters) {
@@ -40,7 +41,13 @@ class TaiKhoanKhachHangService {
       danghoatdong: body.danghoatdong ?? true
     };
 
-    return repo.create(payload);
+    const account = await repo.create(payload);
+    try {
+      await membershipService.ensureDefaultCard(account.maKhachHang || account.makhachhang);
+    } catch (err) {
+      console.error('[TaiKhoanKhachHangService] Unable to issue default membership:', err?.message || err);
+    }
+    return account;
   }
 
   async update(id, body) {

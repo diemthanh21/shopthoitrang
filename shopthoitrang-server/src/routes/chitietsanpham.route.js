@@ -194,4 +194,7 @@ router.put('/:id', ctrl.update);
  */
 router.delete('/:id', ctrl.delete);
 
+router.get('/:id/sizes', ctrl.getSizes);
+router.post('/:id/sizes', ctrl.saveSizes);
+
 module.exports = router;

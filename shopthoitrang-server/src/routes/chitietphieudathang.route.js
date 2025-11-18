@@ -63,6 +63,7 @@ router.get('/:id', controller.getById);
  *               dongia: { type: number }
  *               thanhtien: { type: number }
  *               ghichu: { type: string }
+ *               chatlieu: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -93,6 +94,7 @@ router.post('/', controller.create);
  *               dongia: { type: number }
  *               thanhtien: { type: number }
  *               ghichu: { type: string }
+ *               chatlieu: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công

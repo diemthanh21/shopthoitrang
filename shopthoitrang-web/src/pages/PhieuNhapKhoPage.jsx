@@ -1,15 +1,16 @@
 // src/pages/PhieuNhapKhoPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Search, Eye, Plus, X, Save } from "lucide-react";
+import { FileText, Search, Eye, Plus, X, Save, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import phieuNhapKhoService from "../services/phieunhapkhoService";
+import phieuDatHangService from "../services/phieuDatHangService";
 import nhanvienService from "../services/nhanvienService";
 import nhacungcapService from "../services/nhacungcapService";
 
 // Format helpers
 const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString("vi-VN") : "—";
+  iso ? new Date(iso).toLocaleDateString("vi-VN") : "";
 
 function StatusDot({ color }) {
   return <span className={`inline-block w-2 h-2 rounded-full mr-2 ${color}`} />;
@@ -23,21 +24,54 @@ function Badge({ children, color }) {
   );
 }
 
+// Helper: Lấy màu theo trạng thái
+function getStatusColor(status) {
+  const sLower = (status || "").toLowerCase();
+  
+  if (sLower.includes("hủy")) {
+    return "bg-red-100 text-red-700";
+  } else if (sLower.includes("duyệt")) {
+    return "bg-green-100 text-green-700";
+  } else if (sLower.includes("chờ") || sLower.includes("xác")) {
+    return "bg-yellow-100 text-yellow-700";
+  } else if (sLower.includes("hoàn thành")) {
+    return "bg-purple-100 text-purple-700";
+  }
+  // Mặc định (Tạo mới / không rõ): dùng xanh biển
+  return "bg-blue-100 text-blue-700";
+}
+
+// Helper: Normalize status for filtering
+function normalizeStatus(status) {
+  const s = (status || "").toLowerCase();
+  if (s.includes("tạo")) return "tao-moi";
+  if (s.includes("chờ") || s.includes("xác")) return "cho-xac-nhan";
+  if (s.includes("duyệt")) return "da-duyet";
+  if (s.includes("hủy")) return "da-huy";
+  return "other";
+}
+
 export default function PhieuNhapKhoPage() {
   const navigate = useNavigate();
 
   const [rows, setRows] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all"); // Filter state
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addFormData, setAddFormData] = useState({
-    maNhaCungCap: "",
+    maPhieuDatHang: "",
     maNhanVien: "",
     ngayNhap: new Date().toISOString().split("T")[0],
     ghiChu: "",
@@ -50,21 +84,24 @@ export default function PhieuNhapKhoPage() {
         setLoading(true);
         setErr("");
 
-        const [p, emps, nccs] = await Promise.all([
-          phieuNhapKhoService.getAll(),   // đã normalize → dùng camelCase
+        const [p, emps, orders, nccs] = await Promise.all([
+          phieuNhapKhoService.getAll(),
           nhanvienService.getAll(),
+          phieuDatHangService.getAll(),
           nhacungcapService.getAll(),
         ]);
 
         setRows(Array.isArray(p) ? p : p?.data ?? []);
         setEmployees(Array.isArray(emps) ? emps : emps?.data ?? []);
+        setPurchaseOrders(Array.isArray(orders) ? orders : orders?.data ?? []);
         setSuppliers(Array.isArray(nccs) ? nccs : nccs?.data ?? []);
       } catch (e) {
         console.error(e);
         setRows([]);
         setEmployees([]);
+        setPurchaseOrders([]);
         setSuppliers([]);
-        setErr("Không thể tải danh sách phiếu nhập kho / nhân viên / nhà cung cấp");
+        setErr("Không thể tải danh sách phiếu nhập kho / phiếu đặt hàng / nhân viên / nhà cung cấp");
       } finally {
         setLoading(false);
       }
@@ -73,7 +110,7 @@ export default function PhieuNhapKhoPage() {
 
   // ===== Helper: id -> tên nhân viên =====
   function getTenNhanVien(maNhanVien) {
-    if (!maNhanVien) return "—";
+    if (!maNhanVien) return "";
     const found = employees.find(
       (e) =>
         e.maNhanVien === maNhanVien ||
@@ -85,7 +122,7 @@ export default function PhieuNhapKhoPage() {
 
   // ===== Helper: id -> tên nhà cung cấp =====
   function getTenNhaCungCap(maNCC) {
-    if (!maNCC) return "—";
+    if (!maNCC) return "";
     const found = suppliers.find(
       (s) =>
         s.maNhaCungCap === maNCC ||
@@ -95,19 +132,89 @@ export default function PhieuNhapKhoPage() {
     return found?.tenNhaCungCap ?? found?.tennhacungcap ?? `#${maNCC}`;
   }
 
+  const purchaseOrderMap = useMemo(() => {
+    const map = new Map();
+    purchaseOrders.forEach((order) => {
+      const id = Number(order.maPhieuDatHang ?? order.maphieudathang);
+      if (!Number.isNaN(id)) {
+        map.set(id, order);
+      }
+    });
+    return map;
+  }, [purchaseOrders]);
+
+  const getPurchaseOrderById = (value) => {
+    if (!value) return null;
+    const id = Number(value);
+    if (Number.isNaN(id)) return null;
+    return purchaseOrderMap.get(id) ?? null;
+  };
+
+  const getSupplierIdFromRow = (row) => {
+    if (!row) return null;
+    const direct = row.maNhaCungCap ?? row.manhacungcap ?? null;
+    if (direct) return direct;
+    const order = getPurchaseOrderById(row.maPhieuDatHang ?? row.maphieudathang);
+    return order?.maNhaCungCap ?? order?.manhacungcap ?? null;
+  };
+
+  const getSupplierNameFromRow = (row) => getTenNhaCungCap(getSupplierIdFromRow(row));
+
+  const getOrderLabel = (row) => {
+    const id = row?.maPhieuDatHang ?? row?.maphieudathang;
+    return id ? `${id}` : "-";
+  };
+
+  const eligibleOrders = useMemo(() => {
+    if (!purchaseOrders.length) return [];
+    return purchaseOrders.filter((order) => {
+      const status = (
+        order.trangThaiPhieu ??
+        order.trangthaiphieu ??
+        ""
+      )
+        .toString()
+        .toLowerCase();
+      return status.includes("duy") || status.includes("approve");
+    });
+  }, [purchaseOrders]);
+
+  const selectedOrder = useMemo(
+    () => getPurchaseOrderById(addFormData.maPhieuDatHang),
+    [addFormData.maPhieuDatHang, purchaseOrderMap]
+  );
+
+  const selectedSupplier = useMemo(() => {
+    if (!selectedOrder) return { id: "", name: "" };
+    const id =
+      selectedOrder.maNhaCungCap ??
+      selectedOrder.manhacungcap ??
+      "";
+    const name = getTenNhaCungCap(id);
+    return { id, name };
+  }, [selectedOrder]);
+
   // ===== Filter client-side =====
   const list = useMemo(() => {
     const term = q.trim().toLowerCase();
 
-    return rows.filter((r) => {
+    let filtered = rows.filter((r) => {
+      // Filter by status
+      if (statusFilter !== "all") {
+        const normalized = normalizeStatus(r.trangThai);
+        if (normalized !== statusFilter) return false;
+      }
+
+      // Filter by search term
       if (!term) return true;
 
       const hay = [
-        r.maPhieuNhap,                     // đã normalize
-        getTenNhaCungCap(r.maNhaCungCap),
+        r.maPhieuNhap,
+        getOrderLabel(r),
+        getSupplierNameFromRow(r),
         getTenNhanVien(r.maNhanVien),
         r.ghiChu,
-        r.trangThai,                       // search theo trạng thái
+        r.trangThai,
       ]
         .map((x) => String(x ?? ""))
         .join(" ")
@@ -115,20 +222,38 @@ export default function PhieuNhapKhoPage() {
 
       return hay.includes(term);
     });
-  }, [rows, q, employees, suppliers]);
+    
+    // Sắp xếp theo mã phiếu nhập kho giảm dần
+    filtered.sort((a, b) => {
+      const maA = a.maPhieuNhap ?? 0;
+      const maB = b.maPhieuNhap ?? 0;
+      return Number(maB) - Number(maA);
+    });
+    
+    return filtered;
+  }, [rows, q, statusFilter, employees, suppliers, purchaseOrders]);
+  
+  // ===== Pagination =====
+  const totalPages = Math.ceil(list.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = list.slice(startIndex, startIndex + itemsPerPage);
 
-  // ===== Thống kê theo trạng thái (giống phiếu đặt hàng) =====
+  // Reset về trang 1 khi search hoặc filter
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, statusFilter]);
+
+  // ===== Thống kê theo trạng thái =====
   const stats = useMemo(() => {
-    const s = { taoMoi: 0, choxacnhan : 0, hoanTat: 0, daHuy: 0 };
+    const s = { taoMoi: 0, choXacNhan: 0, daDuyet: 0, daHuy: 0 };
 
     for (const r of rows) {
-      const v = (r.trangThai || "").toLowerCase();
-
-      if (v.includes("tạo")) s.taoMoi++;
-      else if (v.includes("nhập") || v.includes("đang")) s.choxacnhan++;
-      else if (v.includes("hoàn") || v.includes("tất") || v.includes("xong"))
-        s.hoanTat++;
-      else if (v.includes("hủy")) s.daHuy++;
+      const normalized = normalizeStatus(r.trangThai);
+      
+      if (normalized === "tao-moi") s.taoMoi++;
+      else if (normalized === "cho-xac-nhan") s.choXacNhan++;
+      else if (normalized === "da-duyet") s.daDuyet++;
+      else if (normalized === "da-huy") s.daHuy++;
     }
 
     return s;
@@ -142,20 +267,19 @@ export default function PhieuNhapKhoPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <FileText className="text-blue-600" size={32} />
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Quản lý phiếu nhập kho</h1>
-            <p className="text-gray-600">Theo dõi các phiếu nhập hàng từ nhà cung cấp</p>
           </div>
         </div>
         <button
           onClick={() => {
             setAddFormData({
-              maNhaCungCap: "",
+              maPhieuDatHang: "",
               maNhanVien: "",
               ngayNhap: new Date().toISOString().split("T")[0],
               ghiChu: "",
@@ -169,27 +293,50 @@ export default function PhieuNhapKhoPage() {
         </button>
       </div>
 
-      {/* Stats (giống phiếu đặt hàng) */}
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border rounded-xl p-4">
-          <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-gray-500" /> Tạo mới
+        <div 
+          onClick={() => setStatusFilter("tao-moi")}
+          className={`bg-white border rounded-xl p-4 cursor-pointer transition-all ${
+            statusFilter === "tao-moi" ? "ring-2 ring-blue-500 shadow-lg" : "hover:shadow-md"
+          }`}
+        >
+          <div className="text-sm font-medium text-blue-600 flex items-center">
+            <StatusDot color="bg-blue-500" /> Tạo mới
           </div>
           <div className="mt-2 text-3xl font-bold">{stats.taoMoi}</div>
         </div>
-        <div className="bg-white border rounded-xl p-4">
+        
+        <div 
+          onClick={() => setStatusFilter("cho-xac-nhan")}
+          className={`bg-white border rounded-xl p-4 cursor-pointer transition-all ${
+            statusFilter === "cho-xac-nhan" ? "ring-2 ring-yellow-500 shadow-lg" : "hover:shadow-md"
+          }`}
+        >
           <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-blue-500" /> Chờ xác nhận
+            <StatusDot color="bg-yellow-500" /> Chờ xác nhận
           </div>
-          <div className="mt-2 text-3xl font-bold">{stats.choxacnhan}</div>
+          <div className="mt-2 text-3xl font-bold">{stats.choXacNhan}</div>
         </div>
-        <div className="bg-white border rounded-xl p-4">
+        
+        <div 
+          onClick={() => setStatusFilter("da-duyet")}
+          className={`bg-white border rounded-xl p-4 cursor-pointer transition-all ${
+            statusFilter === "da-duyet" ? "ring-2 ring-green-500 shadow-lg" : "hover:shadow-md"
+          }`}
+        >
           <div className="text-sm font-medium text-gray-600 flex items-center">
-            <StatusDot color="bg-green-500" /> Hoàn tất
+            <StatusDot color="bg-green-500" /> Đã duyệt
           </div>
-          <div className="mt-2 text-3xl font-bold">{stats.hoanTat}</div>
+          <div className="mt-2 text-3xl font-bold">{stats.daDuyet}</div>
         </div>
-        <div className="bg-white border rounded-xl p-4">
+        
+        <div 
+          onClick={() => setStatusFilter("da-huy")}
+          className={`bg-white border rounded-xl p-4 cursor-pointer transition-all ${
+            statusFilter === "da-huy" ? "ring-2 ring-red-500 shadow-lg" : "hover:shadow-md"
+          }`}
+        >
           <div className="text-sm font-medium text-gray-600 flex items-center">
             <StatusDot color="bg-red-500" /> Đã hủy
           </div>
@@ -197,7 +344,7 @@ export default function PhieuNhapKhoPage() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search & Filter */}
       <div className="bg-white rounded-xl shadow-sm p-4 border">
         {err && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -213,10 +360,37 @@ export default function PhieuNhapKhoPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Tìm kiếm (mã phiếu, nhà cung cấp, nhân viên, ghi chú, trạng thái...)"
+              placeholder="Tìm kiếm phiếu (mã phiếu, nhà cung cấp, nhân viên, trạng thái...)"
               className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          
+          <div className="relative min-w-[200px]">
+            <Filter
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              size={18}
+            />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+            >
+              <option value="all">Tất cả trạng thái</option>
+              <option value="tao-moi">Tạo mới</option>
+              <option value="cho-xac-nhan">Chờ xác nhận</option>
+              <option value="da-duyet">Đã duyệt</option>
+              <option value="da-huy">Đã hủy</option>
+            </select>
+          </div>
+          
+          {statusFilter !== "all" && (
+            <button
+              onClick={() => setStatusFilter("all")}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border rounded-lg hover:bg-gray-50"
+            >
+              Xóa lọc
+            </button>
+          )}
         </div>
       </div>
 
@@ -226,14 +400,20 @@ export default function PhieuNhapKhoPage() {
           <div className="p-8 text-center text-gray-500">Đang tải...</div>
         ) : list.length === 0 ? (
           <div className="p-12 text-center text-gray-500">
-            Chưa có phiếu nhập kho nào
+            {statusFilter !== "all" || q.trim() 
+              ? "Không tìm thấy phiếu nhập kho nào phù hợp"
+              : "Chưa có phiếu nhập kho nào"
+            }
           </div>
         ) : (
           <table className="min-w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Mã phiếu
+                  Mã phiếu nhập
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Phiếu đặt hàng
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                   Nhà cung cấp
@@ -256,24 +436,20 @@ export default function PhieuNhapKhoPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {list.map((r) => {
-                const status = r.trangThai || "Tạo mới"; // lấy đúng từ normalize
-                const sLower = status.toLowerCase();
-                const badgeColor = sLower.includes("hủy")
-                  ? "bg-red-100 text-red-700"
-                  : sLower.includes("hoàn") || sLower.includes("tất") || sLower.includes("xong")
-                  ? "bg-green-100 text-green-700"
-                  : sLower.includes("chờ") || sLower.includes("xác")
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-gray-100 text-gray-700";
+              {paginatedData.map((r) => {
+                const status = r.trangThai || "Tạo mới";
+                const badgeColor = getStatusColor(status);
 
                 return (
                   <tr key={r.maPhieuNhap} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       {r.maPhieuNhap}
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      {getOrderLabel(r)}
+                    </td>
                     <td className="px-4 py-3 text-sm">
-                      {getTenNhaCungCap(r.maNhaCungCap)}
+                      {getSupplierNameFromRow(r)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {getTenNhanVien(r.maNhanVien)}
@@ -285,7 +461,7 @@ export default function PhieuNhapKhoPage() {
                       <Badge color={badgeColor}>{status}</Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
-                      {r.ghiChu ?? "—"}
+                      {r.ghiChu ?? ""}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -301,6 +477,64 @@ export default function PhieuNhapKhoPage() {
               })}
             </tbody>
           </table>
+        )}
+        
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+            <div className="text-sm text-gray-700">
+              Trang {currentPage} / {totalPages}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+                Trước
+              </button>
+              
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    const distance = Math.abs(page - currentPage);
+                    return distance <= 1 || page === 1 || page === totalPages;
+                  })
+                  .map((page, index, array) => {
+                    const prevPage = array[index - 1];
+                    const showDots = prevPage && page - prevPage > 1;
+                    return (
+                      <div key={page} className="flex items-center gap-1">
+                        {showDots && (
+                          <span className="px-2 py-1 text-gray-400">...</span>
+                        )}
+                        <button
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md ${
+                            currentPage === page
+                              ? "bg-blue-600 text-white"
+                              : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+              
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Tiếp
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -327,8 +561,8 @@ export default function PhieuNhapKhoPage() {
                   setSaving(true);
 
                   // Validate
-                  if (!addFormData.maNhaCungCap) {
-                    alert("Vui lòng chọn nhà cung cấp!");
+                  if (!addFormData.maPhieuDatHang) {
+                    alert("Vui lòng chọn phiếu đặt hàng!");
                     return;
                   }
                   if (!addFormData.maNhanVien) {
@@ -340,10 +574,9 @@ export default function PhieuNhapKhoPage() {
                     return;
                   }
 
-                  // Gửi camelCase, service sẽ toDB + set trangthai = "Tạo mới"
                   const payload = {
                     maNhanVien: Number(addFormData.maNhanVien),
-                    maNhaCungCap: Number(addFormData.maNhaCungCap),
+                    maPhieuDatHang: Number(addFormData.maPhieuDatHang),
                     ngayNhap: addFormData.ngayNhap,
                     ghiChu: addFormData.ghiChu || null,
                     trangThai: "Tạo mới",
@@ -358,7 +591,7 @@ export default function PhieuNhapKhoPage() {
                   setShowAddForm(false);
                   alert("Thêm phiếu nhập kho thành công!");
 
-                  // Navigate to detail page nếu có ID mới
+                  // Navigate to detail page
                   if (res?.maPhieuNhap) {
                     navigate(`/phieunhapkho/${res.maPhieuNhap}`);
                   }
@@ -377,30 +610,49 @@ export default function PhieuNhapKhoPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nhà cung cấp <span className="text-red-500">*</span>
+                    Phiếu đặt hàng <span className="text-red-500">*</span>
                   </label>
                   <select
-                    value={addFormData.maNhaCungCap}
+                    value={addFormData.maPhieuDatHang}
                     onChange={(e) =>
                       setAddFormData((old) => ({
                         ...old,
-                        maNhaCungCap: e.target.value,
+                        maPhieuDatHang: e.target.value,
                       }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   >
-                    <option value="">-- Chọn nhà cung cấp --</option>
-                    {Array.isArray(suppliers) &&
-                      suppliers.map((s) => (
-                        <option
-                          key={s.maNhaCungCap ?? s.manhacungcap}
-                          value={s.maNhaCungCap ?? s.manhacungcap}
-                        >
-                          {s.tenNhaCungCap ?? s.tennhacungcap}
+                    <option value="">-- Chọn phiếu đặt hàng --</option>
+                    {eligibleOrders.map((order) => {
+                      const id = order.maPhieuDatHang ?? order.maphieudathang;
+                      const supplierId = order.maNhaCungCap ?? order.manhacungcap;
+                      const supplierName =
+                        getTenNhaCungCap(supplierId) ||
+                        (supplierId ? `${supplierId}` : "Không rõ NCC");
+                      return (
+                        <option key={id} value={id}>
+                          #{id} - {supplierName}
                         </option>
-                      ))}
+                      );
+                    })}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nhà cung cấp
+                  </label>
+                  <input
+                    type="text"
+                    value={
+                      selectedSupplier.name ||
+                      (selectedSupplier.id ? `#${selectedSupplier.id}` : "")
+                    }
+                    readOnly
+                    placeholder="Tự động theo phiếu đặt hàng"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                  />
                 </div>
 
                 <div>
@@ -429,24 +681,24 @@ export default function PhieuNhapKhoPage() {
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ngày nhập <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  value={addFormData.ngayNhap}
-                  onChange={(e) =>
-                    setAddFormData((old) => ({
-                      ...old,
-                      ngayNhap: e.target.value,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày nhập <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={addFormData.ngayNhap}
+                    onChange={(e) =>
+                      setAddFormData((old) => ({
+                        ...old,
+                        ngayNhap: e.target.value,
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
               </div>
 
               <div>

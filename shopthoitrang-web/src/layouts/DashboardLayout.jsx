@@ -13,6 +13,7 @@ import {
   FileText,
   Building2,
   Bell,
+  MessageSquareText,
 } from "lucide-react";
 
 const DashboardLayout = () => {
@@ -59,14 +60,18 @@ const accountRole =
       icon: LayoutDashboard,
       link: "/dashboard",
     },
+    
     {
       label: "Nhân viên",
       icon: Users,
       items: [
         { label: "Danh sách nhân viên", link: "/nhanvien" },
         { label: "Tài khoản nhân viên", link: "/taikhoannhanvien" },
+        { label: "Ca làm việc", link: "/calamviec" },
         { label: "Phân công ca", link: "/phancongca" },
         { label: "Chốt ca", link: "/chotca" },
+        
+        
       ],
     },
     {
@@ -74,6 +79,7 @@ const accountRole =
       icon: Package,
       items: [
         { label: "Danh sách sản phẩm", link: "/sanpham" },
+        { label: "Kích thước", link: "/kichthuoc" },
         { label: "Danh mục", link: "/danhmuc" },
       ],
     },
@@ -83,12 +89,19 @@ const accountRole =
       items: [
         { label: "Chương trình khuyến mãi", link: "/khuyenmai"},
         {label: "Voucher giảm giá", link: "/vouchergiamgia"}
-      ]
+      ],
+      items: [{ label: "Chương trình khuyến mãi", link: "/khuyenmai" },
+        { label: "Voucher giảm giá", link: "/vouchergiamgia" }
+      ],
     },
     {
       label: "Đơn hàng",
       icon: ShoppingCart,
-      items: [{ label: "Danh sách đơn hàng", link: "/donhang" }],
+      items: [
+        { label: "Danh sách đơn hàng", link: "/donhang" },
+        { label: "Trả hàng/Hoàn tiền", link: "/trahang" },
+        { label: "Đổi hàng", link: "/doihang" },
+      ],
     },
     {
       label: "Khách hàng",
@@ -99,8 +112,18 @@ const accountRole =
       label: "Chứng từ",
       icon: FileText,
       items: [
+        { label: "Nhà cung cấp", link: "/nhacungcap" },
         { label: "Phiếu đặt hàng", link: "/phieudathang" },
         { label: "Phiếu nhập kho", link: "/phieunhapkho" },
+      ],
+    },
+    {
+      label: "Thông báo",
+      icon: Bell,
+      items: [
+        { label: "Tin nhắn", link: "/tinnhan", icon: MessageSquareText },
+        { label: "Đánh giá", link: "/danhgia" },
+        { label: "Thông báo hệ thống", link: "/thongbao" },
       ],
     },
     {
@@ -135,7 +158,7 @@ const accountRole =
           ref={dropdownRef}
         >
           {/* Logo */}
-          <h2 className="text-xl font-bold text-blue-600">Shop Thời Trang</h2>
+          <h2 className="text-xl font-bold text-blue-600">ELORA</h2>
 
           {/* Menu ngang */}
           <nav className="flex items-center gap-6">

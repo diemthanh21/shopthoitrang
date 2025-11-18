@@ -9,7 +9,7 @@ const PhieuNhapKhoRepository = {
     let query = supabase.from(TABLE).select('*');
 
     if (filters.manhanvien) query = query.eq('manhanvien', filters.manhanvien);
-    if (filters.manhacungcap) query = query.eq('manhacungcap', filters.manhacungcap);
+    if (filters.maphieudathang) query = query.eq('maphieudathang', filters.maphieudathang);
     if (filters.from) query = query.gte('ngaynhap', filters.from);
     if (filters.to) query = query.lte('ngaynhap', filters.to);
 

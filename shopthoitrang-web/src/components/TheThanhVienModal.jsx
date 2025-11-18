@@ -1,52 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Table, Switch, message } from 'antd';
-import thethanhvienService from '../services/thethanhvienService';
 import dayjs from 'dayjs';
+import thethanhvienService from '../services/thethanhvienService';
+
+const formatDate = (value) => (value ? dayjs(value).format('DD/MM/YYYY') : '');
 
 export default function TheThanhVienModal({ makhachhang, visible, onClose }) {
   const [memberCards, setMemberCards] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!visible) return;
-    if (!makhachhang) {
-      console.log('No makhachhang provided');
-      return;
+  const loadData = async () => {
+    if (!makhachhang) return;
+    try {
+      setLoading(true);
+      const data = await thethanhvienService.getByKhachHang(makhachhang);
+      setMemberCards(data || []);
+    } catch (err) {
+      console.error(err);
+      message.error('Không thể tải thẻ thành viên');
+    } finally {
+      setLoading(false);
     }
-    console.log('Modal opened for makhachhang:', makhachhang);
-    const load = async () => {
-      try {
-        setLoading(true);
-        console.log('Calling API with makhachhang:', makhachhang);
-        const data = await thethanhvienService.getByKhachHang(makhachhang);
-        console.log('API response:', data);
-        setMemberCards(data || []);
-      } catch (err) {
-        console.error('API Error:', err);
-        message.error('Không thể tải dữ liệu thẻ thành viên');
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
+  };
+
+  useEffect(() => {
+    if (visible) loadData();
   }, [visible, makhachhang]);
 
   const handleToggleStatus = async (record) => {
     try {
       setLoading(true);
-      await thethanhvienService.update(record.mathe, {
-        ...record,
-        trangthai: !record.trangthai
-      });
-      
-      // Reload data after update
-      const data = await thethanhvienService.getByKhachHang(makhachhang);
-      setMemberCards(data || []);
-      
-      message.success('Đã cập nhật trạng thái thẻ thành viên');
+      await thethanhvienService.update(record.mathe, { trangthai: !record.trangthai });
+      await loadData();
+      message.success('Đã cập nhật trạng thái thẻ');
     } catch (err) {
       console.error(err);
-      message.error('Lỗi khi cập nhật trạng thái thẻ thành viên');
+      message.error('Không thể cập nhật trạng thái');
     } finally {
       setLoading(false);
     }
@@ -54,30 +43,38 @@ export default function TheThanhVienModal({ makhachhang, visible, onClose }) {
 
   const columns = [
     { title: 'Mã thẻ', dataIndex: 'mathe', key: 'mathe' },
-    { title: 'Hạng thẻ', dataIndex: 'mahangthe', key: 'mahangthe' },
-    { title: 'Ngày cấp', dataIndex: 'ngaycap', key: 'ngaycap', render: (t) => dayjs(t).format('DD/MM/YYYY') },
-    { title: 'Ngày hết hạn', dataIndex: 'ngayhethan', key: 'ngayhethan', render: (t) => dayjs(t).format('DD/MM/YYYY') },
-    { 
-      title: 'Trạng thái', 
-      dataIndex: 'trangthai', 
-      key: 'trangthai', 
-      render: (trangthai, record) => (
-        <Switch
-          checked={trangthai}
-          onChange={() => handleToggleStatus(record)}
-          loading={loading}
-        />
-      )
+    {
+      title: 'Hạng thẻ',
+      key: 'hangthe',
+      render: (_, record) => (
+        <div>
+          <div className="font-semibold text-gray-900">{record.hangThe?.tenhang || `${record.mahangthe}`}</div>
+          <div className="text-xs text-gray-500">
+            Giảm {record.hangThe?.giamGia ?? record.giamgia ?? 0}% · Voucher{' '}
+            {record.hangThe?.voucherSinhNhat ?? record.voucher_sinhnhat ?? 0}đ
+          </div>
+        </div>
+      ),
+    },
+    { title: 'Ngày cấp', dataIndex: 'ngaycap', key: 'ngaycap', render: formatDate },
+    { title: 'Ngày hết hạn', dataIndex: 'ngayhethan', key: 'ngayhethan', render: formatDate },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'trangthai',
+      key: 'trangthai',
+      render: (value, record) => (
+        <Switch checked={value} onChange={() => handleToggleStatus(record)} loading={loading} />
+      ),
     },
   ];
 
   return (
     <Modal
-      title={`Thẻ thành viên - ${makhachhang || ''}`}
+      title={`Thẻ thành viên - KH ${makhachhang || ''}`}
       open={visible}
       onCancel={onClose}
       footer={null}
-      width={800}
+      width={780}
     >
       <Table
         columns={columns}
@@ -85,9 +82,7 @@ export default function TheThanhVienModal({ makhachhang, visible, onClose }) {
         rowKey="mathe"
         loading={loading}
         pagination={false}
-        locale={{
-          emptyText: 'Không có thẻ thành viên'
-        }}
+        locale={{ emptyText: 'Khách hàng chưa có thẻ' }}
       />
     </Modal>
   );

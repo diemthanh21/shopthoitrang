@@ -29,14 +29,23 @@ class SanPhamService {
       tensanpham: body.tensanpham,
       madanhmuc: body.madanhmuc,
       mathuonghieu: body.mathuonghieu ?? null,
-      trangthai: body.trangthai ?? 'Đang kinh doanh'
+      trangthai: body.trangthai ?? 'Đang kinh doanh',
+      hinhanh: body.hinhanh ?? null,
     };
 
     return repo.create(payload);
   }
 
   async update(id, body) {
-    const updated = await repo.update(id, body);
+    const fields = {};
+
+    if (body.tensanpham !== undefined) fields.tensanpham = body.tensanpham;
+    if (body.madanhmuc !== undefined) fields.madanhmuc = body.madanhmuc;
+    if (body.mathuonghieu !== undefined) fields.mathuonghieu = body.mathuonghieu ?? null;
+    if (body.trangthai !== undefined) fields.trangthai = body.trangthai;
+    if (body.hinhanh !== undefined) fields.hinhanh = body.hinhanh ?? null;
+
+    const updated = await repo.update(id, fields);
     if (!updated) {
       const e = new Error('Không tìm thấy sản phẩm để cập nhật');
       e.status = 404;

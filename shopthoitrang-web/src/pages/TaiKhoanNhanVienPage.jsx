@@ -282,7 +282,7 @@ export default function TaiKhoanNhanVienPage() {
               {filteredAccounts.map((tk) => {
                 const maNV = tk.maNhanVien ?? tk.manhanvien;
                 const tenNV =
-                  nhanVienMap[maNV] ?? (maNV != null ? `NV #${maNV}` : "—");
+                  nhanVienMap[maNV] ?? (maNV != null ? `NV #${maNV}` : "");
                 const tenDangNhap = tk.tenDangNhap ?? tk.tendangnhap ?? "";
                 const dangHoatDong =
                   (tk.dangHoatDong ?? tk.danghoatdong) !== false;
@@ -358,7 +358,7 @@ export default function TaiKhoanNhanVienPage() {
                         editingAccount.manhanvien;
                       const tenNV =
                         nhanVienMap[maNV] ??
-                        (maNV != null ? `NV #${maNV}` : "—");
+                        (maNV != null ? `NV #${maNV}` : "");
                       return (
                         <Option key={maNV} value={maNV}>
                           {maNV} - {tenNV}

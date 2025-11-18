@@ -4,13 +4,15 @@ class SanPham {
     tensanpham,
     madanhmuc,
     mathuonghieu,
-    trangthai
+    trangthai,
+    hinhanh,
   }) {
     this.maSanPham = masanpham;
     this.tenSanPham = tensanpham;
     this.maDanhMuc = madanhmuc;
     this.maThuongHieu = mathuonghieu;
     this.trangThai = trangthai;
+    this.hinhAnh = hinhanh ?? null;
   }
 
   toJSON() {
@@ -19,7 +21,8 @@ class SanPham {
       tensanpham: this.tenSanPham,
       madanhmuc: this.maDanhMuc,
       mathuonghieu: this.maThuongHieu,
-      trangthai: this.trangThai
+      trangthai: this.trangThai,
+      hinhanh: this.hinhAnh,
     };
   }
 }
