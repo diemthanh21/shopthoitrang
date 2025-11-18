@@ -23,6 +23,7 @@ const DashboardLayout = () => {
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const [openAccount, setOpenAccount] = useState(false);
+  const [openNotification, setOpenNotification] = useState(false);
   const dropdownRef = useRef(null);
 
   const handleLogout = () => {
@@ -30,12 +31,22 @@ const DashboardLayout = () => {
     navigate("/login");
   };
 
+  // Tên + chức vụ hiển thị
+  const accountName =
+  user?.hoTen ||
+  user?.tenDangNhap ||
+  user?.tendangnhap || // phòng khi đâu đó vẫn còn snake_case
+  "Admin";
+
+const accountRole =
+  user?.chucVu || (user?.maNhanVien ? "Nhân viên" : "Quản trị viên");
   // 🔹 Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpenDropdown(null);
         setOpenAccount(false);
+        setOpenNotification(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -73,12 +84,13 @@ const DashboardLayout = () => {
       ],
     },
     {
-      label: "Khuyen mai",
+      label: "Khuyến mãi",
       icon: Tag,
       items: [
-        { label: "Chuong trinh khuyen mai", link: "/khuyenmai" },
-        { label: "Ma giam gia", link: "/magiamgia" }
+        { label: "Chương trình khuyến mãi", link: "/khuyenmai"},
+        {label: "Mã giảm giá", link: "/magiamgia"}
       ],
+   
     },
     {
       label: "Đơn hàng",
@@ -92,10 +104,10 @@ const DashboardLayout = () => {
     {
       label: "Khách hàng",
       icon: User,
-      items: [
-        { label: "Danh sách khách hàng", link: "/khachhang" },
-        { label: "Thẻ thành viên", link: "/thethanhvien" },
+      items: [{ label: "Thông tin khách hàng", link: "/khachhang" },
+         { label: "Danh sách thẻ", link: "/hangthe" },
       ],
+      
     },
     {
       label: "Chứng từ",
@@ -119,8 +131,8 @@ const DashboardLayout = () => {
       label: "Khác",
       icon: Building2,
       items: [
-        
         { label: "Banner", link: "/banner" },
+       
       ],
     },
   ];
@@ -140,7 +152,10 @@ const DashboardLayout = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="flex items-center justify-between px-6 py-3" ref={dropdownRef}>
+        <div
+          className="flex items-center justify-between px-6 py-3"
+          ref={dropdownRef}
+        >
           {/* Logo */}
           <h2 className="text-xl font-bold text-blue-600">ELORA</h2>
 
@@ -211,48 +226,89 @@ const DashboardLayout = () => {
             })}
           </nav>
 
-          {/* Dropdown tài khoản */}
-          <div className="relative">
-            <button
-              onClick={() => setOpenAccount(!openAccount)}
-              className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition"
-            >
-              <UserCircle size={20} />
-              <span>Tài khoản</span>
-            </button>
-
-            {openAccount && (
-              <div
-                className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
-                role="menu"
+          {/* Chuông + Tài khoản */}
+          <div className="flex items-center gap-3">
+            {/* Chuông thông báo */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setOpenNotification((prev) => !prev);
+                  setOpenAccount(false);
+                  setOpenDropdown(null);
+                }}
+                className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
               >
-                <div className="px-4 py-2 border-b border-gray-100">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user?.tenDangNhap || "Admin"}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {user?.maNhanVien ? "Nhân viên" : "Quản trị viên"}
-                  </p>
+                <Bell size={18} />
+                {/* Badge số lượng (demo) */}
+                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500 text-white">
+                  0
+                </span>
+              </button>
+
+              {openNotification && (
+                <div
+                  className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
+                  role="menu"
+                >
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-900">
+                      Thông báo
+                    </p>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    <div className="px-4 py-3 text-sm text-gray-600">
+                      Hiện chưa có thông báo mới.
+                    </div>
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Dropdown tài khoản */}
+            <div className="relative">
+              <button
+                onClick={() => setOpenAccount(!openAccount)}
+                className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition"
+              >
+                <UserCircle size={20} />
+                <span>{accountName}</span>
+              </button>
+
+              {openAccount && (
+                <div
+                  className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
+                  role="menu"
+                >
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {accountName}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {accountRole}
+                    </p>
+                  </div>
 
                 <button
-                  onClick={() => alert("Thông tin admin")}
+                  onClick={() => {
+                    setOpenAccount(false);
+                    navigate('/me');
+                  }}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Thông tin Admin
+                  Thông tin nhân viên
                 </button>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <div className="flex items-center gap-2">
-                    <LogOut size={16} />
-                    <span>Đăng xuất</span>
-                  </div>
-                </button>
-              </div>
-            )}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <div className="flex items-center gap-2">
+                      <LogOut size={16} />
+                      <span>Đăng xuất</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

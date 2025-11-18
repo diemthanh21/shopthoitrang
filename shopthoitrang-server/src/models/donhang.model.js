@@ -2,6 +2,7 @@ class DonHang {
   constructor({
     madonhang,
     makhachhang,
+    manhanvien,
     ngaydathang,
     thanhtien,
     phuongthucthanhtoan,
@@ -12,6 +13,7 @@ class DonHang {
   }) {
     this.madonhang = madonhang;
     this.makhachhang = makhachhang;
+    this.manhanvien = manhanvien || null;
     this.ngaydathang = ngaydathang;
     this.ngaygiaohang = ngaygiaohang || null; // thời điểm xác nhận đã giao
     this.thanhtien = thanhtien;

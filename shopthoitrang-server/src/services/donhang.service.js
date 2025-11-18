@@ -10,6 +10,48 @@ const normalizeStatus = (value = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase();
 
+const STATUS_CHO_XAC_NHAN = 'Chờ xác nhận';
+const STATUS_CHO_LAY_HANG = 'Chờ lấy hàng';
+
+const mapPreferredStatus = status => {
+  if (!status) return '';
+  const normalized = normalizeStatus(status);
+  if (!normalized) return '';
+  if (normalized === 'CHO XAC NHAN') return STATUS_CHO_XAC_NHAN;
+  if (normalized === 'CHO LAY HANG') return STATUS_CHO_LAY_HANG;
+  return status;
+};
+
+const isBankTransferMethod = method => {
+  if (!method) return false;
+  const normalized = normalizeStatus(method).replace(/\s+/g, '');
+  return normalized.includes('BANK') || normalized.includes('CHUYENKHOAN');
+};
+
+const isPaidStatus = status => {
+  if (!status) return false;
+  return normalizeStatus(status).includes('DA THANH TOAN');
+};
+
+const shouldAutoMoveToPickup = (method, paymentStatus) =>
+  isBankTransferMethod(method) && isPaidStatus(paymentStatus);
+
+const deriveInitialStatus = (method, paymentStatus, providedStatus) => {
+  const normalizedProvided = normalizeStatus(providedStatus);
+  if (normalizedProvided && normalizedProvided !== 'CHO XAC NHAN') {
+    return mapPreferredStatus(providedStatus);
+  }
+  if (shouldAutoMoveToPickup(method, paymentStatus)) {
+    return STATUS_CHO_LAY_HANG;
+  }
+  return STATUS_CHO_XAC_NHAN;
+};
+
+const isPendingConfirmationStatus = status => {
+  const normalized = normalizeStatus(status);
+  return !normalized || normalized === 'CHO XAC NHAN';
+};
+
 class DonHangService {
   async list() {
     return repo.getAll();
@@ -304,12 +346,18 @@ class DonHangService {
     }
 
     // Create the order first (robust to environments chưa có cột madiachi)
+    const paymentStatus = body.trangthaithanhtoan || 'Chưa thanh toán';
+    const orderStatus = deriveInitialStatus(
+      body.phuongthucthanhtoan,
+      paymentStatus,
+      body.trangthaidonhang
+    );
     const basePayload = {
       makhachhang: body.makhachhang,
       thanhtien: body.thanhtien || 0,
       phuongthucthanhtoan: body.phuongthucthanhtoan,
-      trangthaithanhtoan: body.trangthaithanhtoan || 'Chưa thanh toán',
-      trangthaidonhang: body.trangthaidonhang || 'Chờ xác nhận',
+      trangthaithanhtoan: paymentStatus,
+      trangthaidonhang: orderStatus,
     };
     const withMadiachi = {
       ...basePayload,
@@ -506,19 +554,30 @@ class DonHangService {
 
   async update(id, body) {
     const existing = await repo.getById(id);
+    const payload = body || {};
+    const paymentMethod = payload.phuongthucthanhtoan || existing?.phuongthucthanhtoan;
+    const incomingPaymentStatus = payload.trangthaithanhtoan;
+
+    if (
+      !payload.trangthaidonhang &&
+      incomingPaymentStatus &&
+      shouldAutoMoveToPickup(paymentMethod, incomingPaymentStatus) &&
+      isPendingConfirmationStatus(existing?.trangthaidonhang)
+    ) {
+      payload.trangthaidonhang = STATUS_CHO_LAY_HANG;
+    }
 
     // If status set to 'Đã giao', stamp delivery date so mobile can enforce return window
-    if (body && body.trangthaidonhang && body.trangthaidonhang === 'Đã giao') {
-      if (!body.ngaygiaohang) body.ngaygiaohang = new Date().toISOString();
+    if (payload.trangthaidonhang && payload.trangthaidonhang === 'Đã giao') {
+      if (!payload.ngaygiaohang) payload.ngaygiaohang = new Date().toISOString();
 
       // Business rule: for COD orders, 'Đã giao' means 'Đã thanh toán'
-      const paymentMethod = body.phuongthucthanhtoan || existing?.phuongthucthanhtoan;
-      if (paymentMethod === 'COD' && !body.trangthaithanhtoan) {
-        body.trangthaithanhtoan = 'Đã thanh toán';
+      if (paymentMethod === 'COD' && !payload.trangthaithanhtoan) {
+        payload.trangthaithanhtoan = 'Đã thanh toán';
       }
     }
 
-    const updated = await repo.update(id, body);
+    const updated = await repo.update(id, payload);
     if (!updated) {
       const e = new Error('Khong tim thay don hang de cap nhat');
       e.status = 404;
@@ -527,7 +586,7 @@ class DonHangService {
 
     try {
       const prevStatus = existing ? normalizeStatus(existing.trangthaidonhang || '') : '';
-      const nextStatus = normalizeStatus(updated.trangthaidonhang || body?.trangthaidonhang || '');
+      const nextStatus = normalizeStatus(updated.trangthaidonhang || payload.trangthaidonhang || '');
 
       // Khi đơn mới chuyển sang 'Đã giao' lần đầu -> cộng điểm thành viên
       if (nextStatus.includes('DA GIAO') && !prevStatus.includes('DA GIAO')) {
@@ -603,5 +662,4 @@ class DonHangService {
 }
 
 module.exports = new DonHangService();
-
 

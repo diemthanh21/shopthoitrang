@@ -8,6 +8,7 @@ const normalize = (r) => ({
   donGia: r.dongia ?? r.donGia ?? 0,
   thanhTien: r.thanhtien ?? r.thanhTien ?? 0,
   ghiChu: r.ghichu ?? r.ghiChu ?? null,
+  chatLieu: r.chatlieu ?? r.chatLieu ?? null,
 });
 
 const toDB = (d) => ({
@@ -17,6 +18,7 @@ const toDB = (d) => ({
   dongia: d.donGia ?? undefined,
   thanhtien: d.thanhTien ?? undefined,
   ghichu: d.ghiChu ?? undefined,
+  chatlieu: d.chatLieu ?? undefined,
 });
 
 const PREFIX = '/chitietphieudathang';

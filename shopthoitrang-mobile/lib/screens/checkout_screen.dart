@@ -1,8 +1,12 @@
 ﻿import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'sepay_checkout_screen.dart';
 
 import '../models/order_model.dart';
 import '../models/product_model.dart';
@@ -12,6 +16,7 @@ import '../models/coupon_model.dart';
 import '../services/order_service.dart';
 import '../services/cart_service.dart';
 import '../services/address_service.dart';
+import '../services/payment_service.dart';
 import '../providers/auth_provider.dart';
 import 'address_selection_screen.dart';
 import 'coupon_selection_screen.dart';
@@ -50,6 +55,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final OrderService _orderService = OrderService();
   final CartService _cartService = CartService();
   final AddressService _addressService = AddressService();
+  final PaymentService _paymentService = PaymentService();
   final TextEditingController _noteController = TextEditingController();
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(locale: 'vi_VN', symbol: ' VND', decimalDigits: 0);
@@ -65,7 +71,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Coupon? _selectedDiscountCoupon;
   Coupon? _selectedFreeshipCoupon;
   DiaChiKhachHang? _selectedAddress;
-
   double get _grandTotal =>
       math.max(0, _totalAmount - _orderCouponDiscount) +
       math.max(0, _shippingFee - _shippingCouponDiscount);
@@ -211,18 +216,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw Exception('Chua dang nhap');
       }
 
+      final bool isCod = _selectedPaymentMethod == 'COD';
+      final bool requiresGateway = _selectedPaymentMethod == 'Bank';
+
       final order = Order(
         customerId: auth.user!.maKhachHang,
         orderDate: DateTime.now(),
         total: _grandTotal,
         paymentMethod: _selectedPaymentMethod,
-        paymentStatus: _selectedPaymentMethod == 'COD'
-            ? 'Chua thanh toan'
-            : 'Da thanh toan',
-        orderStatus:
-            _selectedPaymentMethod == 'COD' ? 'Cho xac nhan' : 'Cho lay hang',
+        paymentStatus: 'Chua thanh toan',
+        orderStatus: 'Cho xac nhan',
         items: _orderItems,
         shippingAddress: _selectedAddress,
+        appliedVoucherIds: _collectVoucherIds(),
       );
 
       final createdOrder = await _orderService.createOrder(order);
@@ -238,22 +244,29 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Dat hang thanh cong!'),
-              ],
+        if (requiresGateway && createdOrder.id != null) {
+          await _startOnlinePayment(createdOrder);
+          return;
+        }
+
+        if (isCod && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Dat hang thanh cong!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+          );
+        }
 
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
@@ -286,6 +299,54 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (forShipping && !isFreeship) return 0;
     if (!forShipping && isFreeship) return 0;
     return coupon.calculateDiscount(_totalAmount, _shippingFee);
+  }
+
+  List<int> _collectVoucherIds() {
+    final ids = <int>[];
+    void addCoupon(Coupon? coupon) {
+      final id = coupon?.id;
+      if (id != null) ids.add(id);
+    }
+
+    addCoupon(_selectedDiscountCoupon);
+    addCoupon(_selectedFreeshipCoupon);
+    return ids;
+  }
+
+  Future<void> _startOnlinePayment(Order order) async {
+    final orderId = order.id;
+    if (orderId == null) return;
+    final paymentPayload = await _paymentService.createSepayPayment(
+      orderId: orderId,
+      customerName: _selectedAddress?.ten,
+      customerPhone: _selectedAddress?.soDienThoai,
+    );
+
+    if (paymentPayload == null) {
+      throw Exception(
+        _paymentService.lastError ?? 'Không thể mở cổng thanh toán. Vui lòng thử lại.',
+      );
+    }
+
+    if (paymentPayload.hasHtml || paymentPayload.launchUrl != null) {
+      if (!mounted) return;
+      if (_isLoading) {
+        setState(() => _isLoading = false);
+      }
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SepayCheckoutScreen(
+            initialHtml: paymentPayload.autoSubmitHtml,
+            initialUrl:
+                paymentPayload.hasHtml ? null : paymentPayload.launchUrl,
+            fallbackUrl: paymentPayload.launchUrl,
+          ),
+        ),
+      );
+      return;
+    }
+
+    throw Exception('Không tìm thấy đường dẫn thanh toán hợp lệ.');
   }
 
   Future<void> _openCouponSelection() async {
@@ -431,7 +492,17 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           subtitle: 'Mien phi giao dich',
                           value: 'Bank',
                         ),
-                        
+                          const Divider(height: 8),
+                        _buildPaymentOption(
+                          icon: Icons.account_balance,
+                          title: 'Chuyen khoan MOMO',
+                          subtitle: 'Mien phi giao dich',
+                          value: 'MOMO',
+                        ),
+                        if (_selectedPaymentMethod == 'Bank') ...[
+                          const SizedBox(height: 16),
+                          _buildBankTransferInfo(),
+                        ],
                       ],
                     ),
                   ),
@@ -1409,6 +1480,52 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildBankTransferInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F7FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kPrimaryBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Thanh toan truc tuyen SePay',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sau khi nhan "Dat hang", he thong se mo cong thanh toan SePay de ban thanh toan qua ngan hang hoac vi dien tu. Don hang se duoc cap nhat tu dong khi giao dich thanh cong.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchPaymentUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      throw Exception('Duong dan thanh toan khong hop le');
+    }
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened) {
+      throw Exception('Khong the mo cong thanh toan');
+    }
   }
 
   Widget _buildSummaryRow(

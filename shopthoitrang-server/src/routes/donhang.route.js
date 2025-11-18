@@ -75,6 +75,7 @@ router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
  *             required: [makhachhang, phuongthucthanhtoan]
  *             properties:
  *               makhachhang: { type: integer }
+ *               manhanvien: { type: integer, description: "Mã nhân viên xử lý đơn hàng (tùy chọn)" }
  *               thanhtien: { type: number }
  *               phuongthucthanhtoan: { type: string }
  *               trangthaithanhtoan: { type: string }
@@ -104,6 +105,7 @@ router.post('/', ctrl.create);
  *           schema:
  *             type: object
  *             properties:
+ *               manhanvien: { type: integer, description: "Mã nhân viên xử lý đơn hàng" }
  *               trangthaithanhtoan: { type: string }
  *               trangthaidonhang: { type: string }
  *               thanhtien: { type: number }

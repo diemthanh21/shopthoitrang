@@ -1,6 +1,6 @@
 // src/pages/CaLamViecPage.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Clock, Plus, Search, X, Pencil, Trash2 } from "lucide-react";
+import { Clock, Plus, Search, X, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import calamviecService from "../services/calamviecService";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -22,6 +22,10 @@ export default function CaLamViecPage() {
   const [error, setError] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const [showForm, setShowForm] = useState(false);
   const [editingShift, setEditingShift] = useState(null); // null = tạo mới
@@ -50,6 +54,29 @@ export default function CaLamViecPage() {
     })();
   }, []);
 
+  // ===== Helper functions =====
+  // Kiểm tra ca làm việc có trùng giờ không
+  const checkTimeConflict = (startTime, endTime, excludeId = null) => {
+    const newStart = startTime.split(':').map(Number);
+    const newEnd = endTime.split(':').map(Number);
+    
+    // Chuyển đổi thành phút để so sánh dễ hơn
+    const newStartMinutes = newStart[0] * 60 + newStart[1];
+    const newEndMinutes = newEnd[0] * 60 + newEnd[1];
+    
+    return shifts.some(shift => {
+      if (excludeId && shift.maCa === excludeId) return false;
+      
+      const existingStart = shift.gioBatDau.split(':').map(Number);
+      const existingEnd = shift.gioKetThuc.split(':').map(Number);
+      const existingStartMinutes = existingStart[0] * 60 + existingStart[1];
+      const existingEndMinutes = existingEnd[0] * 60 + existingEnd[1];
+      
+      // Kiểm tra trùng lặp: ca mới bắt đầu trước khi ca cũ kết thúc VÀ ca mới kết thúc sau khi ca cũ bắt đầu
+      return (newStartMinutes < existingEndMinutes && newEndMinutes > existingStartMinutes);
+    });
+  };
+
   // ===== Search =====
   const term = searchTerm.trim().toLowerCase();
   const filtered = useMemo(() => {
@@ -65,6 +92,16 @@ export default function CaLamViecPage() {
       return cells.some((v) => v.includes(term));
     });
   }, [shifts, term]);
+
+  // ===== Pagination =====
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filtered.slice(startIndex, startIndex + itemsPerPage);
+
+  // Reset về trang 1 khi search
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   // ===== Mở form tạo mới =====
   function openCreate() {
@@ -99,12 +136,25 @@ export default function CaLamViecPage() {
       return;
     }
     if (!window.confirm("Bạn có chắc chắn muốn xóa ca làm việc này?")) return;
+    
     try {
-      await calamviecService.delete(id);
+      console.log("Đang xóa ca làm việc ID:", id);
+      const result = await calamviecService.delete(id);
+      console.log("Xóa thành công:", result);
+      
       setShifts((prev) => prev.filter((x) => x.maCa !== id));
+      alert("Xóa ca làm việc thành công.");
     } catch (e) {
-      console.error(e);
-      alert("Không thể xóa ca làm việc.");
+      console.error("Lỗi khi xóa ca làm việc:", e);
+      
+      let errorMsg = "Không thể xóa ca làm việc.";
+      if (e?.response?.data?.message) {
+        errorMsg = e.response.data.message;
+      } else if (e?.message) {
+        errorMsg = e.message;
+      }
+      
+      alert(`Lỗi: ${errorMsg}`);
     }
   }
 
@@ -129,6 +179,24 @@ export default function CaLamViecPage() {
 
     if (!form.gioKetThuc) {
       alert("Vui lòng chọn giờ kết thúc.");
+      return;
+    }
+
+    // Kiểm tra giờ bắt đầu phải nhỏ hơn giờ kết thúc
+    const startTime = form.gioBatDau.split(':').map(Number);
+    const endTime = form.gioKetThuc.split(':').map(Number);
+    const startMinutes = startTime[0] * 60 + startTime[1];
+    const endMinutes = endTime[0] * 60 + endTime[1];
+    
+    if (startMinutes >= endMinutes) {
+      alert("Giờ bắt đầu phải nhỏ hơn giờ kết thúc.");
+      return;
+    }
+
+    // Kiểm tra trùng giờ với ca khác
+    const excludeId = editingShift ? editingShift.maCa : null;
+    if (checkTimeConflict(form.gioBatDau, form.gioKetThuc, excludeId)) {
+      alert("Ca làm việc này bị trùng giờ với ca làm việc khác. Vui lòng chọn thời gian khác.");
       return;
     }
 
@@ -232,43 +300,48 @@ export default function CaLamViecPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
+          <div className="text-sm text-gray-600">
+            Hiển thị {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filtered.length)} trong tổng số {filtered.length} ca làm việc
+          </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             {term ? "Không tìm thấy ca làm việc" : "Chưa có ca làm việc nào"}
           </div>
         ) : (
-          <table className="min-w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Mã ca
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Tên ca
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Giờ bắt đầu
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Giờ kết thúc
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Mô tả
-                </th>
-                {canEdit && (
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
-                    Thao tác
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.map((c) => (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Mã ca
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Tên ca
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Giờ bắt đầu
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Giờ kết thúc
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                      Mô tả
+                    </th>
+                    {canEdit && (
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                        Thao tác
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedData.map((c) => (
                 <tr key={c.maCa} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">
                     {c.maCa}
@@ -312,8 +385,68 @@ export default function CaLamViecPage() {
                   )}
                 </tr>
               ))}
-            </tbody>
-          </table>
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="border-t border-gray-200 px-4 py-3 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Trang {currentPage} / {totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft size={16} />
+                    Trước
+                  </button>
+                  
+                  {/* Page numbers */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        const distance = Math.abs(page - currentPage);
+                        return distance <= 1 || page === 1 || page === totalPages;
+                      })
+                      .map((page, index, array) => {
+                        const prevPage = array[index - 1];
+                        const showDots = prevPage && page - prevPage > 1;
+                        return (
+                          <div key={page} className="flex items-center gap-1">
+                            {showDots && (
+                              <span className="px-2 py-1 text-gray-400">...</span>
+                            )}
+                            <button
+                              onClick={() => setCurrentPage(page)}
+                              className={`px-3 py-2 text-sm font-medium rounded-md ${
+                                currentPage === page
+                                  ? "bg-blue-600 text-white"
+                                  : "text-gray-500 bg-white border border-gray-300 hover:bg-gray-50"
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Tiếp
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

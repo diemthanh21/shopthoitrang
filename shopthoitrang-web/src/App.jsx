@@ -34,7 +34,9 @@ import TraHangDetailPage from './pages/TraHangDetailPage';
 import TraHangPage from './pages/TraHangPage';
 import MaGiamGiaPage from './pages/MaGiamGiaPage';
 import KichThuocPage from './pages/KichThuocPage';
-
+import ChotCaPage from './pages/ChotCaPage';
+import ChotCaDetailPage from './pages/ChotCaDetailPage';
+import ThongTinNhanVienPage from './pages/ThongTinNhanVienPage';
 function App() {
   return (
     <AuthProvider>
@@ -50,6 +52,9 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="me" element={<ThongTinNhanVienPage />} />
+            <Route path="chotca" element={<ChotCaPage />} />  
+            <Route path="chotca/:id" element={<ChotCaDetailPage />} />  
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="nhanvien" element={<NhanVienPage />} />

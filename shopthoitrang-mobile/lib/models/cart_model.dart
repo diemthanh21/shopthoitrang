@@ -555,12 +555,10 @@ class Cart {
   });
 
   factory Cart.fromJson(Map<String, dynamic> json) {
-    print('[Cart.fromJson] Raw JSON: $json');
     final items = (json['items'] as List<dynamic>?)
             ?.map((item) => CartItem.fromJson(item))
             .toList() ??
         [];
-    print('[Cart.fromJson] Parsed ${items.length} items');
     return Cart(
       cartId: json['cartId'] ?? json['id'] ?? 0,
       items: items,

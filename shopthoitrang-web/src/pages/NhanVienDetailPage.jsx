@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import nhanvienService from "../services/nhanvienService";
+import chucnangService from "../services/chucnangService";
+import { useAuth } from "../contexts/AuthContext";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, User, Pencil,
   IdCard, BadgeDollarSign, ShieldCheck
@@ -11,14 +13,26 @@ import { formatDate } from "../utils/nhanvienUtils";
 export default function NhanVienDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [chucnangMap, setChucnangMap] = useState({});
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await nhanvienService.getById(id);
+        const [data, chucList] = await Promise.all([
+          nhanvienService.getById(id),
+          chucnangService.getAll(),
+        ]);
+
+        const map = {};
+        (chucList || []).forEach((c) => {
+          map[c.maChucNang] = c.tenChucNang;
+        });
+        setChucnangMap(map);
+
         setEmployee(data);
         setError("");
       } catch (e) {
@@ -36,6 +50,7 @@ export default function NhanVienDetailPage() {
 
   const initials = (employee.hoTen || "?").trim().charAt(0).toUpperCase();
   const currency = employee.luong != null ? `${Number(employee.luong).toLocaleString("vi-VN")} ₫` : "N/A";
+  const tenChucNang = employee?.maChucNang ? (chucnangMap[employee.maChucNang] || employee.maChucNang) : "N/A";
 
   return (
     <div className="w-full">
@@ -61,10 +76,12 @@ export default function NhanVienDetailPage() {
               </div>
             </div>
 
-            <button
-              onClick={() => navigate(`/nhanvien/${employee.maNhanVien}/edit`)}
-              className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-50 transition"
-            > <Pencil size={18} /> Chỉnh sửa</button>
+            {user?.maQuyen === 'ADMIN' && (
+              <button
+                onClick={() => navigate(`/nhanvien/${employee.maNhanVien}/edit`)}
+                className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-50 transition"
+              > <Pencil size={18} /> Chỉnh sửa</button>
+            )}
           </div>
         </div>
       </div>
@@ -88,7 +105,7 @@ export default function NhanVienDetailPage() {
                 <QuickItem icon={<User size={16} />} label="Giới tính" value={employee.gioiTinh} />
                 <QuickItem icon={<Calendar size={16} />} label="Ngày sinh" value={formatDate(employee.ngaySinh)} />
                 <QuickItem icon={<IdCard size={16} />} label="CCCD" value={employee.cccd} />
-                <QuickItem icon={<ShieldCheck size={16} />} label="Chức năng" value={employee.maChucNang ?? "N/A"} />
+                <QuickItem icon={<ShieldCheck size={16} />} label="Chức năng" value={tenChucNang} />
                 <QuickItem icon={<BadgeDollarSign size={16} />} label="Lương" value={currency} />
               </div>
             </div>

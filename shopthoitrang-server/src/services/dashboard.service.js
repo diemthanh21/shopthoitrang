@@ -14,13 +14,14 @@ const TABLES = {
 };
 
 // Các khả năng tên cột tổng tiền trong đơn hàng (ưu tiên theo thứ tự)
-const ORDER_TOTAL_CANDIDATES = ['tongtien', 'total', 'amount'];
+const ORDER_TOTAL_CANDIDATES = ['thanhtien', 'tongtien', 'total', 'amount'];
 // Cột trạng thái (nếu không tồn tại sẽ bỏ lọc)
-const ORDER_STATUS_CANDIDATES = ['trangthai', 'status'];
-const COMPLETED_VALUES = ['hoanthanh', 'completed', 'done'];
+const ORDER_STATUS_CANDIDATES = ['trangthaidonhang', 'trangthai', 'status'];
+const COMPLETED_VALUES = ['hoanthanh', 'completed', 'done', 'đã giao', 'da giao', 'delivered'];
+const REFUND_DONE_VALUES = ['hoàn tiền thành công', 'da hoan tien', 'đã hoàn tiền', 'hoan tien thanh cong'];
 
 // Cột thời gian tạo đơn (để sort gần nhất) – thử lần lượt
-const ORDER_CREATED_CANDIDATES = ['created_at', 'ngaytao', 'createdat'];
+const ORDER_CREATED_CANDIDATES = ['ngaydathang', 'created_at', 'ngaytao', 'createdat'];
 
 // Primary key columns cho mỗi bảng
 const ORDER_ID_CANDIDATES = ['madonhang', 'id'];
@@ -235,3 +236,239 @@ async function summary() {
 }
 
 module.exports = { summary };
+/**
+ * Revenue Flow: Tổng thu/chi theo khoảng thời gian
+ */
+function dayStartStr(d) {
+  if (!d) return null;
+  const m = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : (new Date(d)).toISOString().slice(0,10);
+  return `${m}T00:00:00`;
+}
+function nextDayStartStr(d) {
+  if (!d) return null;
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`) : new Date(d);
+  if (Number.isNaN(base.getTime())) return null;
+  const dt = new Date(base);
+  dt.setDate(dt.getDate() + 1);
+  return `${dt.toISOString().slice(0,10)}T00:00:00`;
+}
+
+async function getRefundedOrderIds() {
+  // Trả về Set các madonhang đã hoàn tiền thành công
+  try {
+    const { data, error } = await supabase
+      .from('trahang')
+      .select('madonhang, trangthai');
+    if (error) throw error;
+    const set = new Set();
+    (data || []).forEach(r => {
+      const st = String(r.trangthai || '').toLowerCase();
+      if (REFUND_DONE_VALUES.includes(st) && r.madonhang != null) set.add(r.madonhang);
+    });
+    return set;
+  } catch (e) {
+    console.warn('[dashboard] getRefundedOrderIds error', e.message);
+    return new Set();
+  }
+}
+
+async function sumOrdersInflow({ from, to }) {
+  const { idCol, totalCol, statusCol, createdCol } = await resolveOrderColumns();
+  if (!totalCol) return 0;
+
+  let query = supabase.from(TABLES.ORDERS).select([idCol, totalCol, statusCol, createdCol].filter(Boolean).join(','));
+  const startISO = dayStartStr(from);
+  const endISO = nextDayStartStr(to);
+  if (createdCol) {
+    if (startISO) query = query.gte(createdCol, startISO);
+    if (endISO) query = query.lt(createdCol, endISO); // end-of-day inclusive
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const refundedSet = await getRefundedOrderIds();
+  return (data || [])
+    .filter(r => {
+      if (!statusCol) return true;
+      const v = String(r[statusCol] || '').toLowerCase();
+      const done = COMPLETED_VALUES.includes(v);
+      // Loại trừ đơn đã hoàn tiền thành công theo bảng trahang
+      const orderId = idCol ? r[idCol] : (r.madonhang || r.id || r.ID);
+      const isRefunded = refundedSet.has(orderId);
+      return done && !isRefunded;
+    })
+    .reduce((s, r) => s + (Number(r[totalCol]) || 0), 0);
+}
+
+async function sumPurchaseOrdersOutflow({ from, to }) {
+  // phieudathang: tongtien, trangthaiphieu, ngaydatphieu
+  const table = 'phieudathang';
+  const DONE = ['hoàn thành', 'hoan thanh'];
+  let query = supabase
+    .from(table)
+    .select('tongtien, trangthaiphieu, ngaydatphieu');
+  const startISO = dayStartStr(from);
+  const endISO = nextDayStartStr(to);
+  if (startISO) query = query.gte('ngaydatphieu', startISO);
+  if (endISO) query = query.lt('ngaydatphieu', endISO);
+  const { data, error } = await query;
+  if (error && error.code !== '42P01') throw error;
+  const rows = (data || []).filter(r => {
+    const st = String(r.trangthaiphieu || '').toLowerCase();
+    return DONE.includes(st);
+  });
+  return rows.reduce((s, r) => s + (Number(r.tongtien) || 0), 0);
+}
+
+async function revenueFlow({ from, to } = {}) {
+  // default: first day of current month -> now
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const period = {
+    from: from || start.toISOString().slice(0, 10),
+    to: to || now.toISOString().slice(0, 10)
+  };
+
+  const inflowTotal = await sumOrdersInflow(period).catch(() => 0);
+  const purchaseTotal = await sumPurchaseOrdersOutflow(period).catch(() => 0);
+  const outflowTotal = purchaseTotal;
+
+  return {
+    period,
+    inflow: {
+      total: inflowTotal,
+      sources: [
+        { key: 'sales', label: 'Đơn hàng', amount: inflowTotal }
+      ]
+    },
+    outflow: {
+      total: outflowTotal,
+      sources: [
+        { key: 'purchase-orders', label: 'Phiếu đặt hàng', amount: purchaseTotal }
+      ]
+    },
+    net: inflowTotal - outflowTotal
+  };
+}
+
+/**
+ * Top products (best sellers) within period by quantity sold.
+ * Aggregates order details -> variant -> product and computes weighted average price.
+ */
+async function topProductsByPeriod({ from, to, limit = 5, minSold = 1 } = {}) {
+  // Resolve important columns
+  const { idCol: orderIdCol, statusCol: orderStatusCol, createdCol: orderCreatedCol } = await resolveOrderColumns();
+  const completed = new Set(COMPLETED_VALUES);
+
+  // Default range: current month
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const period = {
+    from: from || start.toISOString().slice(0, 10),
+    to: to || now.toISOString().slice(0, 10)
+  };
+  const startISO = dayStartStr(period.from);
+  const endISO = nextDayStartStr(period.to);
+
+  // 1) Fetch eligible orders in range
+  let orderQuery = supabase.from(TABLES.ORDERS).select([orderIdCol, orderStatusCol, orderCreatedCol].filter(Boolean).join(','));
+  if (orderCreatedCol) {
+    if (startISO) orderQuery = orderQuery.gte(orderCreatedCol, startISO);
+    if (endISO) orderQuery = orderQuery.lt(orderCreatedCol, endISO);
+  }
+  const { data: orderRows, error: orderErr } = await orderQuery;
+  if (orderErr) throw orderErr;
+
+  const refundedSet = await getRefundedOrderIds();
+  const orderIds = (orderRows || [])
+    .filter((r) => {
+      if (!orderStatusCol) return true;
+      const v = String(r[orderStatusCol] || '').toLowerCase();
+      const done = completed.has(v);
+      const oid = orderIdCol ? r[orderIdCol] : r.madonhang;
+      return done && !refundedSet.has(oid);
+    })
+    .map((r) => (orderIdCol ? r[orderIdCol] : r.madonhang))
+    .filter((v) => v != null);
+
+  if (orderIds.length === 0) return [];
+
+  // 2) Fetch order details for those orders
+  const { data: detailRows, error: detErr } = await supabase
+    .from('chitietdonhang')
+    .select('madonhang, machitietsanpham, soluong, dongia')
+    .in('madonhang', orderIds);
+  if (detErr) throw detErr;
+
+  if (!detailRows || detailRows.length === 0) return [];
+
+  // 3) Aggregate by variant id first
+  const variantAgg = new Map(); // key: machitietsanpham -> { qty, revenue }
+  for (const r of detailRows) {
+    const vid = r.machitietsanpham;
+    const qty = Number(r.soluong) || 0;
+    const price = Number(r.dongia) || 0;
+    if (!vid || qty <= 0) continue;
+    let obj = variantAgg.get(vid);
+    if (!obj) { obj = { qty: 0, revenue: 0 }; variantAgg.set(vid, obj); }
+    obj.qty += qty;
+    obj.revenue += qty * price;
+  }
+
+  if (variantAgg.size === 0) return [];
+
+  const variantIds = Array.from(variantAgg.keys());
+
+  // 4) Map variant -> product id
+  const { data: variantRows, error: varErr } = await supabase
+    .from('chitietsanpham')
+    .select('machitietsanpham, masanpham')
+    .in('machitietsanpham', variantIds);
+  if (varErr) throw varErr;
+
+  const variantToProduct = new Map();
+  (variantRows || []).forEach((r) => {
+    if (r.machitietsanpham != null && r.masanpham != null) {
+      variantToProduct.set(r.machitietsanpham, r.masanpham);
+    }
+  });
+
+  // 5) Aggregate by product id
+  const productAgg = new Map(); // masanpham -> { qty, revenue }
+  for (const [vid, agg] of variantAgg.entries()) {
+    const pid = variantToProduct.get(vid);
+    if (!pid) continue;
+    let p = productAgg.get(pid);
+    if (!p) { p = { qty: 0, revenue: 0 }; productAgg.set(pid, p); }
+    p.qty += agg.qty;
+    p.revenue += agg.revenue;
+  }
+
+  if (productAgg.size === 0) return [];
+
+  // 6) Fetch product names
+  const productIds = Array.from(productAgg.keys());
+  const { data: prodRows, error: prodErr } = await supabase
+    .from('sanpham')
+    .select('masanpham, tensanpham')
+    .in('masanpham', productIds);
+  if (prodErr) throw prodErr;
+
+  const nameMap = new Map();
+  (prodRows || []).forEach((r) => nameMap.set(r.masanpham, r.tensanpham));
+
+  // 7) Build list and sort
+  const items = Array.from(productAgg.entries())
+    .map(([pid, v]) => ({
+      id: pid,
+      name: nameMap.get(pid) || `SP-${pid}`,
+      soldCount: v.qty,
+      price: v.qty > 0 ? Math.round(v.revenue / v.qty) : 0,
+    }))
+    .filter((x) => x.soldCount >= minSold)
+    .sort((a, b) => b.soldCount - a.soldCount)
+    .slice(0, limit);
+
+  return items;
+}
+
+module.exports = { summary, revenueFlow, topProductsByPeriod };

@@ -47,10 +47,21 @@ const ChatController = {
         }
       }
 
-      // For each chatbox, compute latest message + unread (from customer)
+      // For each chatbox, compute latest non-system message + unread (from customer)
       const ids = boxes.map(b => b.machatbox);
-      let latestByBox = new Map();
+      let latestNonSystemByBox = new Map();
       let unreadByBox = new Map();
+      // helper to detect simple system notifications
+      const isSystemMessage = (m) => {
+        if (!m) return false;
+        try {
+          const text = (m.noidung || '').toString();
+          if (text.startsWith('[SYSTEM]')) return true;
+          if (m.nguoigui && m.nguoigui.toString().toUpperCase() === 'SYSTEM') return true;
+        } catch (_) {}
+        return false;
+      };
+
       if (ids.length) {
         const { data: msgs } = await supabase
           .from('noidungchat')
@@ -59,9 +70,13 @@ const ChatController = {
           .order('thoigiangui', { ascending: true });
         if (Array.isArray(msgs)) {
           for (const m of msgs) {
-            latestByBox.set(m.machatbox, m);
+            // track unread from customers regardless of system flag
             if (m.nguoigui === 'KH' && !m.daxem) {
               unreadByBox.set(m.machatbox, (unreadByBox.get(m.machatbox) || 0) + 1);
+            }
+            // only consider non-system messages for the 'last message' shown in list
+            if (!isSystemMessage(m)) {
+              latestNonSystemByBox.set(m.machatbox, m);
             }
           }
         }
@@ -87,7 +102,8 @@ const ChatController = {
         ...b,
         khachHang: custMap.get(b.makhachhang) || null,
         nhanVien: staffMap.get(b.manhanvien) || null,
-        lastMessage: latestByBox.get(b.machatbox) || null,
+        // expose the last non-system message (if any) so frontend can show the real last message
+        lastMessage: latestNonSystemByBox.get(b.machatbox) || null,
         unreadFromCustomer: unreadByBox.get(b.machatbox) || 0,
       }));
 

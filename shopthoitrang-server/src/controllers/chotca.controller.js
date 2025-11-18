@@ -19,30 +19,13 @@ const ChotCaController = {
     }
   },
 
-   async create(req, res) {
+  async create(req, res) {
     try {
-      const { maphancongca, manhanvien, maca, ngaychotca, giobatdau, gioketthuc, tongthu, tongchi, tienmat, tienchuyenkhoan, soluongdonhang } = req.body;
-
-      // Validate required fields
-      const missing = [];
-      if (!maphancongca) missing.push('maphancongca');
-      if (!manhanvien) missing.push('manhanvien');
-      if (!maca) missing.push('maca');
-
-      if (missing.length > 0) {
-        console.log('Missing fields:', missing);
-        console.log('Request body:', req.body);
-        return res.status(400).json({ 
-          message: `Thiếu thông tin bắt buộc: ${missing.join(', ')}`,
-          received: req.body
-        });
-      }
-
-      const result = await ChotCaService.create(req.body);
-      return res.status(201).json(result);
+      const result = await service.create(req.body);
+      return res.status(201).json(result.toJSON());
     } catch (error) {
       console.error('Error in create:', error);
-      return res.status(500).json({ message: error.message });
+      return res.status(error.status || 500).json({ message: error.message });
     }
   },
 
