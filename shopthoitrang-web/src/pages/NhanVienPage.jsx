@@ -37,10 +37,11 @@ export default function NhanVienPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // chỉ ADMIN mới được thêm / xem chi tiết
-  // nếu muốn MANAGER cũng có quyền thì sửa thành:
-  const canEdit = ["ADMIN", "MANAGER"].includes(user?.maQuyen);
-  //const canEdit = user?.maQuyen === "ADMIN";
+  // ADMIN can add/edit; ADMIN and MANAGER can view details
+  const isAdmin = user?.maQuyen === "ADMIN";
+  const canViewDetails = ["ADMIN", "MANAGER"].includes(
+    String(user?.maQuyen ?? "").toUpperCase()
+  );
 
   const [employees, setEmployees] = useState([]);
   const [functions, setFunctions] = useState([]);
@@ -50,6 +51,11 @@ export default function NhanVienPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showForm, setShowForm] = useState(false);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const pageSizeOptions = [10, 25, 50, 100];
 
   // State form thêm mới
   const [newEmployee, setNewEmployee] = useState({
@@ -66,7 +72,7 @@ export default function NhanVienPage() {
     sodienthoai: "",
     ngaysinh: "",
     machucnang: "",
-    maquanly: "",
+    maquanly: user?.maNhanVien ?? user?.manhanvien ?? "",
   });
 
   // Địa chỉ
@@ -118,9 +124,18 @@ export default function NhanVienPage() {
     });
   }, [employees, term]);
 
+  // reset page when filter or pageSize changes
+  useEffect(() => {
+    setPage(1);
+  }, [term, pageSize, employees]);
+
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
   // ===== Xoá (hiện tại UI chưa dùng, nhưng vẫn chặn quyền) =====
   async function handleDelete(id) {
-    if (!canEdit) {
+    if (!isAdmin) {
       alert("Bạn không có quyền xoá nhân viên.");
       return;
     }
@@ -151,7 +166,7 @@ export default function NhanVienPage() {
   async function handleCreate(e) {
     e.preventDefault();
 
-    if (!canEdit) {
+    if (!isAdmin) {
       alert("Bạn không có quyền thêm nhân viên.");
       return;
     }
@@ -208,7 +223,7 @@ export default function NhanVienPage() {
         email: newEmployee.email || null,
         sodienthoai: newEmployee.sodienthoai || null,
         ngaysinh: newEmployee.ngaysinh || null,
-        diachi: diachiText || null,
+        diaChi: diachiText || null,
         machucnang: newEmployee.machucnang ? Number(newEmployee.machucnang) : null,
         maquanly: newEmployee.maquanly ? Number(newEmployee.maquanly) : null,
       });
@@ -229,7 +244,7 @@ export default function NhanVienPage() {
         sodienthoai: "",
         ngaysinh: "",
         machucnang: "",
-        maquanly: "",
+        maquanly: user?.maNhanVien ?? user?.manhanvien ?? "",
       });
       setAddr({
         provinceCode: "",
@@ -263,9 +278,13 @@ export default function NhanVienPage() {
             <p className="text-gray-600">Quản lý thông tin nhân viên trong hệ thống</p>
           </div>
         </div>
-        {canEdit && (
+        {isAdmin && (
           <button
-            onClick={() => canEdit && setShowForm(true)}
+            onClick={() => {
+              const myId = user?.maNhanVien ?? user?.manhanvien ?? "";
+              setNewEmployee((p) => ({ ...p, maquanly: myId }));
+              setShowForm(true);
+            }}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus size={18} />
@@ -312,7 +331,7 @@ export default function NhanVienPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Ngày sinh</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Giới tính</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Chức năng</th>
-                {canEdit && (
+                {canViewDetails && (
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
                     Thao tác
                   </th>
@@ -320,7 +339,7 @@ export default function NhanVienPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filtered.map((e) => (
+              {paginated.map((e) => (
                 <tr key={e.maNhanVien} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm font-medium text-gray-900">{e.maNhanVien}</td>
                   <td className="px-4 py-3 text-sm">{e.hoTen}</td>
@@ -333,7 +352,7 @@ export default function NhanVienPage() {
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {getTenChucNang(e.maChucNang)}
                   </td>
-                  {canEdit && (
+                  {canViewDetails && (
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => navigate(`/nhanvien/${e.maNhanVien}`)}
@@ -351,8 +370,77 @@ export default function NhanVienPage() {
         )}
       </div>
 
+      {/* Pagination bar */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between bg-white rounded-b-xl shadow-sm border border-t-0 p-4">
+          <div className="text-sm text-gray-600">
+            Hiển thị <span className="font-medium">{Math.min((page - 1) * pageSize + 1, totalItems)}</span> - <span className="font-medium">{Math.min(page * pageSize, totalItems)}</span> của <span className="font-medium">{totalItems}</span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Hiển thị</label>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border rounded px-2 py-1 text-sm"
+              >
+                {pageSizeOptions.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+
+            <nav className="inline-flex items-center gap-1">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className={`px-3 py-1 border rounded ${page <= 1 ? 'text-gray-300 border-gray-200' : 'hover:bg-gray-100'}`}
+              >
+                Prev
+              </button>
+
+              {/* page numbers window */}
+              {(() => {
+                const pages = [];
+                const start = Math.max(1, page - 2);
+                const end = Math.min(totalPages, page + 2);
+                if (start > 1) {
+                  pages.push(1);
+                  if (start > 2) pages.push('...');
+                }
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (end < totalPages) {
+                  if (end < totalPages - 1) pages.push('...');
+                  pages.push(totalPages);
+                }
+                return pages.map((p, idx) => (
+                  typeof p === 'number' ? (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`px-3 py-1 border rounded ${p === page ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`}
+                    >{p}</button>
+                  ) : (
+                    <span key={`dot-${idx}`} className="px-2 text-gray-400">{p}</span>
+                  )
+                ));
+              })()}
+
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className={`px-3 py-1 border rounded ${page >= totalPages ? 'text-gray-300 border-gray-200' : 'hover:bg-gray-100'}`}
+              >
+                Next
+              </button>
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Modal Thêm mới (chỉ ADMIN mới mở được) */}
-      {showForm && canEdit && (
+      {showForm && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
             <button
@@ -537,21 +625,13 @@ export default function NhanVienPage() {
                 <AddressVNCompact value={addr} onChange={setAddr} />
               </div>
 
-              {/* Người quản lý */}
+              {/* Người quản lý (mặc định là ADMIN hiện tại; không cho chọn) */}
               <div>
                 <label className="block text-sm font-medium mb-1">Người quản lý</label>
-                <select
-                  value={newEmployee.maquanly}
-                  onChange={(e) => setNewEmployee({ ...newEmployee, maquanly: e.target.value })}
-                  className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Không có --</option>
-                  {employees.map((m) => (
-                    <option key={m.maNhanVien} value={m.maNhanVien}>
-                      {m.hoTen}
-                    </option>
-                  ))}
-                </select>
+                <input type="hidden" value={newEmployee.maquanly} />
+                <div className="w-full border px-3 py-2 rounded-lg bg-gray-50 text-gray-700">
+                  {user?.hoTen ?? user?.hoten ?? `#${user?.maNhanVien ?? user?.manhanvien ?? ""}`}
+                </div>
               </div>
 
               {/* Action */}

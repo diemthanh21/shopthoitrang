@@ -230,15 +230,18 @@ const DashboardLayout = () => {
                     {user?.tenDangNhap || "Admin"}
                   </p>
                   <p className="text-xs text-gray-500">
-                    {user?.maNhanVien ? "Nhân viên" : "Quản trị viên"}
+                    {user?.maNhanVien ? "Nhân viên" : "Quản lý"}
                   </p>
                 </div>
 
                 <button
-                  onClick={() => alert("Thông tin admin")}
+                  onClick={() => {
+                    setOpenAccount(false);
+                    navigate('/me');
+                  }}
                   className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Thông tin Admin
+                  Thông tin nhân viên
                 </button>
 
                 <button

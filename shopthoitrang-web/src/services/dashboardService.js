@@ -43,4 +43,28 @@ export async function getDashboardData(opts = {}) {
 
   return { stats, recentOrders, topProducts };
 }
-export default { getDashboardData };
+export async function getRevenueFlow(params = {}) {
+  const { from, to } = params;
+  const res = await api.get('/dashboard/revenue-flow', { params: { from, to } });
+  const data = res?.data ?? {};
+  return {
+    period: data.period || {},
+    inflow: data.inflow || { total: 0, sources: [] },
+    outflow: data.outflow || { total: 0, sources: [] },
+    net: data.net ?? 0,
+  };
+}
+
+export async function getTopProducts(params = {}) {
+  const { from, to, limit = 5, minSold = 1 } = params;
+  const res = await api.get('/dashboard/top-products', { params: { from, to, limit, minSold } });
+  const arr = Array.isArray(res?.data?.items) ? res.data.items : (Array.isArray(res?.data) ? res.data : []);
+  return arr.map(p => ({
+    id: p.id ?? p.masanpham ?? p.maSanPham,
+    name: p.name ?? p.tensanpham ?? p.tenSanPham ?? 'Sản phẩm',
+    price: +(p.price ?? p.gia ?? p.giaban ?? 0),
+    soldCount: +(p.soldCount ?? p.soluongban ?? 0),
+  }));
+}
+
+export default { getDashboardData, getRevenueFlow, getTopProducts };

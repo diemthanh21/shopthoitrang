@@ -22,4 +22,26 @@ module.exports = {
       res.status(500).json({ success: false, message: 'Failed to load dashboard summary', error: e.message });
     }
   },
+
+  async revenueFlow(req, res) {
+    try {
+      const { from, to } = req.query;
+      const data = await dashboardService.revenueFlow({ from, to });
+      res.json(data);
+    } catch (e) {
+      console.error('[dashboard.controller] revenueFlow error:', e.stack || e.message);
+      res.status(500).json({ success: false, message: 'Failed to load revenue flow', error: e.message });
+    }
+  },
+
+  async topProducts(req, res) {
+    try {
+      const { from, to, limit, minSold } = req.query;
+      const data = await dashboardService.topProductsByPeriod({ from, to, limit: Number(limit) || 5, minSold: Number(minSold) || 1 });
+      res.json({ items: data });
+    } catch (e) {
+      console.error('[dashboard.controller] topProducts error:', e.stack || e.message);
+      res.status(500).json({ success: false, message: 'Failed to load top products', error: e.message });
+    }
+  },
 };

@@ -26,17 +26,27 @@ const getById = async (id) => {
   return normalize(res.data);
 };
 
+// Map field names gửi lên API (chuẩn snake_case DB)
+function buildBody(data = {}) {
+  return {
+    tennhacungcap: data.tennhacungcap ?? data.tenNhaCungCap ?? null,
+    email: data.email ?? null,
+    diachi: data.diachi ?? data.diaChi ?? null,
+    sodienthoai: data.sodienthoai ?? data.soDienThoai ?? null,
+  };
+}
+
 // Tạo mới nhà cung cấp
-// data nên là dạng DB (snake_case): { tennhacungcap, email, diachi, sodienthoai }
 const create = async (data) => {
-  const res = await api.post(PREFIX, data);
+  const body = buildBody(data);
+  const res = await api.post(PREFIX, body);
   return normalize(res.data);
 };
 
 // Cập nhật nhà cung cấp
-// data cũng dùng dạng DB: { tennhacungcap?, email?, diachi?, sodienthoai? }
 const update = async (id, data) => {
-  const res = await api.put(`${PREFIX}/${id}`, data);
+  const body = buildBody(data);
+  const res = await api.put(`${PREFIX}/${id}`, body);
   return normalize(res.data);
 };
 

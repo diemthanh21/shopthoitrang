@@ -121,7 +121,7 @@ export default function NhaCungCapPage() {
     const payload = {
       tennhacungcap: formData.tenNhaCungCap.trim(),
       email: formData.email?.trim() || null,
-      diachi: formData.diaChi?.trim() || null,
+      diaChi: formData.diaChi?.trim() || null,
       sodienthoai: formData.soDienThoai?.trim() || null,
     };
 

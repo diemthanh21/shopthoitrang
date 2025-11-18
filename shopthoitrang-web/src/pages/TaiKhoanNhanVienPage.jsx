@@ -186,6 +186,21 @@ export default function TaiKhoanNhanVienPage() {
     return haystacks.some((x) => x.includes(term));
   });
 
+  // ================ PAGINATION ================
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const totalItems = filteredAccounts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // ensure currentPage is valid when filters change
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages]);
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pagedAccounts = filteredAccounts.slice(startIndex, endIndex);
+
   // ================= UI =================
   if (loading) {
     return (
@@ -249,7 +264,7 @@ export default function TaiKhoanNhanVienPage() {
 
       {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        {filteredAccounts.length === 0 ? (
+              {pagedAccounts.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             {term
               ? "Không tìm thấy tài khoản phù hợp."
@@ -279,7 +294,7 @@ export default function TaiKhoanNhanVienPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAccounts.map((tk) => {
+              {pagedAccounts.map((tk) => {
                 const maNV = tk.maNhanVien ?? tk.manhanvien;
                 const tenNV =
                   nhanVienMap[maNV] ?? (maNV != null ? `NV #${maNV}` : "");
@@ -322,6 +337,44 @@ export default function TaiKhoanNhanVienPage() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Pagination bottom bar */}
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-gray-600">
+          Hiển thị {totalItems === 0 ? 0 : startIndex + 1} - {endIndex} / {totalItems}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          >
+            ‹ Trước
+          </button>
+
+          <div className="text-sm text-gray-700">Trang {currentPage} / {totalPages}</div>
+
+          <button
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Sau ›
+          </button>
+
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            className="ml-3 border rounded px-2 py-1 text-sm"
+          >
+            <option value={5}>5 / trang</option>
+            <option value={10}>10 / trang</option>
+            <option value={20}>20 / trang</option>
+            <option value={50}>50 / trang</option>
+          </select>
+        </div>
       </div>
 
       {/* MODAL THÊM / SỬA TÀI KHOẢN */}

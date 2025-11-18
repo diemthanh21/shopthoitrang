@@ -67,6 +67,7 @@ app.use('/api/thuonghieu', require('./src/routes/thuonghieu.route'));
 app.use('/api/tichluy_chitieu', require('./src/routes/tichluy_chitieu.route'));
 app.use('/api/trahang', require('./src/routes/trahang.route'));
 app.use('/api/dashboard', require('./src/routes/dashboard.route'));
+app.use('/api/system-logs', require('./src/routes/systemlog.route'));
 
 
 

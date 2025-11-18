@@ -1,31 +1,52 @@
-// src/pages/NhanVienDetailPage.jsx
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import nhanvienService from "../services/nhanvienService";
 import chucnangService from "../services/chucnangService";
-import { useAuth } from "../contexts/AuthContext";
-import {
-  ArrowLeft, Mail, Phone, MapPin, Calendar, User, Pencil,
-  IdCard, BadgeDollarSign, ShieldCheck
-} from "lucide-react";
+import taikhoannhanvienService from "../services/taikhoannhanvienService";
 import { formatDate } from "../utils/nhanvienUtils";
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  User,
+  Pencil,
+  IdCard,
+  BadgeDollarSign,
+  ShieldCheck,
+} from "lucide-react";
 
-export default function NhanVienDetailPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+export default function ThongTinNhanVienPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [employee, setEmployee] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [chucnangMap, setChucnangMap] = useState({});
+  const [account, setAccount] = useState(null);
+  const [manager, setManager] = useState(null);
+
+  const maNhanVien =
+    user?.maNhanVien ?? user?.manhanvien ?? user?.id ?? user?.maNhanVien ?? null;
 
   useEffect(() => {
-    (async () => {
+    let mounted = true;
+
+    const load = async () => {
+      if (!maNhanVien) return;
+      setLoading(true);
       try {
-        const [data, chucList] = await Promise.all([
-          nhanvienService.getById(id),
+        const [emp, chucList, acc] = await Promise.all([
+          nhanvienService.getById(maNhanVien),
           chucnangService.getAll(),
+          taikhoannhanvienService.getById(maNhanVien).catch(() => null),
         ]);
+
+        if (!mounted) return;
+        setEmployee(emp || null);
+        setAccount(acc || null);
 
         const map = {};
         (chucList || []).forEach((c) => {
@@ -33,31 +54,43 @@ export default function NhanVienDetailPage() {
         });
         setChucnangMap(map);
 
-        setEmployee(data);
+        const mgrId = emp?.maQuanLy ?? emp?.maquanly ?? null;
+        if (mgrId) {
+          try {
+            const mgr = await nhanvienService.getById(mgrId);
+            if (mounted) setManager(mgr || null);
+          } catch {
+            if (mounted) setManager(null);
+          }
+        }
+
         setError("");
       } catch (e) {
         console.error(e);
+        if (!mounted) return;
         setError("Không thể tải thông tin nhân viên.");
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
-    })();
-  }, [id]);
+    };
 
-  if (loading) return <div className="p-8 text-center text-gray-600 text-lg">Đang tải dữ liệu…</div>;
-  if (error) return <div className="p-8 text-center text-red-600 text-lg">{error}</div>;
-  if (!employee) return <div className="p-8 text-center text-gray-500 text-lg">Không tìm thấy nhân viên.</div>;
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [maNhanVien]);
 
-  const initials = (employee.hoTen || "?").trim().charAt(0).toUpperCase();
-  const currency = employee.luong != null ? `${Number(employee.luong).toLocaleString("vi-VN")} ₫` : "N/A";
-  const tenChucNang = employee?.maChucNang ? (chucnangMap[employee.maChucNang] || employee.maChucNang) : "N/A";
+  if (!user) return <div className="p-8">Không có thông tin người dùng.</div>;
+
+  const initials = (employee?.hoTen ?? user?.hoTen ?? user?.hoten ?? "?").trim().charAt(0).toUpperCase();
+  const currency = employee?.luong != null ? `${Number(employee.luong).toLocaleString("vi-VN")} ₫` : "—";
+  const tenChucNang = (employee?.maChucNang && chucnangMap[employee.maChucNang]) || "—";
 
   return (
     <div className="w-full">
-      {/* HERO HEADER full-width */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
         <div className="mx-auto max-w-[1400px] px-6 py-6">
-         <button
+          <button
             onClick={() => navigate("/nhanvien")}
             className="flex items-center gap-2 text-white/90 hover:text-white mb-4"
           >
@@ -69,66 +102,57 @@ export default function NhanVienDetailPage() {
                 {initials}
               </div>
               <div>
-                <h1 className="text-3xl font-bold leading-tight">
-                  Hồ sơ nhân viên #{employee.maNhanVien}
-                </h1>
-                <p className="text-white/80">{employee.hoTen}</p>
+                <h1 className="text-3xl font-bold leading-tight">Hồ sơ nhân viên #{employee?.maNhanVien ?? "—"}</h1>
+                <p className="text-white/80">{employee?.hoTen ?? user?.hoTen ?? user?.hoten}</p>
               </div>
             </div>
 
-            {user?.maQuyen === 'ADMIN' && (
+            {(employee?.maNhanVien && (user?.maQuyen === "ADMIN" || String(user?.maNhanVien) === String(employee.maNhanVien))) && (
               <button
                 onClick={() => navigate(`/nhanvien/${employee.maNhanVien}/edit`)}
                 className="flex items-center gap-2 bg-white text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-50 transition"
-              > <Pencil size={18} /> Chỉnh sửa</button>
+              >
+                <Pencil size={18} /> Chỉnh sửa
+              </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* CONTENT max 1400px để nhìn thoáng mà vẫn full-page */}
       <div className="mx-auto max-w-[1400px] px-6 py-8">
-        {/* GRID 12 CỘT: sidebar + nội dung */}
         <div className="grid grid-cols-12 gap-6">
-          {/* SIDEBAR (thông tin nhanh) */}
           <aside className="col-span-12 lg:col-span-3">
             <div className="bg-white rounded-2xl shadow-sm border p-6">
-              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 text-white
-                              flex items-center justify-center text-4xl font-bold mx-auto">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 text-white flex items-center justify-center text-4xl font-bold mx-auto">
                 {initials}
               </div>
-              <h2 className="text-xl font-semibold text-center mt-4">{employee.hoTen}</h2>
-              <p className="text-center text-gray-500">
-                Trạng thái: {employee.trangThai ?? "Đang làm việc"}
-              </p>
+              <h2 className="text-xl font-semibold text-center mt-4">{employee?.hoTen ?? user?.hoTen ?? user?.hoten}</h2>
+              <p className="text-center text-gray-500">Trạng thái: {employee?.trangThai ?? "Đang làm việc"}</p>
               <div className="mt-6 space-y-3 text-sm">
-                <QuickItem icon={<User size={16} />} label="Giới tính" value={employee.gioiTinh} />
-                <QuickItem icon={<Calendar size={16} />} label="Ngày sinh" value={formatDate(employee.ngaySinh)} />
-                <QuickItem icon={<IdCard size={16} />} label="CCCD" value={employee.cccd} />
+                <QuickItem icon={<User size={16} />} label="Giới tính" value={employee?.gioiTinh} />
+                <QuickItem icon={<Calendar size={16} />} label="Ngày sinh" value={formatDate(employee?.ngaySinh)} />
+                <QuickItem icon={<IdCard size={16} />} label="CCCD" value={employee?.cccd} />
                 <QuickItem icon={<ShieldCheck size={16} />} label="Chức năng" value={tenChucNang} />
                 <QuickItem icon={<BadgeDollarSign size={16} />} label="Lương" value={currency} />
               </div>
             </div>
           </aside>
 
-          {/* MAIN CONTENT */}
           <main className="col-span-12 lg:col-span-9 space-y-6">
-            {/* Thông tin liên hệ */}
             <Card title="Thông tin liên hệ">
               <div className="grid md:grid-cols-2 gap-6">
-                <InfoRow icon={<Mail size={18} />} label="Email" value={employee.email} />
-                <InfoRow icon={<Phone size={18} />} label="Số điện thoại" value={employee.soDienThoai} />
-                <InfoRow icon={<MapPin size={18} />} label="Địa chỉ" value={employee.diaChi} />
+                <InfoRow icon={<Mail size={18} />} label="Email" value={employee?.email} />
+                <InfoRow icon={<Phone size={18} />} label="Số điện thoại" value={employee?.soDienThoai} />
+                <InfoRow icon={<MapPin size={18} />} label="Địa chỉ" value={employee?.diaChi} />
               </div>
             </Card>
 
-            {/* Thông tin pháp lý / hợp đồng */}
             <Card title="Thông tin pháp lý & hợp đồng">
               <div className="grid md:grid-cols-2 gap-6">
-                <InfoRow label="Ngày cấp CCCD" value={formatDate(employee.ngayCap)} />
-                <InfoRow label="Nơi cấp CCCD" value={employee.noiCap} />
-                <InfoRow label="Ngày bắt đầu" value={formatDate(employee.ngayBatDau)} />
-                <InfoRow label="Ngày hết hạn" value={formatDate(employee.ngayHetHan)} />
+                <InfoRow label="Ngày cấp CCCD" value={formatDate(employee?.ngayCap)} />
+                <InfoRow label="Nơi cấp CCCD" value={employee?.noiCap} />
+                <InfoRow label="Ngày bắt đầu" value={formatDate(employee?.ngayBatDau)} />
+                <InfoRow label="Ngày hết hạn" value={formatDate(employee?.ngayHetHan)} />
               </div>
             </Card>
           </main>
@@ -137,8 +161,6 @@ export default function NhanVienDetailPage() {
     </div>
   );
 }
-
-/*  Components phụ  */
 
 function Card({ title, children }) {
   return (

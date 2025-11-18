@@ -30,7 +30,6 @@ const { requireEmployee } = require('../middlewares/role.middleware');
  *       properties:
  *         duongdananh: { type: string }
  *         mota: { type: string }
- *         lienket: { type: string }
  *         thutuhienthi: { type: integer }
  *         danghoatdong: { type: boolean }
  */
@@ -134,7 +133,6 @@ router.post('/', authenticateToken, requireEmployee, ctrl.create);
  *             properties:
  *               duongdananh: { type: string }
  *               mota: { type: string }
- *               lienket: { type: string }
  *               thutuhienthi: { type: integer }
  *               danghoatdong: { type: boolean }
  *     responses:

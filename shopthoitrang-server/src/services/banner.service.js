@@ -30,10 +30,6 @@ class BannerService {
       const e = new Error('duongdananh là bắt buộc');
       e.status = 400; throw e;
     }
-    if (body.lienket && body.lienket.trim() && !isValidUrl(body.lienket)) {
-      const e = new Error('lienket không hợp lệ (URL)');
-      e.status = 400; throw e;
-    }
     if (body.thutuhienthi !== undefined && Number.isNaN(Number(body.thutuhienthi))) {
       const e = new Error('thutuhienthi phải là số');
       e.status = 400; throw e;
@@ -42,7 +38,7 @@ class BannerService {
     const payload = {
       duongdananh: body.duongdananh.trim(),
       mota: body.mota?.trim() ?? null,
-      lienket: body.lienket?.trim() ?? null,
+      // lienket removed
       thutuhienthi: body.thutuhienthi !== undefined ? Number(body.thutuhienthi) : null,
       danghoatdong: typeof body.danghoatdong === 'boolean' ? body.danghoatdong : true,
     };
@@ -61,13 +57,7 @@ class BannerService {
     }
     if (body.mota !== undefined) fields.mota = body.mota?.trim() ?? null;
 
-    if (body.lienket !== undefined) {
-      if (body.lienket && body.lienket.trim() && !isValidUrl(body.lienket)) {
-        const e = new Error('lienket không hợp lệ (URL)');
-        e.status = 400; throw e;
-      }
-      fields.lienket = body.lienket?.trim() ?? null;
-    }
+    // lienket removed
 
     if (body.thutuhienthi !== undefined) {
       if (Number.isNaN(Number(body.thutuhienthi))) {

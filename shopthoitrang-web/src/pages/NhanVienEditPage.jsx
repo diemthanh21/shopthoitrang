@@ -6,6 +6,7 @@ import {
 import nhanvienService from "../services/nhanvienService";
 import chucnangService from "../services/chucnangService";
 import AddressVN from "../components/AddressVNCompact";
+import { useAuth } from "../contexts/AuthContext";
 
 function isValidEmail(v){ if(!v) return true; return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function calcAge(yyyyMmDd){
@@ -18,6 +19,8 @@ function calcAge(yyyyMmDd){
 export default function NhanVienEditPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.maQuyen === 'ADMIN';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,13 +40,21 @@ export default function NhanVienEditPage() {
   // địa chỉ theo mô hình mới
   const [addr, setAddr] = useState({
     provinceCode: "", provinceName: "",
-    communeCode: "", communeName: "",
+    wardCode: "", wardName: "",
     hamlet: ""
   });
 
   // tải dữ liệu + chức năng
   useEffect(() => {
     (async () => {
+      // Quyền truy cập: ADMIN hoặc chính chủ (chỉnh sửa thông tin của chính mình)
+      const isAdmin = user?.maQuyen === 'ADMIN';
+      const myId = String(user?.maNhanVien ?? user?.manhanvien ?? "");
+      if (!isAdmin && myId !== String(id)) {
+        alert('Bạn không có quyền truy cập trang này');
+        navigate(-1);
+        return;
+      }
       try {
         setLoading(true);
         const [emp, funcs] = await Promise.all([
@@ -75,9 +86,9 @@ export default function NhanVienEditPage() {
         const dia = (emp.diaChi || "").split(",").map(s=>s.trim());
         setAddr({
           hamlet: dia[0] || "",
-          communeName: dia[1] || "",
+          wardName: dia[1] || "",
           provinceName: dia[2] || "",
-          communeCode: "",
+          wardCode: "",
           provinceCode: ""
         });
 
@@ -104,9 +115,9 @@ export default function NhanVienEditPage() {
       if(age<18){ alert("Nhân viên phải từ 18 tuổi trở lên."); return; }
     }
     if(form.luong!=="" && Number(form.luong)<0){ alert("Lương không hợp lệ."); return; }
-    if(!form.machucnang){ alert("Vui lòng chọn Chức năng."); return; }
+    if(isAdmin && !form.machucnang){ alert("Vui lòng chọn Chức năng."); return; }
 
-    const diachiText = [addr.hamlet, addr.communeName, addr.provinceName]
+    const diachiText = [addr.hamlet, addr.wardName, addr.provinceName]
       .filter(Boolean).join(", ");
 
     try{
@@ -124,7 +135,7 @@ export default function NhanVienEditPage() {
         email: form.email || null,
         sodienthoai: form.sodienthoai || null,
         ngaysinh: form.ngaysinh || null,
-        diachi: diachiText || employee?.diaChi || null,
+        diaChi: diachiText || employee?.diaChi || null,
         machucnang: form.machucnang ? Number(form.machucnang) : null,
       };
 
@@ -222,10 +233,11 @@ export default function NhanVienEditPage() {
             <Field label="Lương (₫)" icon={<BadgeDollarSign size={16}/>}>
               <input
                 type="number" min="0"
-                className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
-                value={form.luong}
-                onChange={(e)=>setForm({...form, luong: e.target.value})}
-                placeholder="13000000"
+                  className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  value={form.luong}
+                  onChange={(e)=>setForm({...form, luong: e.target.value})}
+                  placeholder="13000000"
+                  disabled={!isAdmin}
               />
             </Field>
           </div>
@@ -265,6 +277,7 @@ export default function NhanVienEditPage() {
                 className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                 value={form.trangthai}
                 onChange={(e)=>setForm({...form, trangthai: e.target.value})}
+                disabled={!isAdmin}
               >
                 <option>Đang làm</option>
                 <option>Tạm nghỉ</option>
@@ -281,6 +294,7 @@ export default function NhanVienEditPage() {
                 className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                 value={form.ngaybatdau}
                 onChange={(e)=>setForm({...form, ngaybatdau: e.target.value})}
+                disabled={!isAdmin}
               />
             </Field>
             <Field label="Ngày hết hạn">
@@ -289,6 +303,7 @@ export default function NhanVienEditPage() {
                 className="w-full border px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500"
                 value={form.ngayhethan}
                 onChange={(e)=>setForm({...form, ngayhethan: e.target.value})}
+                disabled={!isAdmin}
               />
             </Field>
           </div>
@@ -298,7 +313,7 @@ export default function NhanVienEditPage() {
             <label className="block text-sm font-medium mb-1">Địa chỉ</label>
             <AddressVN value={addr} onChange={setAddr} />
             <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-              <MapPin size={14}/> Gộp: { [addr.hamlet, addr.communeName, addr.provinceName].filter(Boolean).join(", ") || (employee?.diaChi || "") }
+              <MapPin size={14}/> Gộp: { [addr.hamlet, addr.wardName, addr.provinceName].filter(Boolean).join(", ") || (employee?.diaChi || "") }
             </p>
           </div>
 
@@ -310,6 +325,7 @@ export default function NhanVienEditPage() {
                 value={form.machucnang}
                 onChange={(e)=>setForm({...form, machucnang: e.target.value})}
                 required
+                disabled={!isAdmin}
               >
                 <option value="">-- Chọn chức năng --</option>
                 {functions.map((f) => {

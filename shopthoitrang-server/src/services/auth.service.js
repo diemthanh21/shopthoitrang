@@ -171,6 +171,11 @@ const AuthService = {
       throw new Error('Tên đăng nhập hoặc mật khẩu không đúng');
     }
 
+    // Kiểm tra trạng thái hoạt động của tài khoản
+    if (employee.dangHoatDong === false || employee.danghoatdong === false) {
+      throw new Error('Tài khoản đã bị vô hiệu hóa');
+    }
+
     // Lấy password từ model (model chuyển matkhau -> matKhau)
     const storedPassword = employee.matKhau || employee.matkhau;
     

@@ -51,6 +51,18 @@ const ProductBubble = ({ data, right }) => {
   );
 };
 
+// detect if a message is a system notification that should be hidden
+const isSystemMessage = (m) => {
+  if (!m) return false;
+  try {
+    const text = (m.noidung || '').toString();
+    if (text.startsWith('[SYSTEM]')) return true;
+    if (m.nhanvien && m.nhanvien.tendangnhap && m.nhanvien.tendangnhap.toUpperCase() === 'SYSTEM') return true;
+    if (m.nguoigui && m.nguoigui.toUpperCase() === 'SYSTEM') return true;
+  } catch (_) {}
+  return false;
+};
+
 const ChatDrawer = ({ open, onClose, chatbox, onSend }) => {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState('');
@@ -62,15 +74,9 @@ const ChatDrawer = ({ open, onClose, chatbox, onSend }) => {
       if (!chatbox) return;
       try {
         const data = await chatService.getMessages(chatbox.machatbox);
-        if (mounted) setMessages(data);
-        // Bulk mark read when opening
-        try {
-          await chatService.markAllRead(chatbox.machatbox);
-          if (mounted) {
-            setMessages(prev => prev.map(m => ({ ...m, daxem: true })));
-          }
-        } catch (e) {
-          console.warn('markAllRead failed', e);
+        if (mounted) {
+          // filter out system notifications so they are not shown in the conversation
+          setMessages((data || []).filter(m => !isSystemMessage(m)));
         }
       } catch (e) { console.error(e); }
     };
@@ -152,12 +158,43 @@ export default function TinNhanPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // all | unread | read
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [lastMessagesByBox, setLastMessagesByBox] = useState({});
 
-  const load = async () => {
+  const load = async (fetchMessages = false) => {
     try {
       setLoading(true);
       const data = await chatService.listChatBoxes();
       setList(data);
+      setPage(1);
+      // reset last messages cache and populate with available lastMessage
+      const map = {};
+      (data || []).forEach(b => {
+        if (b.lastMessage && !isSystemMessage(b.lastMessage)) map[b.machatbox] = b.lastMessage;
+      });
+      setLastMessagesByBox(map);
+
+      // Only fetch full message lists (to find last non-system message) when explicitly requested
+      if (fetchMessages) {
+        const jobs = (data || []).map(async b => {
+          try {
+            // already have a non-system lastMessage from list; skip
+            if (map[b.machatbox]) return;
+            const msgs = await chatService.getMessages(b.machatbox);
+            if (Array.isArray(msgs) && msgs.length) {
+              for (let i = msgs.length - 1; i >= 0; i--) {
+                const m = msgs[i];
+                if (!isSystemMessage(m)) { map[b.machatbox] = m; break; }
+              }
+            }
+          } catch (_) {}
+        });
+        await Promise.allSettled(jobs);
+        setLastMessagesByBox({ ...map });
+      }
     } catch (e) {
       console.error(e);
       alert('Không tải được danh sách hội thoại');
@@ -169,16 +206,56 @@ export default function TinNhanPage() {
   const openChat = (box) => { setSelected(box); setDrawerOpen(true); };
   const closeChat = () => { setDrawerOpen(false); setSelected(null); };
 
+  const filteredList = useMemo(() => {
+    const s = (searchText || '').trim().toLowerCase();
+    return (list || []).filter(b => {
+      // search by customer name or id
+      const name = (b.khachHang?.hoten || `KH#${b.makhachhang}` || '').toString().toLowerCase();
+      if (s && !name.includes(s)) return false;
+      if (statusFilter === 'unread') return (b.unreadFromCustomer || 0) > 0;
+      if (statusFilter === 'read') return (b.unreadFromCustomer || 0) === 0;
+      return true;
+    });
+  }, [list, searchText, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil((filteredList || []).length / pageSize));
+
+  // keep page in range when filteredList or pageSize changes
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages]);
+
+  const paginatedList = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return (filteredList || []).slice(start, start + pageSize);
+  }, [filteredList, page, pageSize]);
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-semibold">Tin nhắn</h1>
-        <button onClick={load} className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200">Làm mới</button>
+        <button onClick={() => load(true)} className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200">Làm mới</button>
+      </div>
+
+      <div className="flex items-center gap-3 mb-4">
+        <input
+          value={searchText}
+          onChange={e => setSearchText(e.target.value)}
+          placeholder="Tìm theo tên khách hàng..."
+          className="px-3 py-2 border rounded w-64 text-sm focus:outline-none"
+        />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-2 py-2 border rounded text-sm">
+          <option value="all">Tất cả</option>
+          <option value="unread">Chưa đọc</option>
+          <option value="read">Đã đọc</option>
+        </select>
+        <div className="ml-auto text-sm text-gray-600">Tổng số tin nhắn: {(filteredList || []).length}</div>
       </div>
 
       {loading ? (
         <div>Đang tải...</div>
       ) : (
+        <>
         <div className="bg-white border rounded-lg overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
@@ -190,27 +267,57 @@ export default function TinNhanPage() {
               </tr>
             </thead>
             <tbody>
-              {list.map((b) => (
-                <tr key={b.machatbox} className="border-t">
-                  <td className="px-3 py-2">{b.khachHang?.hoten || `KH#${b.makhachhang}`}</td>
-                  <td className="px-3 py-2 text-gray-600">
-                    {b.lastMessage ? (
-                      (() => {
-                        const tag = b.lastMessage.nguoigui === 'NV' ? 'NV' : 'KH';
-                        const lp = parseProductFromContent(b.lastMessage.noidung);
-                        return `${tag}: ${lp.isProduct ? '[Thẻ sản phẩm]' : b.lastMessage.noidung}`;
-                      })()
-                    ) : ''}
-                  </td>
-                  <td className="px-3 py-2">{b.unreadFromCustomer || 0}</td>
-                  <td className="px-3 py-2">
-                    <button className="px-2 py-1 text-sm rounded bg-blue-600 text-white" onClick={() => openChat(b)}>Mở</button>
-                  </td>
-                </tr>
-              ))}
+              {paginatedList.map((b) => {
+                const last = lastMessagesByBox[b.machatbox] || (b.lastMessage && !isSystemMessage(b.lastMessage) ? b.lastMessage : null);
+                const lp = last ? parseProductFromContent(last.noidung) : { isProduct: false };
+                const fromKH = last && !isSystemMessage(last) && (last.nguoigui !== 'NV');
+                const hasUnread = (b.unreadFromCustomer || 0) > 0;
+                const highlight = fromKH && hasUnread;
+                return (
+                  <tr key={b.machatbox} className="border-t">
+                    <td className="px-3 py-2">{b.khachHang?.hoten || `KH#${b.makhachhang}`}</td>
+                    <td className={`px-3 py-2 ${highlight ? 'bg-yellow-50 font-medium text-gray-800' : 'text-gray-600'}`}>
+                      {last && !isSystemMessage(last) ? (
+                        (() => {
+                          const tag = last.nguoigui === 'NV' ? 'NV' : 'KH';
+                          return `${tag}: ${lp.isProduct ? '[Thẻ sản phẩm]' : last.noidung}`;
+                        })()
+                      ) : ''}
+                    </td>
+                    <td className="px-3 py-2">{b.unreadFromCustomer || 0}</td>
+                    <td className="px-3 py-2">
+                      <button className="px-2 py-1 text-sm rounded bg-blue-600 text-white" onClick={() => openChat(b)}>Mở</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <div className="flex items-center justify-between px-3 py-2 border-t bg-white">
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="px-3 py-1 rounded border bg-gray-50 disabled:opacity-50"
+            >Prev</button>
+            <button
+              disabled={page >= totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="px-3 py-1 rounded border bg-gray-50 disabled:opacity-50"
+            >Next</button>
+            <div className="text-sm text-gray-600">Trang {page} / {totalPages}</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-gray-600">Hiển thị</div>
+            <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }} className="px-2 py-1 border rounded text-sm">
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </select>
+          </div>
+        </div>
+        </>
       )}
 
       <ChatDrawer open={drawerOpen} onClose={closeChat} chatbox={selected} onSend={() => {}} />

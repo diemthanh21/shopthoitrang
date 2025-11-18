@@ -30,6 +30,7 @@ import TaiKhoanNhanVienPage from './pages/TaiKhoanNhanVienPage';
 import TheThanhVienPage from './pages/TheThanhVienPage';
 import ThongBaoPage from './pages/ThongBaoPage';
 import TinNhanPage from './pages/TinNhanPage';
+import ThongTinNhanVienPage from './pages/ThongTinNhanVienPage';
 import TraHangDetailPage from './pages/TraHangDetailPage';
 import TraHangPage from './pages/TraHangPage';
 import VoucherGiamGiaPage from './pages/VoucherGiamGiaPage';
@@ -56,6 +57,7 @@ function App() {
             <Route path="nhanvien/:id" element={<NhanVienDetailPage />} />
             <Route path="nhanvien/:id/edit" element={<NhanVienEditPage />} />
             <Route path="taikhoannhanvien" element={<TaiKhoanNhanVienPage />} />
+            <Route path="me" element={<ThongTinNhanVienPage />} />
             <Route path="sanpham" element={<SanPhamPage />} />
             <Route path="sanpham/:id" element={<SanPhamDetailPage />} />
             <Route path="kichthuoc" element={<KichThuocPage />} />
