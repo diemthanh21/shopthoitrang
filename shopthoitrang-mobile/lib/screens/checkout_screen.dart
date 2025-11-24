@@ -1,8 +1,16 @@
 ﻿import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
+// import 'package:url_launcher/url_launcher.dart';
+
+import 'sepay_checkout_screen.dart';
+import 'momo_payment_screen.dart';
+import 'dashboard_screen.dart';
 
 import '../models/order_model.dart';
 import '../models/product_model.dart';
@@ -12,6 +20,7 @@ import '../models/coupon_model.dart';
 import '../services/order_service.dart';
 import '../services/cart_service.dart';
 import '../services/address_service.dart';
+import '../services/payment_service.dart';
 import '../providers/auth_provider.dart';
 import 'address_selection_screen.dart';
 import 'coupon_selection_screen.dart';
@@ -47,14 +56,18 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
+  static const String _momoCancelMessage =
+      'Thanh toán chuyển khoản thất bại, đặt hàng không thành công. Vui lòng đặt hàng và chọn phương thức thanh toán khác để khỏi tạo đơn đỡ phải xử lý.';
   final OrderService _orderService = OrderService();
   final CartService _cartService = CartService();
   final AddressService _addressService = AddressService();
+  final PaymentService _paymentService = PaymentService();
   final TextEditingController _noteController = TextEditingController();
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(locale: 'vi_VN', symbol: ' VND', decimalDigits: 0);
 
   String _selectedPaymentMethod = 'COD';
+  int? _provisionalOrderId; // reuse existing order instead of creating a new one
   bool _isLoading = false;
   List<OrderItem> _orderItems = [];
   List<CheckoutProductSummary> _productSummaries = [];
@@ -65,7 +78,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Coupon? _selectedDiscountCoupon;
   Coupon? _selectedFreeshipCoupon;
   DiaChiKhachHang? _selectedAddress;
-
   double get _grandTotal =>
       math.max(0, _totalAmount - _orderCouponDiscount) +
       math.max(0, _shippingFee - _shippingCouponDiscount);
@@ -75,6 +87,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _loadOrderItems();
     _loadDefaultAddress();
+    _restoreCheckoutIfAny();
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -211,21 +224,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         throw Exception('Chua dang nhap');
       }
 
+      final bool isCod = _selectedPaymentMethod == 'COD';
+      final bool requiresGateway = _selectedPaymentMethod == 'Bank' || _selectedPaymentMethod == 'MOMO';
+
       final order = Order(
         customerId: auth.user!.maKhachHang,
         orderDate: DateTime.now(),
         total: _grandTotal,
         paymentMethod: _selectedPaymentMethod,
-        paymentStatus: _selectedPaymentMethod == 'COD'
-            ? 'Chua thanh toan'
-            : 'Da thanh toan',
-        orderStatus:
-            _selectedPaymentMethod == 'COD' ? 'Cho xac nhan' : 'Cho lay hang',
+        paymentStatus: 'Chua thanh toan',
+        orderStatus: 'Cho xac nhan',
         items: _orderItems,
         shippingAddress: _selectedAddress,
+        appliedVoucherIds: _collectVoucherIds(),
       );
 
-      final createdOrder = await _orderService.createOrder(order);
+      // If we already have a provisional order, reuse it (avoid creating a new one)
+      Order? createdOrder;
+      if (_provisionalOrderId != null) {
+        // Update existing provisional order on server with latest data
+        final updated = await _orderService.updateOrder(_provisionalOrderId!, order);
+        if (updated == null) {
+          throw Exception(_orderService.lastError ?? 'Không thể cập nhật đơn hiện tại');
+        }
+        createdOrder = updated;
+      } else {
+        createdOrder = await _orderService.createOrder(order);
+        if (createdOrder?.id != null) {
+          _provisionalOrderId = createdOrder!.id;
+          await _persistCheckoutState(orderId: _provisionalOrderId!, paymentMethod: _selectedPaymentMethod);
+        }
+      }
 
       if (createdOrder != null && mounted) {
         if (widget.source == CheckoutSource.cart) {
@@ -238,23 +267,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Dat hang thanh cong!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        if (requiresGateway && createdOrder.id != null) {
+          await _startOnlinePayment(createdOrder);
+          return;
+        }
 
+        if (isCod && mounted) {
+          // Ensure server reflects COD if reusing provisional order from MoMo
+          if (_provisionalOrderId != null) {
+            await _orderService.updatePaymentMethod(_provisionalOrderId!, 'COD');
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: const [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Dat hang thanh cong!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          );
+        }
+
+        // Clear provisional id once we finish
+        _provisionalOrderId = null;
+        await _clearCheckoutState();
         Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         throw Exception(_orderService.lastError ?? 'Khong the tao don hang');
@@ -286,6 +329,202 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (forShipping && !isFreeship) return 0;
     if (!forShipping && isFreeship) return 0;
     return coupon.calculateDiscount(_totalAmount, _shippingFee);
+  }
+
+  List<int> _collectVoucherIds() {
+    final ids = <int>[];
+    void addCoupon(Coupon? coupon) {
+      final id = coupon?.id;
+      if (id != null) ids.add(id);
+    }
+
+    addCoupon(_selectedDiscountCoupon);
+    addCoupon(_selectedFreeshipCoupon);
+    return ids;
+  }
+
+  Future<void> _startOnlinePayment(Order order) async {
+    final orderId = order.id;
+    if (orderId == null) return;
+    if (_selectedPaymentMethod == 'MOMO') {
+      final momoPayload = await _paymentService.createMomoPayment(orderId: orderId);
+      if (momoPayload == null || momoPayload.launchUrl == null) {
+        throw Exception(_paymentService.lastError ?? 'Không thể mở MoMo. Vui lòng thử lại.');
+      }
+      if (!mounted) return;
+      if (_isLoading) setState(() => _isLoading = false);
+      await _persistCheckoutState(orderId: orderId, paymentMethod: 'MOMO', payUrl: momoPayload.launchUrl!);
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MomoPaymentScreen(
+            orderId: orderId,
+            qrOrPayUrl: momoPayload.launchUrl!,
+            // Give users and IPN more time (10 minutes)
+            timeout: const Duration(minutes: 10),
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (result == true) {
+        // Payment succeeded: clear state and go to Orders tab
+        await _clearCheckoutState();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const DashboardScreen(initialIndex: 3, initialOrdersStatus: 'Chờ lấy hàng')),
+          (route) => route.isFirst,
+        );
+        return;
+      }
+      if (result == 'cancel') {
+        await _handleMomoCancellation(orderId);
+      }
+      return;
+    } else {
+      final paymentPayload = await _paymentService.createSepayPayment(
+        orderId: orderId,
+        customerName: _selectedAddress?.ten,
+        customerPhone: _selectedAddress?.soDienThoai,
+      );
+
+      if (paymentPayload == null) {
+        throw Exception(
+          _paymentService.lastError ?? 'Không thể mở cổng thanh toán. Vui lòng thử lại.',
+        );
+      }
+
+      if (paymentPayload.hasHtml || paymentPayload.launchUrl != null) {
+        if (!mounted) return;
+        if (_isLoading) {
+          setState(() => _isLoading = false);
+        }
+        await _persistCheckoutState(orderId: orderId, paymentMethod: 'Bank', payUrl: paymentPayload.launchUrl);
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SepayCheckoutScreen(
+              initialHtml: paymentPayload.autoSubmitHtml,
+              initialUrl:
+                  paymentPayload.hasHtml ? null : paymentPayload.launchUrl,
+              fallbackUrl: paymentPayload.launchUrl,
+            ),
+          ),
+        );
+        return;
+      }
+
+      throw Exception('Không tìm thấy đường dẫn thanh toán hợp lệ.');
+    }
+  }
+
+  Future<void> _handleMomoCancellation(int orderId) async {
+    final deleted = await _orderService.deleteOrder(orderId);
+    if (!deleted) {
+      await _orderService.updateOrderStatus(
+        orderId,
+        orderStatus: 'Đã huỷ',
+        paymentStatus: 'Chưa thanh toán',
+      );
+    }
+    await _clearCheckoutState();
+    if (!mounted) return;
+    setState(() {
+      if (_provisionalOrderId == orderId) {
+        _provisionalOrderId = null;
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: const Text(_momoCancelMessage)),
+    );
+  }
+
+  Future<void> _persistCheckoutState({
+    required int orderId,
+    required String paymentMethod,
+    String? payUrl,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      prefs.setInt('provisional_order_id', orderId);
+      final map = {
+        'paymentMethod': paymentMethod,
+        if (payUrl != null) 'payUrl': payUrl,
+        'savedAt': DateTime.now().toIso8601String(),
+      };
+      prefs.setString('checkout_in_progress', json.encode(map));
+    } catch (e) {
+      debugPrint('Persist checkout state failed: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> _readCheckoutState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getInt('provisional_order_id');
+      final raw = prefs.getString('checkout_in_progress');
+      if (id == null || raw == null) return null;
+      final map = json.decode(raw) as Map<String, dynamic>;
+      map['orderId'] = id;
+      return map;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _clearCheckoutState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('provisional_order_id');
+      await prefs.remove('checkout_in_progress');
+    } catch (e) {
+      debugPrint('Clear checkout state failed: $e');
+    }
+  }
+
+  Future<void> _restoreCheckoutIfAny() async {
+    final state = await _readCheckoutState();
+    if (state == null) return;
+    final orderId = state['orderId'] as int;
+    try {
+      final detail = await _orderService.getOrderById(orderId);
+      if (detail == null) {
+        await _clearCheckoutState();
+        return;
+      }
+      final paid = (detail.paymentStatus.toLowerCase()).contains('da thanh toan');
+      if (paid) {
+        await _clearCheckoutState();
+        return;
+      }
+      setState(() {
+        _provisionalOrderId = orderId;
+        _selectedPaymentMethod = state['paymentMethod'] as String? ?? detail.paymentMethod;
+      });
+      final payUrl = state['payUrl'] as String?;
+      // Auto reopen gateway payment screen if still in progress
+      if (mounted && _selectedPaymentMethod == 'MOMO' && payUrl != null && payUrl.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => MomoPaymentScreen(
+                orderId: orderId,
+                qrOrPayUrl: payUrl,
+                timeout: const Duration(minutes: 10),
+              ),
+            ),
+          );
+          if (!mounted) return;
+          if (result == true) {
+            await _clearCheckoutState();
+            if (!mounted) return;
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const DashboardScreen(initialIndex: 3, initialOrdersStatus: 'Chờ lấy hàng')),
+              (route) => route.isFirst,
+            );
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Restore checkout failed: $e');
+    }
   }
 
   Future<void> _openCouponSelection() async {
@@ -431,7 +670,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           subtitle: 'Mien phi giao dich',
                           value: 'Bank',
                         ),
-                        
+                          const Divider(height: 8),
+                        _buildPaymentOption(
+                          icon: Icons.account_balance,
+                          title: 'Chuyen khoan MOMO',
+                          subtitle: 'Mien phi giao dich',
+                          value: 'MOMO',
+                        ),
+                        if (_selectedPaymentMethod == 'Bank') ...[
+                          const SizedBox(height: 16),
+                          _buildBankTransferInfo(),
+                        ] else if (_selectedPaymentMethod == 'MOMO') ...[
+                          const SizedBox(height: 16),
+                          _buildMomoInfo(),
+                        ],
                       ],
                     ),
                   ),
@@ -1407,6 +1659,64 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBankTransferInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F7FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kPrimaryBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Thanh toan truc tuyen SePay',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sau khi nhan "Dat hang", he thong se mo cong thanh toan SePay de ban thanh toan qua ngan hang hoac vi dien tu. Don hang se duoc cap nhat tu dong khi giao dich thanh cong.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMomoInfo() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F7FF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kPrimaryBlue.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Thanh toan qua MoMo',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 12),
+          Text(
+            'Sau khi nhan "Dat hang", he thong se hien ma QR/duong dan MoMo de ban thanh toan. Don hang se duoc cap nhat tu dong khi thanh toan thanh cong.',
+            style: TextStyle(color: Colors.black54),
+          ),
+        ],
       ),
     );
   }

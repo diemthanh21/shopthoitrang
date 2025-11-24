@@ -3,7 +3,7 @@ const service = require('../services/donhang.service');
 const DonHangController = {
   async getAll(req, res) {
     try {
-      const data = await service.list();
+      const data = await service.list(req.query);
       res.json(data.map(r => r.toJSON()));
     } catch (err) {
       res.status(500).json({ message: err.message });

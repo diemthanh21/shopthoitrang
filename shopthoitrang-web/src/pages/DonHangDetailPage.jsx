@@ -1,6 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import donhangService from '../services/donhangService';
+import trahangService from '../services/trahangService';
+
+// Build public storage URL from a stored path. Uses Vite env vars when available.
+const STORAGE_BASE = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_STORAGE_BASE || '';
+const STORAGE_BUCKET = import.meta.env.VITE_SUPABASE_STORAGE_BUCKET || 'minchunghinhanh';
+
+function buildStorageUrl(path) {
+  if (!path) return null;
+  const p = path.toString().trim();
+  if (!p) return null;
+  if (p.startsWith('http://') || p.startsWith('https://')) return p;
+  if (!STORAGE_BASE) return p; // no base configured, return raw path
+  const clean = p.replace(/^\/+/, '');
+  // if path already contains bucket prefix
+  if (clean.startsWith(STORAGE_BUCKET)) {
+    return `${STORAGE_BASE.replace(/\/$/, '')}/storage/v1/object/public/${clean}`;
+  }
+  // if includes bucket somewhere, just append after public
+  if (clean.includes(`${STORAGE_BUCKET}/`)) {
+    return `${STORAGE_BASE.replace(/\/$/, '')}/storage/v1/object/public/${clean}`;
+  }
+  return `${STORAGE_BASE.replace(/\/$/, '')}/storage/v1/object/public/${STORAGE_BUCKET}/${clean}`;
+}
+
+function parseMedia(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.map(String);
+  return String(raw)
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
 
 function formatTime(ts) {
   try {
@@ -18,6 +50,7 @@ export default function DonHangDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [orderDetail, setOrderDetail] = useState(null);
+  const [returnItems, setReturnItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -28,6 +61,10 @@ export default function DonHangDetailPage() {
         setError('');
         const data = await donhangService.getById(id);
         setOrderDetail(data);
+
+        // Lấy danh sách phiếu trả hàng gắn với đơn này
+        const returns = await trahangService.getByOrder(id);
+        setReturnItems(Array.isArray(returns) ? returns : []);
       } catch (e) {
         console.error(e);
         setError(e?.response?.data?.message || 'Không tải được chi tiết đơn hàng');
@@ -49,6 +86,36 @@ export default function DonHangDetailPage() {
   if (!orderDetail) {
     return <div className="p-8 text-center text-gray-500">Không tìm thấy đơn hàng</div>;
   }
+
+  // Map phiếu trả hàng theo mã CTSP để hiển thị sản phẩm + tính tiền
+  const returnByVariant = (() => {
+    if (!Array.isArray(returnItems) || returnItems.length === 0) return null;
+    const map = new Map();
+    returnItems.forEach((r) => {
+      const key = r.maChiTietSanPham;
+      if (!key) return;
+      const current = map.get(key) || [];
+      current.push(r);
+      map.set(key, current);
+    });
+    return map;
+  })();
+
+  const computedReturnLines = (() => {
+    if (!returnByVariant || !Array.isArray(orderDetail.items)) return [];
+    const lines = [];
+    orderDetail.items.forEach((it) => {
+      const list = returnByVariant.get(it.maChiTietSanPham);
+      if (!list || list.length === 0) return;
+      const totalQty = list.reduce((sum, r) => sum + (Number(r.soLuong) || 0), 0);
+      if (!totalQty) return;
+      const unitPrice = it.donGia || it.thanhTien / (it.soLuong || 1) || 0;
+      const amount = unitPrice * totalQty;
+      lines.push({ item: it, quantity: totalQty, unitPrice, amount });
+    });
+    return lines;
+  })();
+  const totalReturnAmount = computedReturnLines.reduce((s, l) => s + (l.amount || 0), 0);
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -120,18 +187,18 @@ export default function DonHangDetailPage() {
           </div>
         )}
 
-        {/* Delivery address */}
+        {/* Delivery address - ưu tiên địa chỉ khách đặt đơn */}
         {orderDetail.diaChi && (
           <div className="bg-white border rounded-lg p-6">
             <h3 className="font-semibold mb-4">Địa chỉ giao hàng</h3>
             <div className="text-sm space-y-2">
               <div>
                 <span className="text-gray-500">Người nhận:</span>
-                <span className="ml-2 font-medium">{orderDetail.diaChi.ten || orderDetail.diaChi.nguoinhan || ''}</span>
+                <span className="ml-2 font-medium">{orderDetail.diaChi.ten || orderDetail.diaChi.nguoinhan || orderDetail.khachHang?.hoten || ''}</span>
               </div>
               <div>
                 <span className="text-gray-500">SĐT:</span>
-                <span className="ml-2 font-medium">{orderDetail.diaChi.sodienthoai || orderDetail.diaChi.sdt || ''}</span>
+                <span className="ml-2 font-medium">{orderDetail.diaChi.sodienthoai || orderDetail.diaChi.sdt || orderDetail.khachHang?.sodienthoai || ''}</span>
               </div>
               <div>
                 <span className="text-gray-500">Phường/Xã:</span>
@@ -155,10 +222,16 @@ export default function DonHangDetailPage() {
           </div>
         )}
 
-        {/* Products table */}
+        {/* Products table + Tổng tiền đơn hàng */}
         <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="p-6 pb-4">
+          <div className="p-6 pb-4 flex items-center justify-between">
             <h3 className="font-semibold">Sản phẩm</h3>
+            <div className="text-sm text-gray-500">
+              Tổng tiền:&nbsp;
+              <span className="text-xl font-bold text-red-600">
+                {orderDetail.thanhTien ? formatPrice(orderDetail.thanhTien) : '0 ₫'}
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -212,17 +285,100 @@ export default function DonHangDetailPage() {
           </div>
         </div>
 
-        {/* Total */}
-        <div className="bg-white border rounded-lg p-6">
-          <div className="flex justify-end">
-            <div className="text-right">
-              <div className="text-sm text-gray-500 mb-1">Tổng tiền</div>
-              <div className="text-3xl font-bold text-red-600">
-                {orderDetail.thanhTien ? formatPrice(orderDetail.thanhTien) : '0 ₫'}
+        {/* Return requested products */}
+        {computedReturnLines.length > 0 && (
+          <div className="bg-white border rounded-lg overflow-hidden">
+            <div className="p-6 pb-4 flex items-center justify-between">
+              <h3 className="font-semibold">Sản phẩm yêu cầu trả hàng</h3>
+              <div className="text-sm text-gray-500">
+                Tổng tiền yêu cầu trả: <span className="font-semibold text-red-600">{formatPrice(totalReturnAmount)}</span>
               </div>
             </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-y">
+                  <tr>
+                    <th className="px-6 py-3 text-left font-medium">SẢN PHẨM</th>
+                    <th className="px-6 py-3 text-left font-medium">PHÂN LOẠI</th>
+                    <th className="px-6 py-3 text-right font-medium">ĐƠN GIÁ</th>
+                    <th className="px-6 py-3 text-right font-medium">SỐ LƯỢNG YÊU CẦU TRẢ</th>
+                    <th className="px-6 py-3 text-right font-medium">THÀNH TIỀN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {computedReturnLines.map((line, idx) => (
+                    <tr key={idx} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {line.item.imageUrl && (
+                            <img src={line.item.imageUrl} alt={line.item.productName} className="w-16 h-16 object-cover rounded border" />
+                          )}
+                          <div>
+                            <div className="font-medium">{line.item.productName || ''}</div>
+                            <div className="text-xs text-gray-500">Mã CTSP: {line.item.maChiTietSanPham}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-xs space-y-1">
+                          {line.item.variant?.color && <div>Màu: {line.item.variant.color}</div>}
+                          {line.item.variant?.size && <div>Size: {line.item.variant.size}</div>}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right font-medium">{formatPrice(line.unitPrice || 0)}</td>
+                      <td className="px-6 py-4 text-right">{line.quantity}</td>
+                      <td className="px-6 py-4 text-right font-semibold">{formatPrice(line.amount || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
+
+          {/* Return reasons & evidence media (images / videos) */}
+          {Array.isArray(returnItems) && returnItems.length > 0 && (
+            <div className="bg-white border rounded-lg p-6">
+              <h3 className="font-semibold mb-4">Lý do & Minh chứng</h3>
+              <div className="space-y-4">
+                {returnItems.map((r) => {
+                  const media = parseMedia(r.hinhAnhLoi || r.hinhanhloi || r.hinhAnh || r.hinhanh);
+                  return (
+                    <div key={r.id || r.maTraHang || `${r.maChiTietSanPham}-${r.ngayYeuCau}`} className="border rounded p-3">
+                      <div className="text-sm text-gray-600">Phiếu: <span className="font-medium">{r.id || r.maTraHang || ''}</span> &nbsp; Mã CTSP: <span className="font-medium">{r.maChiTietSanPham || r.machitietsanpham || ''}</span></div>
+                      <div className="mt-2">
+                        <div className="text-sm text-gray-500">Lý do:</div>
+                        <div className="mt-1 text-gray-800">{r.lyDo || r.lydo || r.lyDo || r.ly || ''}</div>
+                      </div>
+                      {media && media.length > 0 && (
+                        <div className="mt-3">
+                          <div className="text-sm text-gray-500 mb-2">Minh chứng:</div>
+                          <div className="flex flex-wrap gap-3">
+                            {media.map((m, i) => {
+                              const url = buildStorageUrl(m);
+                              const lower = (m || '').toString().toLowerCase();
+                              const isVideo = lower.endsWith('.mp4') || lower.endsWith('.mov') || lower.endsWith('.webm') || lower.includes('video');
+                              return (
+                                <div key={i} className="w-32 h-32 border rounded overflow-hidden bg-gray-50 flex items-center justify-center">
+                                  {isVideo ? (
+                                    <video src={url} controls className="w-full h-full object-cover" />
+                                  ) : (
+                                    <img src={url} alt={`evidence-${i}`} className="w-full h-full object-cover" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        {/* (Tổng tiền đã gộp vào header bảng Sản phẩm) */}
       </div>
     </div>
   );

@@ -7,8 +7,8 @@ const authenticateToken = require('../middlewares/auth.middleware');
 /**
  * @swagger
  * tags:
- *   - name: Phiếu nhập kho
- *     description: Quản lý phiếu nhập kho
+ *   - name: Phieu nhap kho
+ *     description: Quan ly phieu nhap kho
  */
 
 router.use(authenticateToken);
@@ -17,11 +17,11 @@ router.use(authenticateToken);
  * @swagger
  * /api/phieunhapkho:
  *   get:
- *     summary: Lấy danh sách phiếu nhập kho
- *     tags: [Phiếu nhập kho]
+ *     summary: Lay danh sach phieu nhap kho
+ *     tags: [Phieu nhap kho]
  *     responses:
  *       200:
- *         description: Thành công
+ *         description: Thanh cong
  */
 router.get('/', controller.getAll);
 
@@ -29,8 +29,8 @@ router.get('/', controller.getAll);
  * @swagger
  * /api/phieunhapkho/{id}:
  *   get:
- *     summary: Lấy phiếu nhập kho theo mã
- *     tags: [Phiếu nhập kho]
+ *     summary: Lay phieu nhap kho theo ma
+ *     tags: [Phieu nhap kho]
  *     parameters:
  *       - in: path
  *         name: id
@@ -38,9 +38,9 @@ router.get('/', controller.getAll);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Thành công
+ *         description: Thanh cong
  *       404:
- *         description: Không tìm thấy
+ *         description: Khong tim thay
  */
 router.get('/:id', controller.getById);
 
@@ -48,38 +48,38 @@ router.get('/:id', controller.getById);
  * @swagger
  * /api/phieunhapkho:
  *   post:
- *     summary: Thêm phiếu nhập kho mới
- *     tags: [Phiếu nhập kho]
+ *     summary: Tao phieu nhap kho moi
+ *     tags: [Phieu nhap kho]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [manhanvien, manhacungcap]
+ *             required: [manhanvien, maphieudathang]
  *             properties:
  *               manhanvien:
  *                 type: integer
  *                 example: 1
- *               manhacungcap:
+ *               maphieudathang:
  *                 type: integer
- *                 example: 2
+ *                 example: 42
  *               ngaynhap:
  *                 type: string
  *                 format: date-time
  *                 example: "2025-11-10T00:00:00Z"
  *               trangthai:
  *                 type: string
- *                 enum: ['Tạo mới', 'Đang xử lý', 'Hoàn tất', 'Đã hủy']
- *                 example: "Tạo mới"
+ *                 enum: ['Tao moi', 'Dang xu ly', 'Hoan tat', 'Da huy']
+ *                 example: "Tao moi"
  *               ghichu:
  *                 type: string
- *                 example: "Nhập lô hàng áo khoác"
+ *                 example: "Nhap lo hang ao khoac"
  *     responses:
  *       201:
- *         description: Tạo thành công
+ *         description: Tao thanh cong
  *       400:
- *         description: Thất bại
+ *         description: That bai
  */
 router.post('/', controller.create);
 
@@ -87,8 +87,8 @@ router.post('/', controller.create);
  * @swagger
  * /api/phieunhapkho/{id}:
  *   put:
- *     summary: Cập nhật phiếu nhập kho
- *     tags: [Phiếu nhập kho]
+ *     summary: Cap nhat phieu nhap kho
+ *     tags: [Phieu nhap kho]
  *     parameters:
  *       - in: path
  *         name: id
@@ -103,21 +103,21 @@ router.post('/', controller.create);
  *             properties:
  *               manhanvien:
  *                 type: integer
- *               manhacungcap:
+ *               maphieudathang:
  *                 type: integer
  *               ngaynhap:
  *                 type: string
  *                 format: date-time
  *               trangthai:
  *                 type: string
- *                 enum: ['Tạo mới', 'Đang xử lý', 'Hoàn tất', 'Đã hủy']
+ *                 enum: ['Tao moi', 'Dang xu ly', 'Hoan tat', 'Da huy']
  *               ghichu:
  *                 type: string
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: Cap nhat thanh cong
  *       404:
- *         description: Không tìm thấy
+ *         description: Khong tim thay
  */
 router.put('/:id', controller.update);
 
@@ -125,8 +125,8 @@ router.put('/:id', controller.update);
  * @swagger
  * /api/phieunhapkho/{id}:
  *   delete:
- *     summary: Xoá phiếu nhập kho
- *     tags: [Phiếu nhập kho]
+ *     summary: Xoa phieu nhap kho
+ *     tags: [Phieu nhap kho]
  *     parameters:
  *       - in: path
  *         name: id
@@ -134,9 +134,9 @@ router.put('/:id', controller.update);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Xoá thành công
+ *         description: Xoa thanh cong
  *       404:
- *         description: Không tìm thấy
+ *         description: Khong tim thay
  */
 router.delete('/:id', controller.delete);
 

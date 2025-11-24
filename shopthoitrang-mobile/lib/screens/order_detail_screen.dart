@@ -4,6 +4,7 @@ import '../models/order_model.dart';
 import '../services/order_service.dart';
 import '../services/api_client.dart';
 import '../services/trahang_service.dart';
+import '../utils/return_exchange_status.dart';
 import 'return_request_screen.dart';
 import 'exchange_request_screen.dart';
 import 'review_screen.dart';
@@ -27,6 +28,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Order? _order;
   bool _isLoading = false;
   List<_DisplayItem> _displayItems = [];
+  // If this order has return requests, keep recent return status and request time
+  String? _recentReturnStatus;
+  DateTime? _recentReturnRequestedAt;
 
   static const _supabaseProjectRef = 'ergnrfsqzghjseovmzkg';
 
@@ -50,6 +54,66 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     setState(() => _isLoading = true);
     try {
       var order = await _orderService.getOrderById(widget.orderId);
+
+      // Try to fetch any return records for this order and, if present, prefer mapping the
+      // return's status code to a user-facing label so the order detail shows return progress.
+      try {
+        final returns = await trahangService.getByOrder(widget.orderId);
+        if (returns != null && returns.isNotEmpty) {
+          // Prefer the most recent return (by ngayyeucau if available)
+          returns.sort((a, b) {
+            DateTime? ta;
+            DateTime? tb;
+            if (a is Map) {
+              if (a['ngayyeucau'] != null) ta = DateTime.tryParse(a['ngayyeucau'].toString());
+              else if (a['created_at'] != null) ta = DateTime.tryParse(a['created_at'].toString());
+            }
+            if (b is Map) {
+              if (b['ngayyeucau'] != null) tb = DateTime.tryParse(b['ngayyeucau'].toString());
+              else if (b['created_at'] != null) tb = DateTime.tryParse(b['created_at'].toString());
+            }
+            if (ta == null && tb == null) return 0;
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return tb.compareTo(ta);
+          });
+          final recent = returns.first;
+          if (recent is Map) {
+            // Capture recent return status and request time for action logic
+            if (recent['trangthai'] != null) {
+              final code = recent['trangthai'].toString().trim().toUpperCase();
+              final mapped = ReturnStatusMapper.labels[code];
+              _recentReturnStatus = mapped ?? recent['trangthai'].toString();
+            }
+            // parse ngayyeucau (preferred) or created_at
+            DateTime? reqAt;
+            if (recent['ngayyeucau'] != null) {
+              reqAt = DateTime.tryParse(recent['ngayyeucau'].toString());
+            } else if (recent['created_at'] != null) {
+              reqAt = DateTime.tryParse(recent['created_at'].toString());
+            }
+            _recentReturnRequestedAt = reqAt;
+
+            // If we can map status for display, override the order display status
+            if (_recentReturnStatus != null && order != null) {
+              order = Order(
+                  id: order.id,
+                  customerId: order.customerId,
+                  orderDate: order.orderDate,
+                  deliveredDate: order.deliveredDate,
+                  total: order.total,
+                  paymentMethod: order.paymentMethod,
+                  paymentStatus: order.paymentStatus,
+                  orderStatus: _recentReturnStatus!,
+                  items: order.items,
+                  shippingAddress: order.shippingAddress,
+                  appliedVoucherIds: order.appliedVoucherIds);
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ Could not fetch returns for order detail: $e');
+      }
 
       if (mounted) {
         setState(() {
@@ -607,8 +671,31 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildActionButtons() {
-    final canCancel = _order!.orderStatus == 'Chờ xác nhận' ||
-        _order!.orderStatus == 'Chờ lấy hàng';
+    // Determine cancel behavior. For return-flow orders we allow cancel only when the
+    // recent return status is 'Chờ duyệt' or 'Đã duyệt - chờ gửi'. If the recent return
+    // is 'Đã duyệt - chờ gửi' and `ngayyeucau` is older than 5 days, replace Cancel
+    // with 'Mua lại'. Otherwise fallback to original rules.
+    bool canCancel = false;
+    bool isReturnFlowOrder = false;
+    bool isExpiredReturnAwaitingShipment = false;
+
+    if (_recentReturnStatus != null) {
+      isReturnFlowOrder = true;
+      if (ReturnStatusMapper.isPendingApprovalLabel(_recentReturnStatus!) ||
+          ReturnStatusMapper.isApprovedAwaitingShipmentLabel(_recentReturnStatus!)) {
+        canCancel = true;
+      }
+      if (ReturnStatusMapper.isApprovedAwaitingShipmentLabel(_recentReturnStatus!) && _recentReturnRequestedAt != null) {
+        final diff = DateTime.now().difference(_recentReturnRequestedAt!).inDays;
+        if (diff > 5) {
+          isExpiredReturnAwaitingShipment = true;
+          // when expired, Cancel should be replaced by Mua lại (so not cancellable)
+          canCancel = false;
+        }
+      }
+    } else {
+      canCancel = _order!.orderStatus == 'Chờ xác nhận' || _order!.orderStatus == 'Chờ lấy hàng';
+    }
 
     final canReturn = _isReturnEligible();
     final canExchange = _isExchangeEligible();
@@ -616,13 +703,46 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     return Row(
       children: [
-        if (canCancel)
+        if (isExpiredReturnAwaitingShipment)
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _reorder(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Mua lại'),
+            ),
+          )
+        else if (canCancel)
           Expanded(
             child: OutlinedButton(
               onPressed: _cancelOrder,
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Hủy đơn'),
+            ),
+          )
+        else if (isReturnFlowOrder)
+          // Render disabled Cancel button when this order belongs to a return flow
+          // but cancellation is not allowed. This matches the behavior on the
+          // orders list "Trả hàng" tab where a grey, disabled cancel button is shown.
+          Expanded(
+            child: OutlinedButton(
+              onPressed: null,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey,
+                side: BorderSide(color: Colors.grey.shade300),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -728,6 +848,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return Colors.green;
       case 'Đã hủy':
         return Colors.red;
+      // Return-related statuses (from web)
+      case 'Đang xử lý trả hàng':
+        return Colors.orange;
+      case 'Chờ duyệt':
+        return Colors.amber;
+      case 'Đã duyệt - chờ gửi':
+        return Colors.blue;
+      case 'Đã nhận - chờ kiểm tra':
+        return Colors.deepPurple;
+      case 'Đủ điều kiện hoàn tiền':
+        return Colors.teal;
+      case 'Đã hoàn tiền':
+        return Colors.green;
+      case 'Không hợp lệ':
+      case 'Từ chối':
+        return Colors.red;
       default:
         return Colors.grey;
     }
@@ -762,6 +898,22 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         return 'Đơn hàng đã được giao thành công';
       case 'Đã hủy':
         return 'Đơn hàng đã bị hủy';
+      case 'Đang xử lý trả hàng':
+        return 'Yêu cầu trả hàng đã được tạo, đang chờ xử lý';
+      case 'Chờ duyệt':
+        return 'Shop đang xem xét yêu cầu trả hàng';
+      case 'Đã duyệt - chờ gửi':
+        return 'Yêu cầu đã duyệt, chờ khách gửi hàng trả lại';
+      case 'Đã nhận - chờ kiểm tra':
+        return 'Shop đã nhận hàng trả, chờ kiểm tra chất lượng';
+      case 'Đủ điều kiện hoàn tiền':
+        return 'Yêu cầu hợp lệ, chờ shop thực hiện hoàn tiền';
+      case 'Đã hoàn tiền':
+        return 'Tiền đã được hoàn về cho bạn';
+      case 'Không hợp lệ':
+        return 'Yêu cầu trả hàng không đủ điều kiện';
+      case 'Từ chối':
+        return 'Yêu cầu trả hàng bị từ chối';
       default:
         return '';
     }
@@ -995,6 +1147,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _loadOrderDetail();
       }
     });
+  }
+
+  void _reorder() {
+    if (_order == null) return;
+    // Reuse existing reorder logic (simple placeholder)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Chức năng mua lại đang phát triển')),
+    );
   }
 }
 

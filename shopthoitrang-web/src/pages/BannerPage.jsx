@@ -26,7 +26,6 @@ export default function BannerPage() {
   const [formData, setFormData] = useState({
     duongDanAnh: "",
     moTa: "",
-    lienKet: "",
     thuTuHienThi: "",
     dangHoatDong: true,
   });
@@ -98,7 +97,6 @@ export default function BannerPage() {
       setFormData({
         duongDanAnh: item.duongDanAnh ?? "",
         moTa: item.moTa ?? "",
-        lienKet: item.lienKet ?? "",
         thuTuHienThi:
           item.thuTuHienThi !== null && item.thuTuHienThi !== undefined
             ? String(item.thuTuHienThi)
@@ -111,7 +109,6 @@ export default function BannerPage() {
       setFormData({
         duongDanAnh: "",
         moTa: "",
-        lienKet: "",
         thuTuHienThi: "",
         dangHoatDong: true,
       });
@@ -127,7 +124,6 @@ export default function BannerPage() {
     setFormData({
       duongDanAnh: "",
       moTa: "",
-      lienKet: "",
       thuTuHienThi: "",
       dangHoatDong: true,
     });
@@ -161,7 +157,6 @@ export default function BannerPage() {
       const payload = {
         duongDanAnh: imageUrl,
         moTa: formData.moTa?.trim() || null,
-        lienKet: formData.lienKet?.trim() || null,
         thuTuHienThi:
           formData.thuTuHienThi !== ""
             ? Number(formData.thuTuHienThi)
@@ -200,7 +195,6 @@ export default function BannerPage() {
         String(b.maBanner ?? ""),
         b.duongDanAnh ?? "",
         b.moTa ?? "",
-        b.lienKet ?? "",
         String(b.thuTuHienThi ?? ""),
         String(b.dangHoatDong ?? ""),
       ].map((x) => String(x).toLowerCase());
@@ -286,9 +280,7 @@ export default function BannerPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Mô tả
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Liên kết
-                </th>
+                {/* Cột Liên kết đã được loại bỏ */}
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Thứ tự
                 </th>
@@ -320,20 +312,7 @@ export default function BannerPage() {
                   <td className="px-4 py-3 text-sm text-gray-900">
                     {b.moTa ?? "N/A"}
                   </td>
-                  <td className="px-4 py-3 text-sm">
-                    {b.lienKet ? (
-                      <a
-                        className="text-blue-600 hover:underline"
-                        href={b.lienKet}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {b.lienKet}
-                      </a>
-                    ) : (
-                      "N/A"
-                    )}
-                  </td>
+                  {/* Cột Liên kết đã được loại bỏ */}
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {b.thuTuHienThi ?? "N/A"}
                   </td>
@@ -425,39 +404,23 @@ export default function BannerPage() {
                 />
               </div>
 
-              {/* Liên kết + Thứ tự */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Liên kết (URL)
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.lienKet}
-                    onChange={(e) =>
-                      setFormData((f) => ({ ...f, lienKet: e.target.value }))
-                    }
-                    placeholder="https://..."
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Thứ tự hiển thị
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.thuTuHienThi}
-                    onChange={(e) =>
-                      setFormData((f) => ({
-                        ...f,
-                        thuTuHienThi: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
+              {/* Thứ tự hiển thị */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Thứ tự hiển thị
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={formData.thuTuHienThi}
+                  onChange={(e) =>
+                    setFormData((f) => ({
+                      ...f,
+                      thuTuHienThi: e.target.value,
+                    }))
+                  }
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
               </div>
 
               {/* Trạng thái */}

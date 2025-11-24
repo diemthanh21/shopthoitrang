@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
 
 class TraHangService {
@@ -61,6 +62,84 @@ class TraHangService {
         }
         return null;
       }
+    } catch (e) {
+      lastError = e.toString();
+      return null;
+    }
+  }
+
+  /// Lấy các yêu cầu trả hàng theo mã đơn hàng (để client hiển thị trạng thái trả hàng trên đơn)
+  Future<List<dynamic>?> getByOrder(int orderId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Chưa đăng nhập';
+        return null;
+      }
+      final uri = Uri.parse('$baseUrl?madonhang=$orderId');
+      if (kDebugMode) print('TraHangService.getByOrder: GET $uri');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        lastError = null;
+        final body = json.decode(res.body);
+        if (body is List) return body;
+        if (body is Map && body['data'] is List) return body['data'];
+        return [];
+      }
+      try {
+        final b = json.decode(res.body);
+        lastError = (b['message'] ?? b['error'] ?? res.body).toString();
+      } catch (_) {
+        lastError = 'Lỗi khi tải yêu cầu trả hàng theo đơn: ${res.statusCode}';
+      }
+      return null;
+    } catch (e) {
+      lastError = e.toString();
+      return null;
+    }
+  }
+
+  Future<List<dynamic>?> getReturnableItems(int orderId, {int? customerId}) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Chưa đăng nhập';
+        return null;
+      }
+      final paramsMap = <String, String>{'madonhang': orderId.toString()};
+      if (customerId != null) paramsMap['makhachhang'] = customerId.toString();
+      // Build URI safely to avoid accidental path/query mix-ups
+      final uri = Uri.parse('$baseUrl/returnable-items').replace(queryParameters: paramsMap);
+      if (kDebugMode) print('TraHangService.getReturnableItems: GET $uri');
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (res.statusCode == 200) {
+        lastError = null;
+        final body = json.decode(res.body);
+        if (body is Map<String, dynamic> && body['data'] is List) {
+          return body['data'] as List<dynamic>;
+        }
+        if (body is List) return body;
+        return [];
+      }
+      try {
+        final b = json.decode(res.body);
+        lastError = (b['message'] ?? b['error'] ?? res.body).toString();
+      } catch (_) {
+        lastError = 'Lỗi khi tải danh sách sản phẩm trả: ${res.statusCode}';
+      }
+      return null;
     } catch (e) {
       lastError = e.toString();
       return null;

@@ -14,8 +14,47 @@ import magiamgiaService from "../services/magiamgiaService";
 import nhanvienService from "../services/nhanvienService";
 import { useAuth } from "../contexts/AuthContext";
 
-const fmtDate = (iso) =>
-  iso ? new Date(iso).toLocaleDateString("vi-VN") : "";
+const VIETNAM_TIMEZONE = "Asia/Ho_Chi_Minh";
+const vietnamDisplayFormatter = new Intl.DateTimeFormat("vi-VN", {
+  timeZone: VIETNAM_TIMEZONE,
+});
+const vietnamKeyFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: VIETNAM_TIMEZONE,
+});
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const toVietnamDateObject = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) return new Date(value.getTime());
+  const raw = String(value).trim();
+  if (!raw) return null;
+  const hasTimezoneInfo = /([zZ]|[+-]\d{2}:?\d{2})$/.test(raw);
+  const normalized = hasTimezoneInfo
+    ? raw
+    : raw.includes("T")
+    ? `${raw}+07:00`
+    : `${raw}T00:00:00+07:00`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const toVietnamDateKey = (value) => {
+  const date = toVietnamDateObject(value);
+  return date ? vietnamKeyFormatter.format(date) : "";
+};
+
+const getVietnamTodayKey = () => toVietnamDateKey(new Date());
+
+const compareDateKeys = (a, b) => {
+  if (!a || !b) return 0;
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+};
+
+const fmtDate = (value) => {
+  const date = toVietnamDateObject(value);
+  return date ? vietnamDisplayFormatter.format(date) : "";
+};
 
 const fmtCurrency = (v) =>
   new Intl.NumberFormat("vi-VN", {
@@ -23,6 +62,11 @@ const fmtCurrency = (v) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(Number(v || 0));
+
+const fmtNumber = (value) =>
+  new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
 export default function MaGiamGiaPage() {
   const { user } = useAuth();
@@ -100,31 +144,111 @@ export default function MaGiamGiaPage() {
     return found?.hoTen ?? found?.hoten ?? `NV #${maNV}`;
   };
 
+  const clampNumber = (value, min, max) => {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return min;
+    if (max === undefined) {
+      return num < min ? min : num;
+    }
+    if (num < min) return min;
+    if (num > max) return max;
+    return num;
+  };
+
+  const pickNumberField = (obj, keys) => {
+    for (const key of keys) {
+      if (Object.prototype.hasOwnProperty.call(obj ?? {}, key)) {
+        const raw = obj?.[key];
+        if (raw === null || raw === undefined || raw === "") continue;
+        const num = Number(raw);
+        if (!Number.isNaN(num)) return num;
+      }
+    }
+    return 0;
+  };
+
+  const getQuantityStats = (voucher) => {
+    const total = pickNumberField(voucher, [
+      "soLuong",
+      "soluong",
+      "so_luong",
+      "totalQuantity",
+    ]);
+    let used = pickNumberField(voucher, [
+      "soLuongDaDung",
+      "soluongdadung",
+      "so_luong_da_dung",
+      "usedQuantity",
+    ]);
+    let remaining = pickNumberField(voucher, [
+      "soLuongConLai",
+      "soluongconlai",
+      "so_luong_con_lai",
+      "remainingQuantity",
+    ]);
+
+    const hasCap = total > 0;
+
+    if (hasCap) {
+      if (!used && remaining) {
+        used = Math.max(0, total - remaining);
+      }
+      if (!remaining && used) {
+        remaining = Math.max(0, total - used);
+      }
+      if (!used && !remaining) {
+        remaining = total;
+      }
+
+      used = clampNumber(used, 0, total);
+      remaining = clampNumber(remaining, 0, total);
+    } else {
+      used = Math.max(0, used);
+      remaining = Math.max(0, remaining);
+    }
+
+    return { total, used, remaining, hasCap };
+  };
+
+  const dateKeyToDate = (key) => {
+    if (!key) return null;
+    const [y, m, d] = key.split("-").map((part) => Number(part));
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  };
+
+  const getValidityText = (voucher) => {
+    const startText = fmtDate(voucher.ngayBatDau ?? voucher.ngaybatdau);
+    const endText = fmtDate(voucher.ngayKetThuc ?? voucher.ngayketthuc);
+    if (!startText && !endText) return "";
+    if (startText && endText) {
+      return `Từ ${startText} - đến ${endText}`;
+    }
+    if (startText) {
+      return `Từ ${startText}`;
+    }
+    return `Đến ${endText}`;
+  };
+
+  const getTimeStatusText = (voucher) => {
+    const endKey = toVietnamDateKey(voucher.ngayKetThuc ?? voucher.ngayketthuc);
+    if (!endKey) return "";
+   
+  };
+
+  const getEndConditionText = (voucher) => {
+ 
+
+  };
+
   // ===== Trạng thái voucher =====
   const getTrangThaiVoucher = (v) => {
-    const today = new Date();
-    const dToday = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    ).getTime();
+    const todayKey = getVietnamTodayKey();
+    const startKey = toVietnamDateKey(v.ngayBatDau ?? v.ngaybatdau);
+    const endKey = toVietnamDateKey(v.ngayKetThuc ?? v.ngayketthuc);
+    const { hasCap, remaining } = getQuantityStats(v);
 
-    const startRaw = v.ngayBatDau ?? v.ngaybatdau;
-    const endRaw = v.ngayKetThuc ?? v.ngayketthuc;
-
-    const soLuongConLai =
-      v.soLuongConLai ??
-      v.soluongconlai ??
-      v.so_luong_con_lai ??
-      v.soLuong ??
-      0;
-
-    const dStart = startRaw
-      ? new Date(startRaw).setHours(0, 0, 0, 0)
-      : null;
-    const dEnd = endRaw ? new Date(endRaw).setHours(0, 0, 0, 0) : null;
-
-    if (soLuongConLai <= 0) {
+    if (hasCap && remaining <= 0) {
       return {
         code: "OUT_OF_STOCK",
         label: "Hết lượt",
@@ -132,7 +256,7 @@ export default function MaGiamGiaPage() {
       };
     }
 
-    if (!dStart && !dEnd) {
+    if (!startKey && !endKey) {
       return {
         code: "UNKNOWN",
         label: "Không xác định",
@@ -140,7 +264,7 @@ export default function MaGiamGiaPage() {
       };
     }
 
-    if (dStart && dToday < dStart) {
+    if (startKey && compareDateKeys(todayKey, startKey) < 0) {
       return {
         code: "UPCOMING",
         label: "Sắp diễn ra",
@@ -148,7 +272,7 @@ export default function MaGiamGiaPage() {
       };
     }
 
-    if (dEnd && dToday > dEnd) {
+    if (endKey && compareDateKeys(todayKey, endKey) > 0) {
       return {
         code: "ENDED",
         label: "Đã kết thúc",
@@ -218,6 +342,7 @@ export default function MaGiamGiaPage() {
 
         const tenNV = getTenNhanVien(v.maNhanVien);
         const { label: statusLabel } = getTrangThaiVoucher(v);
+        const quantityStats = getQuantityStats(v);
 
         const minOrder =
           v.dieuKienDonToiThieu != null
@@ -235,9 +360,9 @@ export default function MaGiamGiaPage() {
           v.phanTramGiam,
           v.giamToiDa,
           minOrder,
-          v.soLuong,
-          v.soLuongDaDung,
-          v.soLuongConLai,
+          quantityStats.total,
+          quantityStats.used,
+          quantityStats.remaining,
           v.isBirthdayOnly ? "sinh nhat" : "",
           tenNV,
           statusLabel,
@@ -406,22 +531,23 @@ export default function MaGiamGiaPage() {
       return;
     }
 
-    const dStart = new Date(formData.ngayBatDau);
-    const dEnd = new Date(formData.ngayKetThuc);
-    if (Number.isNaN(dStart.getTime()) || Number.isNaN(dEnd.getTime())) {
+    const dStart = toVietnamDateObject(formData.ngayBatDau);
+    const dEnd = toVietnamDateObject(formData.ngayKetThuc);
+    if (!dStart || !dEnd) {
       alert("Ngày bắt đầu / kết thúc không hợp lệ!");
       return;
     }
-    if (dEnd < dStart) {
+    if (dEnd.getTime() < dStart.getTime()) {
       alert("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu!");
       return;
     }
 
     //  (trừ khi voucher đã/đang chạy)
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = getVietnamTodayKey();
+    const startKey = toVietnamDateKey(formData.ngayBatDau);
     const isPastVoucher =
       editingIsOngoingLike || editingIsEnded;
-    if (!isPastVoucher && formData.ngayBatDau < todayStr) {
+    if (!isPastVoucher && startKey && compareDateKeys(startKey, todayStr) < 0) {
       alert("Ngày bắt đầu không được nhỏ hơn ngày hôm nay!");
       return;
     }
@@ -543,7 +669,7 @@ export default function MaGiamGiaPage() {
   const isPercent = formData.hinhThucGiam === "PERCENT";
   const isFreeship = formData.hinhThucGiam === "FREESHIP";
 
-  const todayInputMin = new Date().toISOString().slice(0, 10);
+  const todayInputMin = getVietnamTodayKey();
 
   return (
     <div className="space-y-6">
@@ -633,6 +759,27 @@ export default function MaGiamGiaPage() {
                 const tenNV = getTenNhanVien(v.maNhanVien);
                 const status = getTrangThaiVoucher(v);
                 const isBirthday = v.isBirthdayOnly;
+                const quantity = getQuantityStats(v);
+                const validityText = getValidityText(v);
+                const timeStatusText = getTimeStatusText(v);
+                const endConditionText = getEndConditionText(v);
+                const quantityTotalLabel = quantity.hasCap
+                  ? fmtNumber(quantity.total)
+                  : "Không giới hạn";
+                const quantityUsedLabel = fmtNumber(quantity.used);
+                const quantityRemainingLabel = quantity.hasCap
+                  ? fmtNumber(quantity.remaining)
+                  : "Không giới hạn";
+                const remainingClass = quantity.hasCap
+                  ? quantity.remaining > 0
+                    ? "text-blue-700"
+                    : "text-red-600"
+                  : "text-gray-600";
+                const timeStatusColor =
+                  timeStatusText &&
+                  timeStatusText.toLowerCase().includes("hết hạn")
+                    ? "text-red-600"
+                    : "text-amber-600";
 
                 const canEditRow = canEditVoucher(v);
                 const canDeleteRow = canDeleteVoucher(v);
@@ -663,41 +810,42 @@ export default function MaGiamGiaPage() {
                         : "Không"}
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      <div className="text-xs">
+                      <div className="text-xs space-y-0.5">
                         <div>
                           Tổng:{" "}
                           <span className="font-semibold">
-                            {v.soLuong}
+                            {quantityTotalLabel}
                           </span>
                         </div>
                         <div>
                           Đã dùng:{" "}
                           <span className="font-semibold">
-                            {v.soLuongDaDung ?? 0}
+                            {quantityUsedLabel}
                           </span>
                         </div>
                         <div>
                           Còn lại:{" "}
-                          <span className="font-semibold text-blue-700">
-                            {v.soLuongConLai}
+                          <span className={`font-semibold ${remainingClass}`}>
+                            {quantityRemainingLabel}
                           </span>
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">
-                      <div className="text-xs">
-                        <div>
-                          Từ:{" "}
-                          <span className="font-medium">
-                            {fmtDate(v.ngayBatDau)}
-                          </span>
-                        </div>
-                        <div>
-                          Đến:{" "}
-                          <span className="font-medium">
-                            {fmtDate(v.ngayKetThuc)}
-                          </span>
-                        </div>
+                      <div className="text-xs space-y-1">
+                        {validityText && (
+                          <div className="text-gray-800">{validityText}</div>
+                        )}
+                        {timeStatusText && (
+                          <div className={`font-semibold ${timeStatusColor}`}>
+                            {timeStatusText}
+                          </div>
+                        )}
+                        {endConditionText && (
+                          <div className="text-[11px] text-gray-500">
+                            {endConditionText}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700">

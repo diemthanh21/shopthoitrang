@@ -117,12 +117,61 @@ const TraHangController = {
   },
   async refund(req, res) {
     try {
-      const item = await service.processRefund(req.params.id, req.body?.phuongthuc);
-      res.json(item.toJSON());
+      // Initiate a refund: create a pending refund record and return it.
+      // Actual transition to 'Đã hoàn tiền' will only occur after gateway verification
+      const pending = await service.initiateRefund(req.params.id, req.user, req.body?.phuongthuc, req.body?.note);
+      res.json(pending);
     } catch (err) {
       res.status(err.status || 400).json({ message: err.message });
     }
   },
+
+  // Admin confirms refund after verifying external transaction id or gateway callback
+  async confirmRefund(req, res) {
+    try {
+      const pending = await service.confirmRefund(req.params.id, req.body?.external_txn_id, req.user);
+      res.json(pending);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  },
+
+  // Public webhook endpoint for payment gateways to notify of refund completion
+  async refundWebhook(req, res) {
+    try {
+      const { external_txn_id } = req.body;
+      if (!external_txn_id) return res.status(400).json({ message: 'Missing external_txn_id' });
+      const pending = await service.confirmRefundByExternalTxn(external_txn_id, req.body);
+      res.json({ ok: true, pending });
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  },
+
+  async getReturnableItems(req, res) {
+    try {
+      const orderId = Number(
+        req.query?.madonhang ?? req.query?.maDonHang ?? req.query?.orderId
+      );
+      if (!orderId || Number.isNaN(orderId)) {
+        return res.status(400).json({ message: 'Thiếu tham số madonhang' });
+      }
+      const userRole = req.user?.role || null;
+      let scopedCustomerId = null;
+      if (userRole === 'customer') {
+        scopedCustomerId = Number(
+          req.user?.makhachhang ?? req.user?.maKhachHang ?? req.user?.customerId
+        );
+      } else if (req.query?.makhachhang || req.query?.maKhachHang) {
+        scopedCustomerId = Number(req.query.makhachhang ?? req.query.maKhachHang);
+      }
+
+      const data = await service.getReturnableItems(orderId, scopedCustomerId, userRole);
+      res.json({ data });
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  }
 };
 
 module.exports = TraHangController;

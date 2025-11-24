@@ -13,6 +13,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Swagger UI hiển thị file đã sinh tự động
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
@@ -29,6 +33,7 @@ app.use('/api', testOrderRoutes);
 
 // Authentication routes (không cần token)
 // test order endpoint mounted at /api/sepay/test-order
+
 app.use('/api/auth', require('./src/routes/auth.route'));
 app.use('/api/banner', require('./src/routes/banner.route'));
 app.use('/api/calamviec', require('./src/routes/calamviec.route'));
@@ -71,7 +76,10 @@ app.use('/api/thuonghieu', require('./src/routes/thuonghieu.route'));
 app.use('/api/tichluy_chitieu', require('./src/routes/tichluy_chitieu.route'));
 app.use('/api/trahang', require('./src/routes/trahang.route'));
 app.use('/api/dashboard', require('./src/routes/dashboard.route'));
-
+app.use('/api/system-logs', require('./src/routes/systemlog.route'));
+app.use('/api/momo', require('./src/routes/momo.route'));
+// Uploads (proxy) - accept multipart from mobile and upload using service_role key
+app.use('/api/uploads', require('./src/routes/uploads.route'));
 
 
 // ✨ Khởi tạo express-oas-generator (đặt sau khi khai báo route)

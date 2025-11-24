@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models/coupon_model.dart';
@@ -27,6 +27,7 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
   final TextEditingController _codeController = TextEditingController();
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
+  final DateFormat _dateFormatter = DateFormat('dd/MM/yyyy');
 
   bool _isLoading = true;
   List<Coupon> _discountCoupons = [];
@@ -46,11 +47,12 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
     setState(() => _isLoading = true);
     final coupons = await _couponService.getCoupons(onlyActive: true);
     if (!mounted) return;
+    final activeCoupons = coupons.where((c) => c.isActive).toList();
     setState(() {
       _discountCoupons =
-          coupons.where((c) => c.discountType != 'FREESHIP').toList();
+          activeCoupons.where((c) => c.discountType != 'FREESHIP').toList();
       _freeshipCoupons =
-          coupons.where((c) => c.discountType == 'FREESHIP').toList();
+          activeCoupons.where((c) => c.discountType == 'FREESHIP').toList();
       _isLoading = false;
     });
   }
@@ -62,6 +64,39 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
   }
 
   bool _isApplicable(Coupon coupon) => coupon.canApplyTo(widget.subtotal);
+
+  DateTime get _todayDateOnly {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  String? _ineligibleReason(Coupon coupon) {
+    final today = _todayDateOnly;
+    if (!coupon.hasQuantity && coupon.totalQuantity > 0) {
+      return 'Mã đã hết lượt sử dụng';
+    }
+    final startDate = coupon.startDateOnly;
+    if (startDate != null && today.isBefore(startDate)) {
+      return 'Áp dụng từ ${_formatDate(startDate)}';
+    }
+    final endDate = coupon.endDateOnly;
+    if (endDate != null && today.isAfter(endDate)) {
+      return 'Mã đã hết hạn';
+    }
+    if (coupon.minOrderValue != null && widget.subtotal < coupon.minOrderValue!) {
+      final missing = coupon.minOrderValue! - widget.subtotal;
+      return 'Mua thêm ${_formatCurrency(missing)} để áp dụng mã này';
+    }
+    return null;
+  }
+
+  String? _conditionDescription(Coupon coupon) {
+    final note = coupon.conditionNote?.trim();
+    if (note != null && note.isNotEmpty) return note;
+    final desc = coupon.description?.trim();
+    if (desc != null && desc.isNotEmpty) return desc;
+    return null;
+  }
 
   void _toggleDiscount(Coupon coupon) {
     if (!_isApplicable(coupon)) return;
@@ -286,7 +321,17 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
     required VoidCallback onTap,
   }) {
     final applicable = _isApplicable(coupon);
+    final reason = applicable ? null : _ineligibleReason(coupon);
     final subtitle = _couponValueLabel(coupon);
+    final condition = _conditionDescription(coupon);
+    final displayName = (coupon.name?.trim().isNotEmpty ?? false)
+        ? coupon.name!.trim()
+        : coupon.code;
+    final validity = _validityInfo(coupon);
+    final timeStatus = _timeStatusLabel(coupon);
+    final usageInfo = _usageInfo(coupon);
+    final endCondition = _endConditionInfo(coupon);
+
     return GestureDetector(
       onTap: applicable ? onTap : null,
       child: Container(
@@ -310,10 +355,10 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          coupon.code,
+                          displayName,
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
@@ -321,6 +366,27 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                         const Icon(Icons.check_circle, color: Colors.blue),
                     ],
                   ),
+                  if (displayName.toUpperCase() != coupon.code.toUpperCase())
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200],
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Mã: ${coupon.code}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
                   Text(
                     subtitle,
@@ -341,11 +407,89 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                         ),
                       ),
                     ),
-                  if (!applicable)
+                  if (validity != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.access_time,
+                              size: 16, color: Colors.grey[600]),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              validity,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (timeStatus != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        timeStatus,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              applicable ? Colors.orange[700] : Colors.red[400],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  if (usageInfo != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: Text(
-                        'Chưa đủ điều kiện áp dụng',
+                        usageInfo,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  if (endCondition != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        endCondition,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ),
+                  if (condition != null && condition.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Điều kiện áp dụng',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            condition,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (!applicable && reason != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        reason,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.red[400],
@@ -381,8 +525,53 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
     }
   }
 
+  String? _validityInfo(Coupon coupon) {
+    final start = coupon.startDateOnly;
+    final end = coupon.endDateOnly;
+    if (start == null && end == null) return null;
+    if (start != null && end != null) {
+      return 'Hiệu lực ${_formatDate(start)} - ${_formatDate(end)}';
+    }
+    if (start != null) {
+      return 'Hiệu lực từ ${_formatDate(start)}';
+    }
+    return 'Hiệu lực đến ${_formatDate(end!)}';
+  }
+
+  String? _timeStatusLabel(Coupon coupon) {
+    final end = coupon.endDateOnly;
+    if (end == null) return null;
+    final today = _todayDateOnly;
+    final days = end.difference(today).inDays;
+    if (days < 0) return 'Mã đã hết hạn';
+    if (days == 0) return 'Hết hạn trong hôm nay';
+    if (days == 1) return 'Còn 1 ngày';
+    return 'Còn $days ngày';
+  }
+
+  String? _usageInfo(Coupon coupon) {
+    if (coupon.totalQuantity <= 0) return null;
+    final remaining = coupon.remainingQuantity;
+    
+  }
+
+  String? _endConditionInfo(Coupon coupon) {
+    final hasQuota = coupon.totalQuantity > 0;
+    final end = coupon.endDateOnly;
+    if (!hasQuota && end == null) return null;
+    final segments = <String>[];
+    if (end != null) {
+      segments.add('hết hạn (${_formatDate(end)})');
+    }
+   
+  }
+
   String _formatCurrency(double value) {
     return _currencyFormatter.format(value);
+  }
+
+  String _formatDate(DateTime value) {
+    return _dateFormatter.format(value);
   }
 }
 

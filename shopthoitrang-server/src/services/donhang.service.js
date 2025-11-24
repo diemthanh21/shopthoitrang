@@ -10,6 +10,52 @@ const normalizeStatus = (value = '') =>
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase();
 
+const STATUS_CHO_XAC_NHAN = 'Chờ xác nhận';
+const STATUS_CHO_LAY_HANG = 'Chờ lấy hàng';
+
+const mapPreferredStatus = status => {
+  if (!status) return '';
+  const normalized = normalizeStatus(status);
+  if (!normalized) return '';
+  if (normalized === 'CHO XAC NHAN') return STATUS_CHO_XAC_NHAN;
+  if (normalized === 'CHO LAY HANG') return STATUS_CHO_LAY_HANG;
+  return status;
+};
+
+const isBankTransferMethod = method => {
+  if (!method) return false;
+  const normalized = normalizeStatus(method).replace(/\s+/g, '');
+  return (
+    normalized.includes('BANK') ||
+    normalized.includes('CHUYENKHOAN') ||
+    normalized.includes('MOMO')
+  );
+};
+
+const isPaidStatus = status => {
+  if (!status) return false;
+  return normalizeStatus(status).includes('DA THANH TOAN');
+};
+
+const shouldAutoMoveToPickup = (method, paymentStatus) =>
+  isBankTransferMethod(method) && isPaidStatus(paymentStatus);
+
+const deriveInitialStatus = (method, paymentStatus, providedStatus) => {
+  const normalizedProvided = normalizeStatus(providedStatus);
+  if (normalizedProvided && normalizedProvided !== 'CHO XAC NHAN') {
+    return mapPreferredStatus(providedStatus);
+  }
+  if (shouldAutoMoveToPickup(method, paymentStatus)) {
+    return STATUS_CHO_LAY_HANG;
+  }
+  return STATUS_CHO_XAC_NHAN;
+};
+
+const isPendingConfirmationStatus = status => {
+  const normalized = normalizeStatus(status);
+  return !normalized || normalized === 'CHO XAC NHAN';
+};
+
 class DonHangService {
   async list() {
     return repo.getAll();
@@ -112,14 +158,37 @@ class DonHangService {
         .eq('madonhang', id)
         .maybeSingle();
       if (!addrErr && orderAddr) {
+        // Ensure structured fields are filled even if the snapshot stored a single `diachi` string
+        let ten = orderAddr.ten || null;
+        let sodienthoai = orderAddr.sodienthoai || null;
+        let tinh = orderAddr.tinh || null;
+        let phuong = orderAddr.phuong || null;
+        let diachicuthe = orderAddr.diachicuthe || null;
+        const rawDiachi = orderAddr.diachi || '';
+
+        if ((!ten || !sodienthoai || !tinh || !phuong || !diachicuthe) && rawDiachi) {
+          const parts = String(rawDiachi).split('|').map(p => p.trim());
+          if (!ten && parts[0]) ten = parts[0];
+          if (!sodienthoai && parts[1]) sodienthoai = parts[1];
+          const location = parts[2] || '';
+          if (location) {
+            const locParts = location.split(',').map(p => p.trim());
+            const maybeTinh = locParts[0] || null;
+            const maybePhuong = locParts[1] || null;
+            tinh = tinh || maybeTinh;
+            phuong = phuong || maybePhuong;
+          }
+          diachicuthe = diachicuthe || parts[3] || parts.slice(3).join(' | ') || null;
+        }
+
         orderJson.diaChi = {
-          madiachi: orderAddr.madiachi,
-          ten: orderAddr.ten,
-          sodienthoai: orderAddr.sodienthoai,
-          tinh: orderAddr.tinh,
-          phuong: orderAddr.phuong,
-          diachicuthe: orderAddr.diachicuthe,
-          diachi: orderAddr.diachi,
+          madiachi: orderAddr.madiachi || null,
+          ten: ten || null,
+          sodienthoai: sodienthoai || null,
+          tinh: tinh || null,
+          phuong: phuong || null,
+          diachicuthe: diachicuthe || null,
+          diachi: rawDiachi || `${ten || ''} | ${sodienthoai || ''} | ${tinh || ''}, ${phuong || ''} | ${diachicuthe || ''}`,
           macdinh: false,
         };
       }
@@ -169,24 +238,40 @@ class DonHangService {
           const def = addresses.find(a => a.macdinh) || addresses[0];
           // If structured fields missing, try to parse diachi string
           let tinh = def.tinh, phuong = def.phuong, diachicuthe = def.diachicuthe;
-          if ((!tinh || !phuong || !diachicuthe) && def.diachi) {
-            const parts = String(def.diachi).split('|').map(p => p.trim());
+          let ten = def.ten || null;
+          let sodienthoai = def.sodienthoai || null;
+          const rawDiachi = def.diachi || '';
+
+          // If structured parts missing but we have a full diachi string, attempt to parse it.
+          if ((!tinh || !phuong || !diachicuthe || !ten || !sodienthoai) && rawDiachi) {
+            const parts = String(rawDiachi).split('|').map(p => p.trim());
+            // Common formats we've seen:
+            // 0: name, 1: phone, 2: "Tỉnh, Phường", 3: detailed address
+            if (!ten && parts[0]) ten = parts[0];
+            if (!sodienthoai && parts[1]) sodienthoai = parts[1];
             const location = parts[2] || '';
-            const [pTinh, pPhuong] = location.split(',').map(p => p.trim());
-            tinh = tinh || pTinh || null;
-            phuong = phuong || pPhuong || null;
-            diachicuthe = diachicuthe || parts[3] || null;
+            if (location) {
+              const locParts = location.split(',').map(p => p.trim());
+              const maybeTinh = locParts[0] || null;
+              const maybePhuong = locParts[1] || null;
+              tinh = tinh || maybeTinh;
+              phuong = phuong || maybePhuong;
+            }
+            diachicuthe = diachicuthe || parts[3] || parts.slice(3).join(' | ') || null;
           }
-          orderJson.diaChi = def ? {
-            madiachi: def.madiachi,
-            ten: def.ten,
-            sodienthoai: def.sodienthoai,
-            tinh,
-            phuong,
-            diachicuthe,
-            macdinh: !!def.macdinh,
-            diachi: def.diachi || `${def.ten || ''} | ${def.sodienthoai || ''} | ${tinh || ''}, ${phuong || ''} | ${diachicuthe || ''}`,
-          } : null;
+
+          orderJson.diaChi = def
+            ? {
+                madiachi: def.madiachi,
+                ten: ten || def.ten || null,
+                sodienthoai: sodienthoai || def.sodienthoai || null,
+                tinh: tinh || null,
+                phuong: phuong || null,
+                diachicuthe: diachicuthe || null,
+                macdinh: !!def.macdinh,
+                diachi: rawDiachi || `${ten || ''} | ${sodienthoai || ''} | ${tinh || ''}, ${phuong || ''} | ${diachicuthe || ''}`,
+              }
+            : null;
         }
       }
     } catch (custErr) {
@@ -304,12 +389,18 @@ class DonHangService {
     }
 
     // Create the order first (robust to environments chưa có cột madiachi)
+    const paymentStatus = body.trangthaithanhtoan || 'Chưa thanh toán';
+    const orderStatus = deriveInitialStatus(
+      body.phuongthucthanhtoan,
+      paymentStatus,
+      body.trangthaidonhang
+    );
     const basePayload = {
       makhachhang: body.makhachhang,
       thanhtien: body.thanhtien || 0,
       phuongthucthanhtoan: body.phuongthucthanhtoan,
-      trangthaithanhtoan: body.trangthaithanhtoan || 'Chưa thanh toán',
-      trangthaidonhang: body.trangthaidonhang || 'Chờ xác nhận',
+      trangthaithanhtoan: paymentStatus,
+      trangthaidonhang: orderStatus,
     };
     const withMadiachi = {
       ...basePayload,
@@ -506,28 +597,215 @@ class DonHangService {
 
   async update(id, body) {
     const existing = await repo.getById(id);
+    const payload = body || {};
+    // Extract potential items array (client may send 'items' or 'Items') to handle separately.
+    // We must not pass it into supabase.update on table 'donhang'.
+    const incomingItems = Array.isArray(payload.items)
+      ? payload.items
+      : (Array.isArray(payload.Items) ? payload.Items : null);
+    if (payload.items) delete payload.items;
+    if (payload.Items) delete payload.Items;
+    // Normalize incoming address payloads: clients may send nested `diaChi`/`diachi` object.
+    // Map it to `madiachi` (the DB column) and remove nested object so supabase.update
+    // doesn't attempt to write a non-existent `diachi` column.
+    try {
+      const addrObj = payload.diaChi || payload.diachi || null;
+      if (addrObj && typeof addrObj === 'object') {
+        const providedId = addrObj.madiachi || addrObj.maDiaChi || addrObj.id || null;
+        if (providedId) payload.madiachi = providedId;
+        // remove nested object to avoid updating non-existing column
+        delete payload.diaChi;
+        delete payload.diachi;
+      }
+    } catch (mapErr) {
+      // ignore mapping errors and continue
+      console.warn('[DonHangService.update] address mapping failed:', mapErr?.message || mapErr);
+    }
+    const paymentMethod = payload.phuongthucthanhtoan || existing?.phuongthucthanhtoan;
+    const incomingPaymentStatus = payload.trangthaithanhtoan;
+
+    if (
+      !payload.trangthaidonhang &&
+      incomingPaymentStatus &&
+      shouldAutoMoveToPickup(paymentMethod, incomingPaymentStatus) &&
+      isPendingConfirmationStatus(existing?.trangthaidonhang)
+    ) {
+      payload.trangthaidonhang = STATUS_CHO_LAY_HANG;
+    }
 
     // If status set to 'Đã giao', stamp delivery date so mobile can enforce return window
-    if (body && body.trangthaidonhang && body.trangthaidonhang === 'Đã giao') {
-      if (!body.ngaygiaohang) body.ngaygiaohang = new Date().toISOString();
+    if (payload.trangthaidonhang && payload.trangthaidonhang === 'Đã giao') {
+      if (!payload.ngaygiaohang) payload.ngaygiaohang = new Date().toISOString();
 
       // Business rule: for COD orders, 'Đã giao' means 'Đã thanh toán'
-      const paymentMethod = body.phuongthucthanhtoan || existing?.phuongthucthanhtoan;
-      if (paymentMethod === 'COD' && !body.trangthaithanhtoan) {
-        body.trangthaithanhtoan = 'Đã thanh toán';
+      if (paymentMethod === 'COD' && !payload.trangthaithanhtoan) {
+        payload.trangthaithanhtoan = 'Đã thanh toán';
       }
     }
 
-    const updated = await repo.update(id, body);
+    let updated;
+    try {
+      updated = await repo.update(id, payload);
+    } catch (e) {
+      // If DB complains about missing madiachi or diachi column, try again without that field
+      const msg = String(e?.message || e).toLowerCase();
+      if (msg.includes('column') && (msg.includes('madiachi') || msg.includes('diachi'))) {
+        try {
+          const clone = { ...payload };
+          delete clone.madiachi;
+          delete clone.diaChi;
+          delete clone.diachi;
+          updated = await repo.update(id, clone);
+        } catch (e2) {
+          throw e2;
+        }
+      } else {
+        throw e;
+      }
+    }
     if (!updated) {
       const e = new Error('Khong tim thay don hang de cap nhat');
       e.status = 404;
       throw e;
     }
 
+    // If items were provided, synchronize chitietdonhang lines and adjust stock deltas.
+    if (incomingItems && Array.isArray(incomingItems)) {
+      try {
+        // Fetch existing order items
+        const { data: oldItems, error: oldErr } = await supabase
+          .from('chitietdonhang')
+          .select('machitietdonhang, machitietsanpham, chitietsize_id, soluong, dongia')
+          .eq('madonhang', id);
+        if (oldErr) {
+          console.error('[DonHangService.update] Fetch existing items error:', oldErr);
+        }
+
+        // Helper to resolve size bridge id from (variantId, sizeId)
+        const resolveSizeBridgeId = async (variantId, sizeId) => {
+          if (!variantId || !sizeId) return null;
+          try {
+            const { data: sizeRow, error: sizeErr } = await supabase
+              .from('chitietsanpham_kichthuoc')
+              .select('id')
+              .eq('machitietsanpham', variantId)
+              .eq('makichthuoc', sizeId)
+              .maybeSingle();
+            if (sizeErr) return null;
+            return sizeRow?.id || null;
+          } catch (_) {
+            return null;
+          }
+        };
+
+        // Build map of old quantities per size bridge id for stock delta calculation
+        const oldQtyBySizeId = new Map();
+        if (Array.isArray(oldItems)) {
+          for (const it of oldItems) {
+            const key = it.chitietsize_id || null;
+            if (!key) continue;
+            const prev = Number(oldQtyBySizeId.get(key) || 0);
+            oldQtyBySizeId.set(key, prev + (Number(it.soluong) || 0));
+          }
+        }
+
+        // Normalize incoming items; also pre-resolve size bridge ids when possible
+        const normalizedItems = [];
+        for (const raw of incomingItems) {
+          const variantId = raw.machitietsanpham || raw.variantId;
+          const quantity = raw.soluong || raw.quantity || 0;
+          const price = raw.dongia || raw.price || 0;
+          let sizeBridgeId = raw.chitietsizeId || raw.chitietsize_id || raw.sizeBridgeId || null;
+          const sizeId = raw.makichthuoc || raw.sizeId || raw.kichthuocId || null;
+
+          if (!sizeBridgeId && variantId && sizeId) {
+            sizeBridgeId = await resolveSizeBridgeId(variantId, sizeId);
+          }
+
+          normalizedItems.push({
+            variantId,
+            quantity: Number(quantity) || 0,
+            price: Number(price) || 0,
+            sizeBridgeId: sizeBridgeId || null,
+          });
+        }
+
+        // Compute new quantities by size id
+        const newQtyBySizeId = new Map();
+        for (const it of normalizedItems) {
+          const key = it.sizeBridgeId || null;
+          if (!key) continue;
+          const prev = Number(newQtyBySizeId.get(key) || 0);
+          newQtyBySizeId.set(key, prev + (Number(it.quantity) || 0));
+        }
+
+        // Calculate stock deltas = new - old
+        const deltaBySizeId = new Map();
+        // Include keys from both sets
+        const allKeys = new Set([...oldQtyBySizeId.keys(), ...newQtyBySizeId.keys()]);
+        for (const key of allKeys) {
+          const oldQty = Number(oldQtyBySizeId.get(key) || 0);
+          const newQty = Number(newQtyBySizeId.get(key) || 0);
+          const delta = newQty - oldQty;
+          if (delta !== 0) deltaBySizeId.set(key, delta);
+        }
+
+        // Replace order items: delete then insert
+        if (Array.isArray(oldItems) && oldItems.length > 0) {
+          const { error: delErr } = await supabase
+            .from('chitietdonhang')
+            .delete()
+            .eq('madonhang', id);
+          if (delErr) {
+            console.error('[DonHangService.update] Delete old items error:', delErr);
+          }
+        }
+
+        for (const it of normalizedItems) {
+          try {
+            await chitietdonhangService.taoMoi({
+              madonhang: id,
+              machitietsanpham: it.variantId,
+              soluong: it.quantity,
+              dongia: it.price,
+              chitietsize_id: it.sizeBridgeId || null,
+            });
+          } catch (insErr) {
+            console.error('[DonHangService.update] Insert item failed:', insErr);
+          }
+        }
+
+        // Apply stock updates by delta
+        for (const [sizeId, delta] of deltaBySizeId.entries()) {
+          if (!sizeId || delta === 0) continue;
+          try {
+            const { data: row, error: fetchErr } = await supabase
+              .from('chitietsanpham_kichthuoc')
+              .select('so_luong')
+              .eq('id', sizeId)
+              .maybeSingle();
+            if (fetchErr || !row) continue;
+            const current = Number(row.so_luong) || 0;
+            const next = Math.max(0, current - delta); // delta>0 means need to reduce stock
+            const { error: updErr } = await supabase
+              .from('chitietsanpham_kichthuoc')
+              .update({ so_luong: next })
+              .eq('id', sizeId);
+            if (updErr) {
+              console.error('[DonHangService.update] Stock update error for size', sizeId, updErr);
+            }
+          } catch (stockErr) {
+            console.error('[DonHangService.update] Stock update exception:', stockErr);
+          }
+        }
+      } catch (syncErr) {
+        console.error('[DonHangService.update] Sync items failed:', syncErr);
+      }
+    }
+
     try {
       const prevStatus = existing ? normalizeStatus(existing.trangthaidonhang || '') : '';
-      const nextStatus = normalizeStatus(updated.trangthaidonhang || body?.trangthaidonhang || '');
+      const nextStatus = normalizeStatus(updated.trangthaidonhang || payload.trangthaidonhang || '');
 
       // Khi đơn mới chuyển sang 'Đã giao' lần đầu -> cộng điểm thành viên
       if (nextStatus.includes('DA GIAO') && !prevStatus.includes('DA GIAO')) {
@@ -603,5 +881,4 @@ class DonHangService {
 }
 
 module.exports = new DonHangService();
-
 

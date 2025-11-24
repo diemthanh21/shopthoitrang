@@ -125,15 +125,18 @@ export default function TraHangPage() {
     status: "",
   });
 
+  // summaryCounts stores global counts for each status (used by chips)
+  const [summaryCounts, setSummaryCounts] = useState({ total: 0 });
+
   const [dialog, setDialog] = useState(null);
 
   const load = async () => {
     try {
       setLoading(true);
       setError("");
-      const params = {};
-      if (filters.status) params.trangthai = filters.status.toUpperCase();
-      const data = await trahangService.getAll(params);
+      // Luôn load toàn bộ rồi lọc trạng thái ở client để đảm bảo
+      // số lượng hiển thị trên chips khớp hoàn toàn với bảng.
+      const data = await trahangService.getAll();
       setItems(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err?.message || "Không thể tải dữ liệu");
@@ -143,10 +146,34 @@ export default function TraHangPage() {
   };
 
   useEffect(() => {
+    // Khi đổi trạng thái filter cũng reload để đồng bộ dữ liệu mới nhất
     load();
   }, [filters.status]);
 
+  // Load summary counts once on mount (so chips show global counts regardless of active filter)
+  const loadSummary = async () => {
+    try {
+      const data = await trahangService.getAll();
+      const counter = { total: Array.isArray(data) ? data.length : 0 };
+      (Array.isArray(data) ? data : []).forEach((item) => {
+        const key = resolveStatusKey(item.trangThai);
+        if (!key) return;
+        counter[key] = (counter[key] || 0) + 1;
+      });
+      setSummaryCounts(counter);
+    } catch (err) {
+      // ignore summary errors silently; chips will show 0
+      setSummaryCounts({ total: 0 });
+    }
+  };
+
+  useEffect(() => {
+    loadSummary();
+  }, []);
+
+  // use summaryCounts (global) for chips; fallback to current items if summary not loaded
   const counts = useMemo(() => {
+    if (summaryCounts && Object.keys(summaryCounts).length > 0) return summaryCounts;
     const counter = { total: items.length };
     items.forEach((item) => {
       const key = resolveStatusKey(item.trangThai);
@@ -154,12 +181,19 @@ export default function TraHangPage() {
       counter[key] = (counter[key] || 0) + 1;
     });
     return counter;
-  }, [items]);
+  }, [summaryCounts, items]);
 
   const filteredItems = useMemo(() => {
     const term = filters.keyword.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter((item) => {
+
+    // Lọc theo trạng thái trước (dùng cùng resolveStatusKey với phần đếm)
+    const byStatus = !filters.status
+      ? items
+      : items.filter((item) => resolveStatusKey(item.trangThai) === filters.status);
+
+    if (!term) return byStatus;
+
+    return byStatus.filter((item) => {
       const haystack = [
         item.maTraHang,
         item.maDonHang,
@@ -173,7 +207,7 @@ export default function TraHangPage() {
         .toLowerCase();
       return haystack.includes(term);
     });
-  }, [filters.keyword, items]);
+  }, [filters.keyword, filters.status, items]);
 
   const openDialog = (type, id) => setDialog({ type, id });
   const closeDialog = () => setDialog(null);
@@ -182,10 +216,35 @@ export default function TraHangPage() {
     try {
       await fn();
       await load();
+      // Refresh summary counts to keep chips in sync with latest server state
+      await loadSummary();
     } catch (err) {
       window.alert(
         err?.response?.data?.message || err?.message || "Không thể xử lý yêu cầu"
       );
+    }
+  };
+
+  const handleInitiateRefund = async (id) => {
+    try {
+      // Ensure refund amount is calculated
+      try { await trahangService.calcRefund(id); } catch (_) { /* ignore calc errors */ }
+      // Initiate pending refund
+      const pending = await trahangService.refund(id, 'GATEWAY');
+      await load();
+      await loadSummary();
+      window.alert(`Hoàn tiền đã được khởi tạo (pending id: ${pending?.id || pending?.matrahang || 'n/a'}).`);
+      // Ask admin if they'd like to confirm the refund immediately
+      const shouldConfirm = window.confirm('Bạn muốn xác nhận giao dịch (đánh dấu Đã hoàn tiền) ngay bây giờ?');
+      if (shouldConfirm) {
+        const txn = window.prompt('Nhập mã giao dịch/external_txn_id để xác nhận hoàn tiền (hoặc OK để hủy):');
+        if (txn) {
+          await runAndReload(() => trahangService.confirmRefund(id, txn));
+          window.alert('Hoàn tiền đã được xác nhận và trạng thái đơn được cập nhật.');
+        }
+      }
+    } catch (err) {
+      window.alert(err?.response?.data?.message || err?.message || 'Không thể khởi tạo hoàn tiền');
     }
   };
 
@@ -243,7 +302,7 @@ export default function TraHangPage() {
             <ActionButton tone="cyan" onClick={() => runAndReload(() => trahangService.calcRefund(id))}>
               Tính tiền hoàn
             </ActionButton>
-            <ActionButton tone="sky" onClick={() => runAndReload(() => trahangService.refund(id, "GATEWAY"))}>
+            <ActionButton tone="sky" onClick={() => handleInitiateRefund(id)}>
               Hoàn tiền
             </ActionButton>
           </div>

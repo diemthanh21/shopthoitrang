@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shopthoitrang_mobile/screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
 import 'providers/return_provider.dart';
 import 'providers/exchange_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
+import 'config/supabase_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('vi_VN');
+
+  // Khởi tạo Supabase với anon key đã cấu hình (fallback hoặc --dart-define)
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
+
   runApp(const ShopThoitrangApp());
 }
 

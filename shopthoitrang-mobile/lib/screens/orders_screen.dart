@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/order_model.dart';
 import '../models/review_model.dart';
+import '../utils/return_exchange_status.dart';
+import '../widgets/status_badge.dart';
 import '../services/order_service.dart';
 import '../services/trahang_service.dart';
 import '../services/doihang_service.dart';
@@ -16,7 +18,9 @@ import 'return_request_screen.dart';
 import 'cart_screen.dart';
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  final String? initialStatus; // e.g. 'Chờ lấy hàng'
+  final int? initialTabIndex;
+  const OrdersScreen({super.key, this.initialStatus, this.initialTabIndex});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -32,6 +36,8 @@ class _OrdersScreenState extends State<OrdersScreen>
   List<Order> _allOrders = [];
   Set<int> _returnedOrderIds =
       {}; // Lưu danh sách mã đơn đã gửi yêu cầu trả hàng
+  Map<int, String> _returnedOrderStatus = {}; // maDonHang -> trạng thái trả hàng (hiển thị)
+  Map<int, DateTime?> _returnedOrderCreatedAt = {}; // maDonHang -> thời gian tạo yêu cầu trả hàng
   Set<int> _exchangedOrderIds =
       {}; // Lưu danh sách mã đơn đã gửi yêu cầu đổi hàng
   Map<int, List<Review>> _reviewsByOrder = {};
@@ -52,6 +58,17 @@ class _OrdersScreenState extends State<OrdersScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _statuses.length, vsync: this);
+    // Set initial tab if provided
+    if (widget.initialTabIndex != null &&
+        widget.initialTabIndex! >= 0 &&
+        widget.initialTabIndex! < _statuses.length) {
+      _tabController.index = widget.initialTabIndex!;
+    } else if (widget.initialStatus != null) {
+      final idx = _statuses.indexWhere(
+        (s) => s.toLowerCase() == widget.initialStatus!.toLowerCase(),
+      );
+      if (idx >= 0) _tabController.index = idx;
+    }
     _loadOrders();
   }
 
@@ -82,8 +99,37 @@ class _OrdersScreenState extends State<OrdersScreen>
         await _loadReturnedOrders();
 
         if (mounted) {
+          // If we have return-status information, apply it to the freshly loaded orders
+          final List<Order> effectiveOrders;
+          if (_returnedOrderStatus.isNotEmpty && orders.isNotEmpty) {
+            final updated = <Order>[];
+            for (final order in orders) {
+              if (order.id != null && _returnedOrderStatus.containsKey(order.id)) {
+                final newStatus = _returnedOrderStatus[order.id] ?? 'Trả hàng';
+                updated.add(Order(
+                  id: order.id,
+                  customerId: order.customerId,
+                  orderDate: order.orderDate,
+                  deliveredDate: order.deliveredDate,
+                  total: order.total,
+                  paymentMethod: order.paymentMethod,
+                  paymentStatus: order.paymentStatus,
+                  orderStatus: newStatus,
+                  items: order.items,
+                  shippingAddress: order.shippingAddress,
+                  appliedVoucherIds: order.appliedVoucherIds,
+                ));
+              } else {
+                updated.add(order);
+              }
+            }
+            effectiveOrders = updated;
+          } else {
+            effectiveOrders = orders;
+          }
+
           setState(() {
-            _allOrders = orders;
+            _allOrders = effectiveOrders;
             _reviewsByOrder = reviewsByOrder;
             _reviewedOrderIds = reviewsByOrder.keys.toSet();
             _isLoading = false;
@@ -142,16 +188,103 @@ class _OrdersScreenState extends State<OrdersScreen>
       final returns = await trahangService.getMyReturns();
       if (returns != null) {
         final orderIds = <int>{};
+        final Map<int, String> statusMap = {};
+        final Map<int, DateTime?> createdAtMap = {};
+
         for (var item in returns) {
           if (item is Map && item['madonhang'] != null) {
-            orderIds.add(item['madonhang'] as int);
+            final dynamic raw = item['madonhang'];
+            final int? ma = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+            if (ma == null) continue;
+            orderIds.add(ma);
+
+            // Resolve status: prefer machine code 'trangthai' and map via ReturnStatusMapper.labels
+            String statusText = '';
+            if (item['trangthai'] != null) {
+              final code = item['trangthai'].toString().trim().toUpperCase();
+              statusText = ReturnStatusMapper.labels[code] ?? code;
+            } else if (item['trangthai_hienthi'] != null) {
+              statusText = item['trangthai_hienthi'].toString();
+            } else if (item['trangthai_text'] != null) {
+              statusText = item['trangthai_text'].toString();
+            } else if (item['status'] != null) {
+              statusText = item['status'].toString();
+            }
+
+            statusText = statusText.trim();
+            if (statusText.isEmpty) statusText = 'Trả hàng';
+
+            statusMap[ma] = statusText;
+
+            // Try to parse return request timestamp. Prefer 'ngayyeucau' (used by backend),
+            // then fall back to other common keys like created_at/ngaytao/ngay_tao/createdAt
+            // This ensures consistent use of the same column for the 5-day expiry check.
+            // 'ngayyeucau' is expected to be an ISO string (or epoch).
+            // We'll try all formats gracefully.
+            //
+            // NOTE: keep this list consistent with other spots (order_detail_screen.dart).
+            
+            // Try to parse created/created_at/ngaytao fields for expiration checks
+            DateTime? createdAt;
+            dynamic cand;
+            if (item.containsKey('ngayyeucau')) cand = item['ngayyeucau'];
+            else if (item.containsKey('created_at')) cand = item['created_at'];
+            else if (item.containsKey('ngaytao')) cand = item['ngaytao'];
+            else if (item.containsKey('ngay_tao')) cand = item['ngay_tao'];
+            else if (item.containsKey('createdAt')) cand = item['createdAt'];
+
+            if (cand != null) {
+              try {
+                if (cand is String) {
+                  createdAt = DateTime.tryParse(cand);
+                } else if (cand is int) {
+                  // Detect seconds vs milliseconds
+                  if (cand > 1000000000000) {
+                    createdAt = DateTime.fromMillisecondsSinceEpoch(cand);
+                  } else {
+                    createdAt = DateTime.fromMillisecondsSinceEpoch(cand * 1000);
+                  }
+                }
+              } catch (e) {
+                createdAt = null;
+              }
+            }
+
+            createdAtMap[ma] = createdAt;
           }
         }
-        _returnedOrderIds = orderIds;
-        debugPrint(
-            '📦 Loaded ${_returnedOrderIds.length} returned orders: $_returnedOrderIds');
-      }
 
+        _returnedOrderIds = orderIds;
+        _returnedOrderStatus = statusMap;
+        _returnedOrderCreatedAt = createdAtMap;
+
+        // Apply returned statuses to loaded orders so UI shows the same status as web
+        if (_allOrders.isNotEmpty) {
+          final updated = <Order>[];
+          for (final order in _allOrders) {
+            if (order.id != null && _returnedOrderStatus.containsKey(order.id)) {
+              final newStatus = _returnedOrderStatus[order.id] ?? 'Trả hàng';
+              final o = Order(
+                id: order.id,
+                customerId: order.customerId,
+                orderDate: order.orderDate,
+                deliveredDate: order.deliveredDate,
+                total: order.total,
+                paymentMethod: order.paymentMethod,
+                paymentStatus: order.paymentStatus,
+                orderStatus: newStatus,
+                items: order.items,
+                shippingAddress: order.shippingAddress,
+                appliedVoucherIds: order.appliedVoucherIds,
+              );
+              updated.add(o);
+            } else {
+              updated.add(order);
+            }
+          }
+          _allOrders = updated;
+        }
+      }
       // Load đổi hàng
       final exchanges =
           await _doiHangService.getMyExchanges(auth.user!.maKhachHang);
@@ -342,44 +475,37 @@ class _OrdersScreenState extends State<OrdersScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Header: Mã đơn hàng và trạng thái
-              Row(
+                  Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.receipt_outlined,
-                        size: 20,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Đơn hàng #${order.id}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                  Flexible(
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.receipt_outlined,
+                          size: 20,
+                          color: Colors.grey[600],
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Đơn hàng #${order.id}',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          _getStatusColor(order.orderStatus).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      order.orderStatus,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _getStatusColor(order.orderStatus),
-                      ),
-                    ),
+                  // Use StatusBadge to avoid overflow; pass label as code and a labels map with same label
+                  StatusBadge(
+                    code: order.orderStatus,
+                    labels: {order.orderStatus: order.orderStatus},
+                    colorOf: (_) => _getStatusColor(order.orderStatus),
                   ),
                 ],
               ),
@@ -473,9 +599,15 @@ class _OrdersScreenState extends State<OrdersScreen>
 
               // Action buttons dựa trên trạng thái
               if (_shouldShowActions(order.orderStatus)) ...[
-                const SizedBox(height: 16),
-                _buildActionButtons(order),
-              ],
+                    const SizedBox(height: 16),
+                    // Determine if current tab is the 'Trả hàng' tab
+                    Builder(builder: (ctx) {
+                      final currentTab = _tabController.index;
+                      final returnTabIndex = _statuses.indexWhere((s) => s.toLowerCase() == 'trả hàng');
+                      final isReturnTab = currentTab == returnTabIndex;
+                      return _buildActionButtons(order, renderDisabledCancelInReturnTab: isReturnTab);
+                    }),
+                  ],
             ],
           ),
         ),
@@ -494,6 +626,22 @@ class _OrdersScreenState extends State<OrdersScreen>
       case 'Đã giao':
         return Colors.green;
       case 'Đã hủy':
+        return Colors.red;
+      // Return-related statuses (from web)
+      case 'Đang xử lý trả hàng':
+        return Colors.orange;
+      case 'Chờ duyệt':
+        return Colors.amber;
+      case 'Đã duyệt - chờ gửi':
+        return Colors.blue;
+      case 'Đã nhận - chờ kiểm tra':
+        return Colors.deepPurple;
+      case 'Đủ điều kiện hoàn tiền':
+        return Colors.teal;
+      case 'Đã hoàn tiền':
+        return Colors.green;
+      case 'Không hợp lệ':
+      case 'Từ chối':
         return Colors.red;
       default:
         return Colors.grey;
@@ -518,9 +666,40 @@ class _OrdersScreenState extends State<OrdersScreen>
     return status != 'Đã hủy';
   }
 
-  Widget _buildActionButtons(Order order) {
-    final canCancel = order.orderStatus == 'Chờ xác nhận' ||
-        order.orderStatus == 'Chờ lấy hàng';
+  Widget _buildActionButtons(Order order, {bool renderDisabledCancelInReturnTab = false}) {
+    final paidText = order.paymentStatus.trim().toLowerCase();
+    final isPaid =
+        paidText.contains('đã thanh toán') || paidText.contains('da thanh toan');
+    final bool isReturnFlowOrder = _returnedOrderIds.contains(order.id);
+    final bool isExchangeFlowOrder = _exchangedOrderIds.contains(order.id);
+    final bool isReturnOrExchangeFlow = isReturnFlowOrder || isExchangeFlowOrder;
+    bool canCancel = false;
+    // If this order has a return flow, allow cancel only when return status is 'Chờ duyệt' or 'Đã duyệt - chờ gửi'
+    if (isReturnFlowOrder) {
+      final retStatus = _returnedOrderStatus[order.id] ?? '';
+      if (ReturnStatusMapper.isPendingApprovalLabel(retStatus) ||
+          ReturnStatusMapper.isApprovedAwaitingShipmentLabel(retStatus)) {
+        canCancel = true;
+      }
+    } else {
+      // Non-return orders: original cancel rules
+      canCancel = isReturnOrExchangeFlow ||
+          (!isPaid &&
+              (order.orderStatus == 'Chờ xác nhận' || order.orderStatus == 'Chờ lấy hàng'));
+    }
+
+    // Check expired "Đã duyệt - chờ gửi" (older than 5 days) — in that case the Cancel button should become Mua lại
+    bool isExpiredReturnAwaitingShipment = false;
+    if (isReturnFlowOrder) {
+      final retStatus = _returnedOrderStatus[order.id] ?? '';
+      if (ReturnStatusMapper.isApprovedAwaitingShipmentLabel(retStatus)) {
+        final DateTime? createdAt = _returnedOrderCreatedAt[order.id];
+        if (createdAt != null) {
+          final diff = DateTime.now().difference(createdAt).inDays;
+          if (diff > 5) isExpiredReturnAwaitingShipment = true;
+        }
+      }
+    }
 
     // Determine return/review eligibility (within 7 days from DELIVERED DATE)
     bool isReturnEligible = false;
@@ -532,25 +711,65 @@ class _OrdersScreenState extends State<OrdersScreen>
     // Đổi hàng dùng cùng điều kiện với trả (theo yêu cầu): trong 7 ngày sau ĐÃ GIAO
     final bool isExchangeEligible = isReturnEligible;
 
-    return Row(
-      children: [
-        // Cancel button
-        if (canCancel)
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () => _cancelOrder(order),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text('Hủy đơn'),
+    // Prepare cancel widget: enabled when allowed; if on Trả hàng tab and not allowed, render disabled button
+    Widget? cancelWidget;
+    Widget? buyAgainReplacementForCancel;
+    if (canCancel) {
+      cancelWidget = Expanded(
+        child: OutlinedButton(
+          onPressed: () => _cancelOrder(order),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.red,
+            side: const BorderSide(color: Colors.red),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
+          child: const Text('Hủy đơn'),
+        ),
+      );
+    } else if (renderDisabledCancelInReturnTab && isReturnFlowOrder) {
+      cancelWidget = Expanded(
+        child: OutlinedButton(
+          onPressed: null,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.grey,
+            side: BorderSide(color: Colors.grey.shade300),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text('Hủy đơn'),
+        ),
+      );
+    }
 
-        if (canCancel) const SizedBox(width: 12),
+    // If the return is awaiting shipment and expired (>5 days) replace cancel with Mua lại
+    if (isExpiredReturnAwaitingShipment) {
+      buyAgainReplacementForCancel = Expanded(
+        child: ElevatedButton(
+          onPressed: () => _reorder(order),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text('Mua lại'),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        if (buyAgainReplacementForCancel != null) ...[
+          buyAgainReplacementForCancel,
+          const SizedBox(width: 12),
+        ] else if (cancelWidget != null) ...[
+          cancelWidget,
+          const SizedBox(width: 12),
+        ],
 
         // If delivered and within 7 days -> show Trả hàng + Đánh giá
         if (isReturnEligible) ...[

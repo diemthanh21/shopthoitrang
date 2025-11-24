@@ -30,6 +30,15 @@ const getAll = async (params = {}, opts = {}) => {
   return pickList(res.data).map(normalize);
 };
 
+// Lấy các phiếu trả hàng theo mã đơn (dùng cho trang chi tiết đơn)
+const getByOrder = async (maDonHang, opts = {}) => {
+  const res = await api.get(PREFIX, {
+    params: { madonhang: maDonHang },
+    signal: opts.signal,
+  });
+  return pickList(res.data).map(normalize);
+};
+
 const getById = async (id) => {
   const res = await api.get(`${PREFIX}/${id}`);
   return normalize(res.data);
@@ -73,10 +82,20 @@ const calcRefund = async (id) => {
   const res = await api.post(`${PREFIX}/${id}/calc-refund`);
   return normalize(res.data);
 };
-const refund = async (id, phuongthuc) => {
-  const res = await api.post(`${PREFIX}/${id}/refund`, { phuongthuc });
-  return normalize(res.data);
+// Initiate a refund (creates a pending refund record). Returns the pending record (raw).
+const initiateRefund = async (id, phuongthuc, opts = {}) => {
+  const res = await api.post(`${PREFIX}/${id}/refund`, { phuongthuc, ...opts });
+  return res.data;
 };
+
+// Confirm a pending refund (admin action) by providing external transaction id
+const confirmRefund = async (id, external_txn_id) => {
+  const res = await api.post(`${PREFIX}/${id}/confirm-refund`, { external_txn_id });
+  return res.data;
+};
+
+// Backwards-compatible alias
+const refund = initiateRefund;
 
 const getLogs = async (id) => {
   const res = await api.get(`${PREFIX}/${id}/logs`);
@@ -88,4 +107,4 @@ const refundPreview = async (id) => {
   return res.data;
 };
 
-export default { getAll, getById, update, delete: remove, create, accept, reject, markReceived, markInvalid, markValid, calcRefund, refund, getLogs, refundPreview };
+export default { getAll, getByOrder, getById, update, delete: remove, create, accept, reject, markReceived, markInvalid, markValid, calcRefund, refund, getLogs, refundPreview };

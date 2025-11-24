@@ -21,69 +21,75 @@ export default function AddressVNCompact({
   disabled = false,
   showLabels = true,
 }) {
-  const [provinces, setProvinces] = useState([]);
-  const [wards, setWards] = useState([]);     // all wards merged by province
+  const [provinces, setProvinces] = useState([]); // [{ id, name }]
+  const [provinceData, setProvinceData] = useState({}); // name -> [wardName]
+  const [wards, setWards] = useState([]);     // wards of selected province: [{code,name}]
   const [loadingWards, setLoadingWards] = useState(false);
 
   const provinceCode = value?.provinceCode || "";
   const wardCode = value?.wardCode || "";
   const hamlet = value?.hamlet || "";
 
-  // load all provinces once
+  // load provinces + wards dataset (VietnamLabs API, đã cập nhật sau sáp nhập)
   useEffect(() => {
-    j("https://provinces.open-api.vn/api/?depth=1")
-      .then(setProvinces)
-      .catch(console.error);
+    (async () => {
+      try {
+        const res = await j("https://vietnamlabs.com/api/vietnamprovince");
+        const list = res?.data || [];
+        setProvinces(list.map((p) => ({ id: String(p.id), name: p.province })));
+        const map = {};
+        for (const p of list) {
+          map[p.province] = (p.wards || []).map((w) => w.name);
+        }
+        setProvinceData(map);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, []);
 
-  const provinceName = useMemo(
-    () => provinces.find(p => p.code === Number(provinceCode))?.name || "",
-    [provinces, provinceCode]
-  );
+  const provinceName = useMemo(() => {
+    if (value?.provinceName) return value.provinceName;
+    const found = provinces.find((p) => String(p.id) === String(provinceCode));
+    return found?.name || "";
+  }, [provinces, provinceCode, value?.provinceName]);
   const wardName = useMemo(
-    () => wards.find(w => w.code === Number(wardCode))?.name || "",
+    () => wards.find(w => String(w.code) === String(wardCode))?.name || "",
     [wards, wardCode]
   );
 
-  // khi chọn TỈNH: gộp toàn bộ xã của tỉnh (bỏ qua quận/huyện)
+  // khi chọn TỈNH: lấy danh sách xã/phường theo dữ liệu đã tải
   useEffect(() => {
-    if (!provinceCode) { setWards([]); return; }
-    (async () => {
-      setLoadingWards(true);
-      try {
-        // lấy districts của tỉnh
-        const p = await j(`https://provinces.open-api.vn/api/p/${provinceCode}?depth=2`);
-        const districts = p?.districts ?? [];
+    if (!provinceCode && !provinceName) { setWards([]); return; }
+    setLoadingWards(true);
+    try {
+      const pName = provinceName || (provinces.find((p) => String(p.id) === String(provinceCode))?.name || "");
+      const matched = provinces.find((p) => p.name === pName);
+      const names = provinceData[pName] || [];
+      const merged = names.map((n) => ({ code: n, name: n }));
+      merged.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+      setWards(merged);
+      // Nếu form đã có wardName (trường hợp edit), tự chọn tương ứng
+      const existingWardName = (value?.wardName || "").trim();
+      const matchedWard = existingWardName
+        ? merged.find((w) => w.name.toLowerCase() === existingWardName.toLowerCase())
+        : null;
 
-        // lấy wards cho từng district song song, rồi gộp
-        const lists = await Promise.all(
-          districts.map(d =>
-            j(`https://provinces.open-api.vn/api/d/${d.code}?depth=2`)
-              .then(x => x?.wards || [])
-              .catch(() => [])
-          )
-        );
-        const merged = lists.flat().map(w => ({ code: w.code, name: w.name }));
-        merged.sort((a,b) => a.name.localeCompare(b.name, "vi"));
-
-        setWards(merged);
-        // reset xã/thôn khi đổi tỉnh
-        onChange?.({
-          provinceCode,
-          provinceName,
-          wardCode: "",
-          wardName: "",
-          hamlet: "",
-        });
-      } catch (e) {
-        console.error(e);
-        setWards([]);
-      } finally {
-        setLoadingWards(false);
-      }
-    })();
+      onChange?.({
+        provinceCode: provinceCode || matched?.id || pName, // ưu tiên id, fallback name
+        provinceName: pName,
+        wardCode: matchedWard ? matchedWard.code : "",
+        wardName: matchedWard ? matchedWard.name : "",
+        hamlet: matchedWard ? hamlet : "",
+      });
+    } catch (e) {
+      console.error(e);
+      setWards([]);
+    } finally {
+      setLoadingWards(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [provinceCode]);
+  }, [provinceCode, provinceName, provinces, provinceData]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -95,7 +101,7 @@ export default function AddressVNCompact({
           value={provinceCode}
           onChange={(e) => {
             const code = e.target.value;
-            const name = provinces.find(p => p.code === Number(code))?.name || "";
+            const name = provinces.find(p => String(p.id) === String(code))?.name || "";
             onChange?.({
               provinceCode: code,
               provinceName: name,
@@ -107,7 +113,7 @@ export default function AddressVNCompact({
         >
           <option value="">-- Chọn tỉnh/thành --</option>
           {provinces.map(p => (
-            <option key={p.code} value={p.code}>{p.name}</option>
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
       </div>
@@ -120,7 +126,7 @@ export default function AddressVNCompact({
           value={wardCode}
           onChange={(e) => {
             const code = e.target.value;
-            const name = wards.find(w => w.code === Number(code))?.name || "";
+            const name = wards.find(w => String(w.code) === String(code))?.name || "";
             onChange?.({
               provinceCode, provinceName,
               wardCode: code, wardName: name,

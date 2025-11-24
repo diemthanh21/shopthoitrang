@@ -13,6 +13,7 @@ class Order {
   final String orderStatus; // trangthaidonhang
   final List<OrderItem> items; // chitietdonhang
   final DiaChiKhachHang? shippingAddress; // dia chi giao hang
+  final List<int> appliedVoucherIds;
 
   Order({
     this.id,
@@ -25,6 +26,7 @@ class Order {
     required this.orderStatus,
     this.items = const [],
     this.shippingAddress,
+    this.appliedVoucherIds = const [],
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class Order {
               macDinh: json['diaChi']['macdinh'] == true,
             )
           : null,
+      appliedVoucherIds: _parseVoucherIds(json),
     );
   }
 
@@ -74,6 +77,7 @@ class Order {
       'trangthaidonhang': orderStatus,
       if (items.isNotEmpty)
         'items': items.map((item) => item.toJson()).toList(),
+      if (appliedVoucherIds.isNotEmpty) 'voucher_ids': appliedVoucherIds,
       if (shippingAddress != null) ...{
         'madiachi': shippingAddress!.maDiaChi,
         'diachi': {
@@ -88,6 +92,39 @@ class Order {
         }
       },
     };
+  }
+
+  static List<int> _parseVoucherIds(Map<String, dynamic> json) {
+    final result = <int>[];
+    void addValue(dynamic value) {
+      if (value == null) return;
+      final parsed = value is int ? value : int.tryParse(value.toString());
+      if (parsed != null && parsed > 0) result.add(parsed);
+    }
+
+    final candidates = [
+      json['voucher_ids'],
+      json['voucherIds'],
+      json['appliedVoucherIds'],
+      json['applied_voucher_ids'],
+    ];
+    for (final candidate in candidates) {
+      if (candidate is List) {
+        for (final value in candidate) {
+          addValue(value);
+        }
+      }
+    }
+
+    if (json['appliedVouchers'] is List) {
+      for (final item in json['appliedVouchers']) {
+        if (item is Map<String, dynamic>) {
+          addValue(item['mavoucher'] ?? item['maVoucher'] ?? item['id']);
+        }
+      }
+    }
+
+    return result;
   }
 }
 
@@ -198,4 +235,3 @@ class ShippingAddress {
     };
   }
 }
-

@@ -6,6 +6,8 @@ const chatboxRepo = require('../repositories/chatbox.repository');
 const chatMsgRepo = require('../repositories/noidungchat.repository');
 const STATUS = require('../constants/status');
 const trahangLogRepo = require('../repositories/trahanglog.repository');
+const trahangRefundPendingRepo = require('../repositories/trahang_refund_pending.repository');
+const donhangTrangthaiAuditRepo = require('../repositories/donhang_trangthai_audit.repository');
 
 class TraHangService {
   _norm(s){
@@ -106,22 +108,42 @@ class TraHangService {
         throw e;
       }
 
+      // Chuẩn hoá & validate danh sách media minh chứng: tối thiểu 3 hình ảnh / video
+      const rawMedia = body.hinhanhloi;
+      let mediaList = [];
+      if (Array.isArray(rawMedia)) {
+        mediaList = rawMedia
+          .map(x => (x || '').toString().trim())
+          .filter(x => x.length > 0);
+      } else if (typeof rawMedia === 'string') {
+        mediaList = rawMedia
+          .split(',')
+          .map(x => x.trim())
+          .filter(x => x.length > 0);
+      }
+
+      if (mediaList.length < 3) {
+        const e = new Error('Vui lòng tải lên tối thiểu 3 hình ảnh hoặc video minh chứng');
+        e.status = 400;
+        throw e;
+      }
+
       const payload = {
         madonhang: body.madonhang,
         makhachhang: body.makhachhang,
         machitietsanpham: body.machitietsanpham,
         soluong: body.soluong,
         lydo: body.lydo,
-        hinhanhloi: body.hinhanhloi ?? null,
+        hinhanhloi: mediaList.join(','),
         ngayyeucau: body.ngayyeucau ?? new Date().toISOString(),
         trangthai: STATUS.TRAHANG.CHO_DUYET,
         ghichu: body.ghichu ?? null
       };
       const created = await repo.create(payload);
 
-      // Cập nhật trạng thái đơn gốc (tuỳ chọn chính sách) để dễ theo dõi
+      // Cập nhật trạng thái đơn gốc để khách hàng thấy tiến trình trả hàng
       try {
-        await donhangRepo.update(body.madonhang, { trangthaidonhang: 'Đang xử lý đổi trả' });
+        await donhangRepo.update(body.madonhang, { trangthaidonhang: 'Đang xử lý trả hàng' });
       } catch (_) { /* ignore if fails */ }
 
       // Tự động tạo hoặc lấy chatbox và gửi thông báo hệ thống
@@ -189,6 +211,10 @@ class TraHangService {
       `[SYSTEM] Yêu cầu trả hàng #${id} đã được duyệt. Gửi hàng về: ${diaChiGuiHang || 'Kho mặc định'}` +
       (huongDanDongGoi ? `\nHướng dẫn đóng gói: ${huongDanDongGoi}` : '')
     );
+    // Đồng bộ trạng thái đơn hàng để khách hàng thấy tiến trình
+    try {
+      await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'Đã duyệt - chờ gửi' });
+    } catch (_) {}
     return updated;
   }
 
@@ -206,6 +232,10 @@ class TraHangService {
     });
     await trahangLogRepo.log(id, 'REJECT', item.trangthai, STATUS.TRAHANG.TU_CHOI, lyDo || '', 'ADMIN');
     await this._systemMessage(item.makhachhang, `[SYSTEM] Yêu cầu trả hàng #${id} bị từ chối. Lý do: ${lyDo || 'Không rõ'}`);
+    // Đồng bộ trạng thái đơn hàng để khách hàng thấy lý do từ chối
+    try {
+      await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'Từ chối', ghichu: lyDo || null });
+    } catch (_) {}
     return updated;
   }
 
@@ -221,6 +251,10 @@ class TraHangService {
     });
     await trahangLogRepo.log(id, 'MARK_RECEIVED', item.trangthai, STATUS.TRAHANG.DA_NHAN_HANG_CHO_KIEM_TRA, '', 'STAFF');
     await this._systemMessage(item.makhachhang, `[SYSTEM] Shop đã nhận hàng cho phiếu #${id}, đang kiểm tra.`);
+    // Đồng bộ trạng thái đơn hàng để khách hàng theo dõi
+    try {
+      await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'Đã nhận - chờ kiểm tra' });
+    } catch (_) {}
     return updated;
   }
 
@@ -239,6 +273,10 @@ class TraHangService {
     });
     await trahangLogRepo.log(id, 'MARK_INVALID', item.trangthai, STATUS.TRAHANG.KHONG_HOP_LE, ghiChu || '', 'STAFF');
     await this._systemMessage(item.makhachhang, `[SYSTEM] Phiếu trả hàng #${id} không hợp lệ. ${ghiChu || ''}`);
+    // Đồng bộ trạng thái đơn hàng để khách hàng thấy kết quả kiểm tra
+    try {
+      await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'Không hợp lệ', ghichu: ghiChu || null });
+    } catch (_) {}
     return updated;
   }
 
@@ -255,6 +293,10 @@ class TraHangService {
     });
     await trahangLogRepo.log(id, 'MARK_VALID', item.trangthai, STATUS.TRAHANG.DU_DIEU_KIEN_HOAN_TIEN, '', 'STAFF');
     await this._systemMessage(item.makhachhang, `[SYSTEM] Phiếu #${id} đủ điều kiện hoàn tiền.`);
+    // Đồng bộ trạng thái đơn hàng để khách hàng thấy phiếu đã đủ điều kiện hoàn tiền
+    try {
+      await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'Đủ điều kiện hoàn tiền' });
+    } catch (_) {}
     return updated;
   }
 
@@ -282,29 +324,230 @@ class TraHangService {
     return updated;
   }
 
-  async processRefund(id, phuongThuc = 'GATEWAY') {
+  // Create a pending refund record. Actual marking 'Đã hoàn tiền' happens on confirmation.
+  async initiateRefund(id, user = null, phuongThuc = 'GATEWAY', note = null) {
+    const item = await this.get(id);
+    if (this._norm(item.trangthai) !== this._norm(STATUS.TRAHANG.DU_DIEU_KIEN_HOAN_TIEN)) {
+      const e = new Error('Chỉ có thể thực hiện hoàn tiền khi phiếu đủ điều kiện');
+      e.status = 409; throw e;
+    }
+    // calculate amount if not present
+    const { data: detailRow, error: detailErr } = await supabase
+      .from('chitietdonhang')
+      .select('dongia')
+      .eq('madonhang', item.maDonHang || item.madonhang)
+      .eq('machitietsanpham', item.maChiTietSanPham || item.machitietsanpham)
+      .maybeSingle();
+    if (detailErr) throw detailErr;
+    const soTien = (Number(detailRow?.dongia) || 0) * (item.soLuong || item.soluong || 0);
+
+    const createdBy = user?.manhanvien || user?.id || null;
+    const createdByName = user?.displayName || user?.name || user?.username || null;
+
+    const pending = await trahangRefundPendingRepo.create({
+      matrahang: item.maTraHang || item.id,
+      madonhang: item.maDonHang || item.madonhang,
+      amount: soTien,
+      method: phuongThuc,
+      status: 'PENDING',
+      created_by: createdBy,
+      created_by_name: createdByName,
+      note: note || null
+    });
+
+    // Optionally mark the trahang status to 'Đang hoàn tiền' so UI can show progress
+    try {
+      await repo.update(id, { trangthai: 'Đang hoàn tiền' });
+      await trahangLogRepo.log(id, 'INIT_REFUND', item.trangthai, 'Đang hoàn tiền', `pending_id=${pending.id}`, 'ADMIN');
+      await this._systemMessage(item.makhachhang, `[SYSTEM] Yêu cầu hoàn tiền #${id} đã được khởi tạo, đang chờ xác nhận giao dịch.`);
+    } catch (e) {
+      // ignore
+    }
+
+    return pending;
+  }
+
+  // Confirm refund by matrahang id (admin manual confirm)
+  async confirmRefund(matrahang, external_txn_id, user = null) {
+    const pending = await trahangRefundPendingRepo.getByMatrahang(matrahang);
+    if (!pending) {
+      const e = new Error('Không tìm thấy bản ghi hoàn tiền đang chờ');
+      e.status = 404; throw e;
+    }
+    if (pending.status === 'CONFIRMED') {
+      return pending;
+    }
+    // mark pending as confirmed
+    const confirmedBy = user?.manhanvien || user?.id || null;
+    const confirmedByName = user?.displayName || user?.name || user?.username || null;
+    const updatedPending = await trahangRefundPendingRepo.update(pending.id, {
+      status: 'CONFIRMED',
+      external_txn_id: external_txn_id || null,
+      confirmed_at: new Date().toISOString(),
+      confirmed_by: confirmedBy,
+      confirmed_by_name: confirmedByName
+    });
+
+    // call processRefund to finalize
+    await this.processRefund(pending.matrahang, pending.method, { actor: { type: 'STAFF', id: confirmedBy, name: confirmedByName } });
+    return updatedPending;
+  }
+
+  // Confirm refund by external txn id (webhook)
+  async confirmRefundByExternalTxn(external_txn_id, payload = {}) {
+    const pending = await trahangRefundPendingRepo.getByExternalTxn(external_txn_id);
+    if (!pending) {
+      const e = new Error('Không tìm thấy bản ghi hoàn tiền tương ứng external_txn_id');
+      e.status = 404; throw e;
+    }
+    if (pending.status === 'CONFIRMED') return pending;
+    const updatedPending = await trahangRefundPendingRepo.update(pending.id, {
+      status: 'CONFIRMED',
+      confirmed_at: new Date().toISOString(),
+      // no confirmed_by in webhook context
+    });
+    await this.processRefund(pending.matrahang, pending.method, { actor: { type: 'GATEWAY', id: null, name: payload.gateway || 'EXTERNAL' } });
+    return updatedPending;
+  }
+
+  async processRefund(id, phuongThuc = 'GATEWAY', opts = {}) {
     const item = await this.get(id);
   if (![this._norm(STATUS.TRAHANG.DU_DIEU_KIEN_HOAN_TIEN),'Dang hoan tien','Đang hoàn tiền'].includes(this._norm(item.trangthai))) {
       const e = new Error('Trạng thái không phù hợp để hoàn tiền');
       e.status = 409; throw e;
     }
-    // Giả lập gateway: thành công luôn (nếu cần tích hợp thật, thay thế đoạn này)
+    // Finalize refund: set trahang status and donhang status to 'Đã hoàn tiền'
     const updated = await repo.update(id, {
-  trangthai: STATUS.TRAHANG.DA_HOAN_TIEN,
+      trangthai: STATUS.TRAHANG.DA_HOAN_TIEN,
       phuongthuc_hoan: phuongThuc,
       ngayhoantien: new Date().toISOString()
     });
     await trahangLogRepo.log(id, 'REFUND', item.trangthai, STATUS.TRAHANG.DA_HOAN_TIEN, `method=${phuongThuc}`, 'ADMIN');
     await this._systemMessage(item.makhachhang, `[SYSTEM] Đã hoàn tiền phiếu #${id} số tiền ${updated.sotien_hoan || 0}đ.`);
-    // Trả trạng thái đơn về 'ĐÃ GIAO' nếu không còn phiếu mở khác (best-effort)
+    // When refund is confirmed, update order status and write audit info (actor if provided)
     try {
-      const others = await repo.getByDonHang(item.maDonHang || item.madonhang);
-      const stillOpen = others.filter(p => p.matrahang !== id && !['TỪ_CHỐI','KHÔNG_HỢP_LỆ','ĐÃ_HOÀN_TIỀN'].includes(p.trangthai));
-      if (!stillOpen.length) {
-        await donhangRepo.update(item.maDonHang || item.madonhang, { trangthaidonhang: 'ĐÃ GIAO' });
-      }
-    } catch(_) {}
+      const actor = (opts && opts.actor) || {};
+      await donhangRepo.update(item.maDonHang || item.madonhang, {
+        trangthaidonhang: 'Đã hoàn tiền',
+        _actorType: actor.type || 'SYSTEM',
+        _actorId: actor.id || null,
+        _actorName: actor.name || null,
+        _actorNote: `refund_method=${phuongThuc}`
+      });
+    } catch (e) {
+      console.warn('Failed to update donhang status after refund:', e.message || e);
+    }
     return updated;
+  }
+
+  async getReturnableItems(orderId, customerId = null, requesterRole = 'customer') {
+    if (!orderId) {
+      const e = new Error('Thiếu mã đơn hàng (madonhang)');
+      e.status = 400;
+      throw e;
+    }
+
+    const order = await donhangRepo.getById(orderId);
+    if (!order) {
+      const e = new Error('Không tìm thấy đơn hàng');
+      e.status = 404;
+      throw e;
+    }
+
+    const ownerId = Number(order.makhachhang || order.maKhachHang || order.customerId || 0);
+    if (requesterRole === 'customer') {
+      const compareId = Number(customerId || 0);
+      if (!compareId || ownerId !== compareId) {
+        const e = new Error('Đơn hàng không thuộc về khách hàng hiện tại');
+        e.status = 403;
+        throw e;
+      }
+    } else if (customerId && ownerId !== Number(customerId)) {
+      const e = new Error('Đơn hàng không thuộc khách hàng chỉ định');
+      e.status = 403;
+      throw e;
+    }
+
+    const orderItems = await chitietDonHangRepo.getByOrderId(orderId);
+    if (!orderItems.length) {
+      return [];
+    }
+
+    const variantIds = [...new Set(orderItems.map(it => it.machitietsanpham).filter(Boolean))];
+    let variantMap = new Map();
+    if (variantIds.length) {
+      // Lấy thông tin biến thể + size từ bảng chitietsanpham_kichthuoc thông qua quan hệ Supabase
+      const { data: variantRows, error: variantErr } = await supabase
+        .from('chitietsanpham')
+        .select(`
+          machitietsanpham,
+          masanpham,
+          mausac,
+          sanpham ( tensanpham ),
+          chitietsanpham_kichthuoc ( kichthuocs ( ten_kichthuoc ) )
+        `)
+        .in('machitietsanpham', variantIds);
+      if (variantErr) throw variantErr;
+      variantMap = new Map(
+        (variantRows || []).map(row => {
+          let sizeName = null;
+          const sizeLinks = row.chitietsanpham_kichthuoc || row.chitietsanphamKichthuoc || [];
+          if (Array.isArray(sizeLinks) && sizeLinks.length > 0) {
+            const firstLink = sizeLinks[0] || {};
+            if (firstLink.kichthuocs) {
+              sizeName = firstLink.kichthuocs.ten_kichthuoc || firstLink.kichthuocs.tenKichThuoc || null;
+            }
+          }
+          return [row.machitietsanpham, {
+            masanpham: row.masanpham ?? null,
+            mausac: row.mausac ?? row.mau ?? null,
+            kichthuoc: sizeName,
+            tensanpham: (row?.sanpham && row.sanpham.tensanpham) || row.tensanpham || null
+          }];
+        })
+      );
+    }
+
+    const { data: existingReturns, error: returnsErr } = await supabase
+      .from('trahang')
+      .select('machitietsanpham, soluong, trangthai')
+      .eq('madonhang', orderId);
+    if (returnsErr) throw returnsErr;
+
+    const releasingStatuses = new Set([
+      this._norm(STATUS.TRAHANG.TU_CHOI),
+      this._norm(STATUS.TRAHANG.KHONG_HOP_LE)
+    ]);
+
+    const consumedMap = {};
+    (existingReturns || []).forEach(row => {
+      const variantId = row.machitietsanpham;
+      if (!variantId) return;
+      const normalizedStatus = this._norm(row.trangthai);
+      if (releasingStatuses.has(normalizedStatus)) return;
+      const qty = Number(row.soluong || 0);
+      consumedMap[variantId] = (consumedMap[variantId] || 0) + qty;
+    });
+
+    return orderItems.map(item => {
+      const variantId = item.machitietsanpham;
+      const variantInfo = variantMap.get(variantId) || {};
+      const orderedQty = Number(item.soluong || 0);
+      const consumed = Number(consumedMap[variantId] || 0);
+      const available = Math.max(0, orderedQty - consumed);
+      return {
+        machitietdonhang: item.machitietdonhang,
+        machitietsanpham: variantId,
+        masanpham: variantInfo.masanpham || null,
+        tensanpham: variantInfo.tensanpham || null,
+        mausac: variantInfo.mausac || null,
+        kichthuoc: variantInfo.kichthuoc || null,
+        ordered_qty: orderedQty,
+        returned_qty: consumed,
+        available_to_return: available,
+        dongia: Number(item.dongia || 0)
+      };
+    });
   }
 
   async _systemMessage(makhachhang, text) {
@@ -363,6 +606,10 @@ class TraHangService {
       throw e;
     }
     return item;
+  }
+
+  async getByOrderId(orderId) {
+    return this.layTheoDonHang(orderId);
   }
 
   async update(id, data) {

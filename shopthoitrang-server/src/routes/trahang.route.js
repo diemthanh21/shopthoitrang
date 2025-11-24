@@ -3,6 +3,7 @@ const router = express.Router();
 const ctrl = require('../controllers/trahang.controller');
 const logCtrl = require('../controllers/trahanglog.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
+const { requireEmployee } = require('../middlewares/role.middleware');
 
 /**
  * @swagger
@@ -40,6 +41,27 @@ router.use(authenticateToken);
  *         description: Thành công
  */
 router.get('/', ctrl.getAll);
+
+/**
+ * @swagger
+ * /api/trahang/returnable-items:
+ *   get:
+ *     summary: Liệt kê sản phẩm trong đơn đủ điều kiện trả
+ *     tags: [Trả hàng]
+ *     parameters:
+ *       - in: query
+ *         name: madonhang
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: makhachhang
+ *         schema: { type: integer }
+ *         description: "Bắt buộc với khách hàng tự xem đơn của họ"
+ *     responses:
+ *       200:
+ *         description: Thành công
+ */
+router.get('/returnable-items', ctrl.getReturnableItems);
 
 /**
  * @swagger
@@ -135,13 +157,16 @@ router.put('/:id', ctrl.update);
 router.delete('/:id', ctrl.delete);
 
 // --- Workflow specific endpoints ---
-router.post('/:id/accept', ctrl.accept);        // body: { diachiguihang }
-router.post('/:id/reject', ctrl.reject);        // body: { lydo }
-router.post('/:id/mark-received', ctrl.markReceived);
-router.post('/:id/mark-invalid', ctrl.markInvalid); // body: { ghichu }
-router.post('/:id/mark-valid', ctrl.markValid);
-router.post('/:id/calc-refund', ctrl.calcRefund);
-router.post('/:id/refund', ctrl.refund);        // body: { phuongthuc }
+router.post('/:id/accept', requireEmployee, ctrl.accept);        // body: { diachiguihang }
+router.post('/:id/reject', requireEmployee, ctrl.reject);        // body: { lydo }
+router.post('/:id/mark-received', requireEmployee, ctrl.markReceived);
+router.post('/:id/mark-invalid', requireEmployee, ctrl.markInvalid); // body: { ghichu }
+router.post('/:id/mark-valid', requireEmployee, ctrl.markValid);
+router.post('/:id/calc-refund', requireEmployee, ctrl.calcRefund);
+router.post('/:id/refund', requireEmployee, ctrl.refund);        // body: { phuongthuc } -> initiate pending refund
+router.post('/:id/confirm-refund', requireEmployee, ctrl.confirmRefund); // body: { external_txn_id }
+// Public webhook for payment gateways to report refund results
+router.post('/refund-webhook', ctrl.refundWebhook);
 router.get('/:id/refund-preview', ctrl.refundPreview);
 // Logs
 router.get('/:id/logs', logCtrl.list);

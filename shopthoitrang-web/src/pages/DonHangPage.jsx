@@ -132,6 +132,9 @@ export default function DonHangPage() {
   const renderActions = (r) => {
     const st = normStatus(r.trangThaiDonHang);
     const disabled = updatingId === r.maDonHang;
+    const method = (r.phuongThucThanhToan || '').trim().toUpperCase();
+    const paymentStatusRaw = (r.trangThaiThanhToan || '').trim().toLowerCase();
+    const isPaid = paymentStatusRaw.includes('đã');
     const btn = (onClick, label, cls, Icon) => (
       <button
         disabled={disabled}

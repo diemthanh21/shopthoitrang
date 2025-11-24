@@ -5,7 +5,7 @@ const normalize = (r) => ({
   maBanner: r.mabanner ?? r.maBanner ?? r.id,
   duongDanAnh: r.duongdananh ?? r.duongDanAnh ?? "",
   moTa: r.mota ?? r.moTa ?? null,
-  lienKet: r.lienket ?? r.lienKet ?? null,
+  // lienKet removed
   thuTuHienThi: r.thutuhienthi ?? r.thuTuHienThi ?? null,
   dangHoatDong: typeof r.danghoatdong === "boolean" ? r.danghoatdong : !!r.dangHoatDong,
 });
@@ -14,7 +14,7 @@ const toDB = (b) => ({
   mabanner: b.maBanner ?? undefined,
   duongdananh: b.duongDanAnh,
   mota: b.moTa ?? null,
-  lienket: b.lienKet ?? null,
+  // lienket removed
   thutuhienthi: b.thuTuHienThi ?? null,
   danghoatdong: typeof b.dangHoatDong === "boolean" ? b.dangHoatDong : true,
 });

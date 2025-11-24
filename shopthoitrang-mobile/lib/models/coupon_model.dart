@@ -1,10 +1,22 @@
 import 'dart:math' as math;
 
+DateTime _todayDateOnly() {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, now.day);
+}
+
+DateTime? _dateOnly(DateTime? value) {
+  if (value == null) return null;
+  return DateTime(value.year, value.month, value.day);
+}
+
 /// Data model for discount vouchers (mã giảm giá / magiamgia table).
 class Coupon {
   final int? id;
   final String code;
+  final String? name;
   final String? description;
+  final String? conditionNote;
   final String discountType; // AMOUNT | PERCENT | FREESHIP
   final double? fixedAmount; // for AMOUNT
   final double? percent; // for PERCENT
@@ -19,7 +31,9 @@ class Coupon {
   const Coupon({
     this.id,
     required this.code,
+    this.name,
     this.description,
+    this.conditionNote,
     required this.discountType,
     this.fixedAmount,
     this.percent,
@@ -74,7 +88,16 @@ class Coupon {
     return Coupon(
       id: json['mavoucher'] ?? json['maVoucher'] ?? json['id'],
       code: (json['macode'] ?? json['maCode'] ?? json['code'] ?? '').toString(),
+      name: (json['tenmagiamgia'] ??
+              json['tenMaGiamGia'] ??
+              json['ten_ma_giam_gia'])
+          ?.toString(),
       description: json['mota']?.toString() ?? json['moTa']?.toString(),
+      conditionNote: (json['noidung_giam'] ??
+              json['noiDungGiam'] ??
+              json['noidunggiam'] ??
+              json['noi_dung_giam'])
+          ?.toString(),
       discountType: rawType,
       fixedAmount: parseDouble(
         json['sotien_giam'] ?? json['giaTriGiam'] ?? json['giatrigiam'],
@@ -101,10 +124,15 @@ class Coupon {
 
   bool get hasQuantity => remainingQuantity > 0 || totalQuantity == 0;
 
+  DateTime? get startDateOnly => _dateOnly(startDate);
+  DateTime? get endDateOnly => _dateOnly(endDate);
+
   bool get isInDateRange {
-    final now = DateTime.now();
-    if (startDate != null && now.isBefore(startDate!)) return false;
-    if (endDate != null && now.isAfter(endDate!)) return false;
+    final today = _todayDateOnly();
+    final start = startDateOnly;
+    final end = endDateOnly;
+    if (start != null && today.isBefore(start)) return false;
+    if (end != null && today.isAfter(end)) return false;
     return true;
   }
 

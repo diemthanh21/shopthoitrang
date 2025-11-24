@@ -19,7 +19,10 @@ import '../providers/auth_provider.dart';
 // ================================================================================
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final int initialIndex;
+  final String? initialOrdersStatus; // e.g. 'Chờ lấy hàng'
+  final int? initialOrdersTabIndex;  // or by index
+  const DashboardScreen({super.key, this.initialIndex = 0, this.initialOrdersStatus, this.initialOrdersTabIndex});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -33,6 +36,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     _loadCartCount();
   }
 
@@ -178,7 +182,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const _HomeTab(),
           const ProductListScreen(),
           const NotificationScreen(),
-          const OrdersScreen(),
+          OrdersScreen(
+            initialStatus: widget.initialOrdersStatus,
+            initialTabIndex: widget.initialOrdersTabIndex,
+          ),
           const ProfileScreen(),
         ],
       ),
@@ -230,19 +237,29 @@ class _HomeTabState extends State<_HomeTab> {
     final api = ApiClient();
     _bannerService = BannerService(api);
     _loadBanners();
-    _startAutoPlay();
+    // Start autoplay after first frame so the PageView has a chance to attach
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _startAutoPlay();
+    });
   }
 
   void _startAutoPlay() {
     _autoPlayTimer?.cancel();
     _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || _banners.isEmpty) return;
+      // Ensure the controller is attached to a PageView before animating
+      if (!_pageCtrl.hasClients) return;
       final nextPage = (_page + 1) % _banners.length;
-      _pageCtrl.animateToPage(
-        nextPage,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
-      );
+      try {
+        _pageCtrl.animateToPage(
+          nextPage,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeInOut,
+        );
+      } catch (_) {
+        // If controller detached between the hasClients check and the call,
+        // ignore the error — the next tick will attempt again.
+      }
     });
   }
 
