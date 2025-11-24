@@ -41,7 +41,9 @@ class ExchangeStatusMapper {
     'KHONG_HOP_LE': 'Không hợp lệ',
     'DU_DIEU_KIEN_XU_LY_CHENH_LECH': 'Đủ điều kiện tính chênh',
     'DA_XU_LY_CHENH_LECH_CHO_TAO_DON': 'Chuẩn bị tạo đơn',
+    'CHO_TAO_DON_MOI': 'Chờ tạo đơn mới',
     'DA_TAO_DON_MOI_DANG_GIAO': 'Đơn mới đang giao',
+    'DANG_GIAO_HANG_MOI': 'Đang giao hàng mới',
     'DA_DOI_XONG': 'Đã đổi xong',
     'TU_CHOI': 'Từ chối',
   };
@@ -56,6 +58,10 @@ class ExchangeStatusMapper {
         return Colors.deepPurple;
       case 'DU_DIEU_KIEN_XU_LY_CHENH_LECH':
         return Colors.teal;
+      case 'CHO_TAO_DON_MOI':
+        return Colors.indigo;
+      case 'DANG_GIAO_HANG_MOI':
+        return Colors.lightBlue;
       case 'DA_TAO_DON_MOI_DANG_GIAO':
       case 'DA_DOI_XONG':
         return Colors.green;

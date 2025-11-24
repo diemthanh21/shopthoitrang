@@ -32,11 +32,19 @@ export default function KhachHangPage() {
     try {
       setLoading(true);
       const data = await khachhangServices.getAll();
+      console.log('fetchCustomers received:', data, 'isArray:', Array.isArray(data));
+      if (!Array.isArray(data)) {
+        console.error('Data is not an array!', typeof data, data);
+        setCustomers([]);
+        setError("Dữ liệu khách hàng không hợp lệ");
+        return;
+      }
       setCustomers(data);
       setError("");
     } catch (err) {
       console.error(err);
       setError("Không thể tải danh sách khách hàng");
+      setCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -198,7 +206,8 @@ export default function KhachHangPage() {
   ];
 
   const term = searchTerm.trim().toLowerCase();
-  const filtered = customers.filter((cust) => {
+  const filtered = !Array.isArray(customers) ? [] : customers.filter((cust) => {
+    if (!cust) return false;
     if (!term) return true;
     const haystacks = [
       String(cust.makhachhang ?? ""),

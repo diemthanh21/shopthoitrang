@@ -68,7 +68,7 @@ const DoiHangController = {
     catch(err){ res.status(err.status||400).json({message:err.message}); }
   },
   async markInvalid(req, res) {
-    try { const item = await service.markInvalid(req.params.id, req.body?.ghichu); res.json(item.toJSON()); }
+    try { const item = await service.markInvalid(req.params.id, req.body?.note ?? req.body?.ghichu); res.json(item.toJSON()); }
     catch(err){ res.status(err.status||400).json({message:err.message}); }
   },
   async markValid(req, res) {
@@ -82,21 +82,29 @@ const DoiHangController = {
   async diffPreview(req, res) {
     try {
       const item = await service.get(req.params.id);
+      const detail =
+        (item.chitietdoihang && item.chitietdoihang[0]) ||
+        (item.items && item.items[0]);
+      if (!detail) {
+        const e = new Error('Phiếu đổi không có chi tiết để tính chênh lệch');
+        e.status = 400;
+        throw e;
+      }
       const db = require('../../config/db');
       const { data: line } = await db
         .from('chitietdonhang')
         .select('dongia')
         .eq('madonhang', item.madonhang || item.maDonHang)
-        .eq('machitietsanpham', item.machitietsanphamcu || item.maChiTietSanPhamCu)
+        .eq('machitietsanpham', detail?.machitietsanphamcu || detail?.maChiTietSanPhamCu)
         .maybeSingle();
       const { data: variantNew } = await db
         .from('chitietsanpham')
         .select('giaban')
-        .eq('machitietsanpham', item.machitietsanphammoi || item.maChiTietSanPhamMoi)
+        .eq('machitietsanpham', detail?.machitietsanphammoi || detail?.maChiTietSanPhamMoi)
         .maybeSingle();
       const giacu = Number(line?.dongia) || 0;
       const giamoi = Number(variantNew?.giaban) || 0;
-      const qty = item.soluong || item.soLuong || 0;
+      const qty = detail?.soluong || detail?.soLuong || 0;
       const chenhlech = (giamoi - giacu) * qty;
       res.json({ madoihang: item.madoihang || item.id, giacu, giamoi, qty, chenhlech });
     } catch (err) {

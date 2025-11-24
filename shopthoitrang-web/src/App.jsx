@@ -37,6 +37,7 @@ import KichThuocPage from './pages/KichThuocPage';
 import ChotCaPage from './pages/ChotCaPage';
 import ChotCaDetailPage from './pages/ChotCaDetailPage';
 import ThongTinNhanVienPage from './pages/ThongTinNhanVienPage';
+import PhiVanChuyenPage from './pages/PhiVanChuyenPage';
 function App() {
   return (
     <AuthProvider>
@@ -87,6 +88,7 @@ function App() {
             <Route path="tinnhan" element={<TinNhanPage />} />
             <Route path="danhgia" element={<DanhGiaPage />} />
             <Route path="thongbao" element={<ThongBaoPage />} />
+            <Route path="phivanchuyen" element={<PhiVanChuyenPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

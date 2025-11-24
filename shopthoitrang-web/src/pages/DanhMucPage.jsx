@@ -15,9 +15,10 @@ const DanhMucPage = () => {
     try {
       setLoading(true);
       const data = await danhmucService.getAll();
-      setDanhMuc(data);
+      setDanhMuc(Array.isArray(data) ? data : []);
     } catch (error) {
       message.error('Không thể tải dữ liệu danh mục');
+      setDanhMuc([]);
     } finally {
       setLoading(false);
     }
@@ -47,9 +48,10 @@ const DanhMucPage = () => {
   // CRUD operations
   const handleSubmit = async (values) => {
     try {
+      const currentList = Array.isArray(danhMuc) ? danhMuc : [];
       if (editingDanhMuc) {
         // Kiểm tra trùng tên (ngoại trừ chính nó)
-        const exists = danhMuc.some(
+        const exists = currentList.some(
           dm => dm.tendanhmuc.toLowerCase() === values.tendanhmuc.toLowerCase() && 
                dm.madanhmuc !== editingDanhMuc.madanhmuc
         );
@@ -72,7 +74,7 @@ const DanhMucPage = () => {
         });
       } else {
         // Kiểm tra trùng tên khi thêm mới
-        const exists = danhMuc.some(
+        const exists = currentList.some(
           dm => dm.tendanhmuc.toLowerCase() === values.tendanhmuc.toLowerCase()
         );
         if (exists) {
@@ -174,7 +176,7 @@ const DanhMucPage = () => {
       <div className="bg-white rounded-xl shadow-sm">
         <Table
           columns={columns}
-          dataSource={danhMuc}
+          dataSource={Array.isArray(danhMuc) ? danhMuc : []}
           rowKey="madanhmuc"
           loading={loading}
         />

@@ -16,7 +16,9 @@ import 'notification_screen.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
-// ================================================================================
+const Color kPrimaryBlue = Color(0xFF0288D1);
+const Color kLightBlue = Color(0xFFE1F5FE);
+const Color kDarkBlue = Color(0xFF01579B);
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -62,15 +64,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final goLogin = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text('Cần đăng nhập'),
           content: const Text('Bạn cần đăng nhập để trao đổi với nhân viên.'),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Để sau')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text('Để sau', style: TextStyle(color: Colors.grey[600])),
+            ),
             ElevatedButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Đăng nhập')),
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimaryBlue,
+              ),
+              child: const Text('Đăng nhập'),
+            ),
           ],
         ),
       );
@@ -86,20 +96,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final box = await svc.startChat();
       if (!mounted) return;
       await Navigator.of(context).push(
-        MaterialPageRoute(
-            builder: (_) => ChatScreen(
-                chatBox: box)), // product null => không gửi thẻ sản phẩm
+        MaterialPageRoute(builder: (_) => ChatScreen(chatBox: box)),
       );
     } catch (e) {
       if (!mounted) return;
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text('Lỗi'),
           content: Text('Không thể mở chat: $e'),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx), child: const Text('Đóng'))
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            )
           ],
         ),
       );
@@ -110,68 +123,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.4,
-        centerTitle: false,
-        titleSpacing: 12,
-        title: Row(
-          children: const [
-            Icon(Icons.verified, color: Colors.blueAccent),
-            SizedBox(width: 8),
-            Text(
-              'ELORA',
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.w700,
-                letterSpacing: .5,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
-            tooltip: 'Nhắn tin',
-            onPressed: _openChat,
-          ),
-          Stack(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.shopping_bag_outlined),
-                onPressed: _navigateToCart,
-              ),
-              if (_cartItemCount > 0)
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+      appBar: _currentIndex == 0
+          ? AppBar(
+              backgroundColor: kPrimaryBlue,
+              elevation: 0,
+              centerTitle: false,
+              titleSpacing: 16,
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    constraints: const BoxConstraints(
-                      minWidth: 16,
-                      minHeight: 16,
-                    ),
-                    child: Text(
-                      _cartItemCount > 99 ? '99+' : '$_cartItemCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+                    child: Icon(
+                      Icons.storefront,
+                      color: kPrimaryBlue,
+                      size: 20,
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'ELORA',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.search, color: Colors.white),
+                  onPressed: () {},
                 ),
-            ],
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline,
+                      color: Colors.white),
+                  tooltip: 'Nhắn tin',
+                  onPressed: _openChat,
+                ),
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.shopping_bag_outlined,
+                          color: Colors.white),
+                      onPressed: _navigateToCart,
+                    ),
+                    if (_cartItemCount > 0)
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Text(
+                            _cartItemCount > 99 ? '99+' : '$_cartItemCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 4),
+              ],
+            )
+          : null,
       body: IndexedStack(
         index: _currentIndex,
         children: [
@@ -182,31 +214,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const ProfileScreen(),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) => setState(() => _currentIndex = i),
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.black87,
-        unselectedItemColor: Colors.black54,
-        showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_bag_outlined), label: 'Sản phẩm'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_outlined), label: 'Thông báo'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.receipt_long_outlined), label: 'Đơn hàng'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline), label: 'Tài khoản'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (i) => setState(() => _currentIndex = i),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: kPrimaryBlue,
+          unselectedItemColor: Colors.grey[600],
+          showUnselectedLabels: true,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 12,
+          ),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Trang chủ',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.shopping_bag_outlined),
+              activeIcon: Icon(Icons.shopping_bag),
+              label: 'Sản phẩm',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications_outlined),
+              activeIcon: Icon(Icons.notifications),
+              label: 'Thông báo',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_outlined),
+              activeIcon: Icon(Icons.receipt_long),
+              label: 'Đơn hàng',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Tài khoản',
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// ====== TAB TRANG CHỦ - CHỈ HIỂN THỊ BANNER ======
 class _HomeTab extends StatefulWidget {
   const _HomeTab();
 
@@ -235,13 +299,13 @@ class _HomeTabState extends State<_HomeTab> {
 
   void _startAutoPlay() {
     _autoPlayTimer?.cancel();
-    _autoPlayTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _autoPlayTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || _banners.isEmpty) return;
       final nextPage = (_page + 1) % _banners.length;
       _pageCtrl.animateToPage(
         nextPage,
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOut,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutCubic,
       );
     });
   }
@@ -273,266 +337,306 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
+      color: kPrimaryBlue,
       onRefresh: _loadBanners,
       child: CustomScrollView(
         slivers: [
-          // Welcome message
+          // Full screen banner with overlay content
           SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                    Theme.of(context).colorScheme.secondary.withOpacity(0.05),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Chào mừng đến với ELORA',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Khám phá những xu hướng thời trang mới nhất',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.grey[700],
-                        ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Banner slider - Responsive height cho mobile (50% màn hình)
-          SliverToBoxAdapter(
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.5,
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _loadingBanner
-                    ? const Center(child: CircularProgressIndicator())
-                    : (_errBanner != null)
-                        ? Center(
+            child: SizedBox(
+              height: MediaQuery.of(context).size.height -
+                  MediaQuery.of(context).padding.top -
+                  kToolbarHeight -
+                  kBottomNavigationBarHeight,
+              child: _loadingBanner
+                  ? Container(
+                      color: kLightBlue.withOpacity(0.3),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: kPrimaryBlue),
+                      ),
+                    )
+                  : (_errBanner != null)
+                      ? Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [kLightBlue, Colors.white],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
+                          ),
+                          child: Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.error_outline,
-                                    size: 48, color: Colors.red[300]),
-                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 20,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    Icons.error_outline,
+                                    size: 64,
+                                    color: Colors.red[300],
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
                                 Text(
                                   'Lỗi tải banner',
-                                  style: TextStyle(color: Colors.grey[600]),
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey[700],
+                                  ),
                                 ),
                               ],
                             ),
-                          )
-                        : (_banners.isEmpty)
-                            ? Container(
-                                color: Colors.grey[200],
-                                child: Center(
+                          ),
+                        )
+                      : (_banners.isEmpty)
+                          ? Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    kPrimaryBlue.withOpacity(0.1),
+                                    kLightBlue,
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(24),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color:
+                                                Colors.black.withOpacity(0.1),
+                                            blurRadius: 20,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Icon(
+                                        Icons.image_outlined,
+                                        size: 64,
+                                        color: kPrimaryBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Text(
+                                      'Chào mừng đến ELORA',
+                                      style: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: kDarkBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Khám phá thời trang mới nhất',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                // Banner PageView
+                                PageView.builder(
+                                  controller: _pageCtrl,
+                                  onPageChanged: (i) =>
+                                      setState(() => _page = i),
+                                  itemCount: _banners.length,
+                                  itemBuilder: (_, i) =>
+                                      _BannerSlide(banner: _banners[i]),
+                                ),
+
+                                // Gradient overlay at bottom
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    height: 200,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [
+                                          Colors.black.withOpacity(0.7),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // Welcome text overlay
+                                Positioned(
+                                  left: 24,
+                                  right: 24,
+                                  bottom: 100,
                                   child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Icon(Icons.image_outlined,
-                                          size: 48, color: Colors.grey[400]),
+                                      Text(
+                                        'ELORA',
+                                        style: TextStyle(
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.w900,
+                                          color: Colors.white,
+                                          letterSpacing: 2,
+                                          shadows: [
+                                            Shadow(
+                                              color:
+                                                  Colors.black.withOpacity(0.3),
+                                              blurRadius: 10,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        'Chưa có banner',
-                                        style:
-                                            TextStyle(color: Colors.grey[600]),
+                                        'Khám phá phong cách của bạn',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          color: Colors.white.withOpacity(0.95),
+                                          fontWeight: FontWeight.w500,
+                                          shadows: [
+                                            Shadow(
+                                              color:
+                                                  Colors.black.withOpacity(0.3),
+                                              blurRadius: 8,
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              )
-                            : Stack(
-                                children: [
-                                  PageView.builder(
-                                    controller: _pageCtrl,
-                                    onPageChanged: (i) =>
-                                        setState(() => _page = i),
-                                    itemCount: _banners.length,
-                                    itemBuilder: (_, i) =>
-                                        _BannerSlide(banner: _banners[i]),
+
+                                // Dots indicator
+                                Positioned(
+                                  bottom: 40,
+                                  left: 0,
+                                  right: 0,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: List.generate(
+                                      _banners.length,
+                                      (i) => AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 4),
+                                        width: _page == i ? 32 : 8,
+                                        height: 8,
+                                        decoration: BoxDecoration(
+                                          color: _page == i
+                                              ? Colors.white
+                                              : Colors.white.withOpacity(0.4),
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  Colors.black.withOpacity(0.2),
+                                              blurRadius: 4,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                  // Dots indicator
+                                ),
+
+                                // Navigation arrows (optional)
+                                if (_banners.length > 1) ...[
                                   Positioned(
-                                    bottom: 16,
-                                    left: 0,
-                                    right: 0,
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: List.generate(
-                                        _banners.length,
-                                        (i) => Container(
-                                          margin: const EdgeInsets.symmetric(
-                                              horizontal: 4),
-                                          width: _page == i ? 24 : 8,
-                                          height: 8,
-                                          decoration: BoxDecoration(
-                                            color: _page == i
-                                                ? Colors.white
-                                                : Colors.white.withOpacity(0.5),
-                                            borderRadius:
-                                                BorderRadius.circular(4),
+                                    left: 16,
+                                    top: 0,
+                                    bottom: 0,
+                                    child: Center(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.chevron_left,
+                                            color: Colors.white,
+                                            size: 32,
                                           ),
+                                          onPressed: () {
+                                            final prevPage = _page == 0
+                                                ? _banners.length - 1
+                                                : _page - 1;
+                                            _pageCtrl.animateToPage(
+                                              prevPage,
+                                              duration: const Duration(
+                                                  milliseconds: 400),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: 16,
+                                    top: 0,
+                                    bottom: 0,
+                                    child: Center(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.3),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: IconButton(
+                                          icon: const Icon(
+                                            Icons.chevron_right,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                          onPressed: () {
+                                            final nextPage =
+                                                (_page + 1) % _banners.length;
+                                            _pageCtrl.animateToPage(
+                                              nextPage,
+                                              duration: const Duration(
+                                                  milliseconds: 400),
+                                              curve: Curves.easeInOut,
+                                            );
+                                          },
                                         ),
                                       ),
                                     ),
                                   ),
                                 ],
-                              ),
-              ),
-            ),
-          ),
-
-          // Quick actions / categories
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Danh mục nổi bật',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    children: [
-                      _CategoryCard(
-                        icon: Icons.woman_outlined,
-                        label: 'Nữ',
-                        color: Colors.pink.shade100,
-                        onTap: () {
-                          // Navigate to products tab
-                          DefaultTabController.of(context).animateTo(1);
-                        },
-                      ),
-                      _CategoryCard(
-                        icon: Icons.man_outlined,
-                        label: 'Nam',
-                        color: Colors.blue.shade100,
-                        onTap: () {
-                          DefaultTabController.of(context).animateTo(1);
-                        },
-                      ),
-                      _CategoryCard(
-                        icon: Icons.child_care_outlined,
-                        label: 'Trẻ em',
-                        color: Colors.orange.shade100,
-                        onTap: () {
-                          DefaultTabController.of(context).animateTo(1);
-                        },
-                      ),
-                      _CategoryCard(
-                        icon: Icons.local_offer_outlined,
-                        label: 'Sale',
-                        color: Colors.red.shade100,
-                        onTap: () {
-                          DefaultTabController.of(context).animateTo(1);
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // CTA button
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigate to products tab
-                  DefaultTabController.of(context).animateTo(1);
-                },
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Xem tất cả sản phẩm',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(Icons.arrow_forward),
-                  ],
-                ),
-              ),
+                              ],
+                            ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
-
-  const _CategoryCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: Colors.black87),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -544,49 +648,57 @@ class _BannerSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final desc = banner.description;
     return Stack(
       fit: StackFit.expand,
       children: [
-        Positioned.fill(
-          child: banner.imageUrl.isEmpty
-              ? Container(color: Colors.grey[300])
-              : Image.network(
-                  banner.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.image_not_supported),
+        banner.imageUrl.isEmpty
+            ? Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      kPrimaryBlue.withOpacity(0.3),
+                      kLightBlue,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-        ),
-        if (desc != null && desc.trim().isNotEmpty)
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [Colors.black54, Colors.transparent],
+              )
+            : Image.network(
+                banner.imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: kLightBlue.withOpacity(0.3),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                        color: kPrimaryBlue,
+                      ),
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kLightBlue, Colors.white],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.image_not_supported,
+                      size: 64,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-        if (desc != null && desc.trim().isNotEmpty)
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 16,
-            child: Text(
-              desc,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                height: 1.2,
-              ),
-            ),
-          ),
       ],
     );
   }

@@ -43,6 +43,11 @@ const syncAll = async () => {
   return res.data;
 };
 
+const releasePendingPoints = async () => {
+  const res = await api.post('/membership/pending/release');
+  return res.data;
+};
+
 export default {
   getAll,
   getByKhachHang,
@@ -51,4 +56,5 @@ export default {
   update,
   delete: remove,
   syncAll,
+  releasePendingPoints,
 };

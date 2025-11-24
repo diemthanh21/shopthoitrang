@@ -18,11 +18,11 @@
   }
 }
 
-/// ThÃ´ng tin sáº£n pháº©m quÃ  táº·ng (mua X táº·ng Y)
+/// Thông tin sản phẩm quà tặng (mua X tặng Y)
 class CartGiftProduct {
   final int id;
   final String name;
-  final String? variantLabel; // vÃ­ dá»¥: "Äá» - M"
+  final String? variantLabel; // ví dụ: "Đỏ - M"
   final String? imageUrl;
 
   CartGiftProduct({
@@ -34,7 +34,7 @@ class CartGiftProduct {
 
   factory CartGiftProduct.fromJson(Map<String, dynamic> json) {
     return CartGiftProduct(
-      // TODO: map Ä‘Ãºng vá»›i key tá»« API / database cá»§a báº¡n
+      // TODO: map đúng với key từ API / database của bạn
       id: json['id'] ??
           json['productId'] ??
           json['sanpham_id'] ??
@@ -66,6 +66,7 @@ class CartGiftOption {
   final String? sizeLabel;
   final String? color;
   final String? imageUrl;
+  final int? promoId;
   final String? promoLabel;
   final int buyQty;
   final int giftQty;
@@ -80,6 +81,7 @@ class CartGiftOption {
     this.sizeLabel,
     this.color,
     this.imageUrl,
+    this.promoId,
     this.promoLabel,
     this.buyQty = 1,
     this.giftQty = 1,
@@ -99,6 +101,7 @@ class CartGiftOption {
       productId: parseInt(json['productId'] ?? json['product_id']),
       sizeBridgeId:
           parseInt(json['sizeBridgeId'] ?? json['size_bridge_id'] ?? json['sizeId']),
+      promoId: parseInt(json['promoId'] ?? json['promo_id']),
       name: (json['productName'] ?? json['name'] ?? '').toString(),
       label: json['label']?.toString(),
       sizeLabel: json['sizeLabel']?.toString(),
@@ -119,32 +122,44 @@ class CartItem {
   final int variantId;
   final int quantity;
 
-  /// GiÃ¡ Ä‘ang tÃ­nh tiá»n cho item (sau khi Ã¡p dá»¥ng khuyáº¿n mÃ£i náº¿u backend Ä‘Ã£ tÃ­nh)
+  /// Giá đang tính tiền cho item (sau khi áp dụng khuyến mãi nếu backend đã tính)
   final double price;
 
   final int? sizeBridgeId; // id chitietsanpham_kichthuoc
   final CartVariant? variant;
 
-  // ====== THÃ”NG TIN KHUYáº¾N MÃƒI ======
+  // ====== THÔNG TIN KHUYẾN MÃI ======
 
-  /// GiÃ¡ gá»‘c trÆ°á»›c khuyáº¿n mÃ£i (náº¿u cÃ³). Náº¿u null thÃ¬ sáº½ fallback qua variant.price.
+  /// Giá gốc trước khuyến mãi (nếu có). Nếu null thì sẽ fallback qua variant.price.
   final double? originalPrice;
 
-  /// Pháº§n trÄƒm giáº£m (10 -> 10%)
+  /// Phần trăm giảm (10 -> 10%)
   final double? discountPercent;
 
-  /// Loáº¡i khuyáº¿n mÃ£i (vd: 'PERCENT', 'BUY_X_GET_Y')
+  /// Loại khuyến mãi (vd: 'PERCENT', 'BUY_X_GET_Y')
   final String? promotionType;
 
-  /// TÃªn / nhÃ£n chÆ°Æ¡ng trÃ¬nh khuyáº¿n mÃ£i (vd: 'Giáº£m 10% má»—i sáº£n pháº©m')
+  /// Tên / nhãn chương trình khuyến mãi (vd: 'Giảm 10% mỗi sản phẩm')
   final String? promotionLabel;
 
-  /// ThÃ´ng tin quÃ  táº·ng (náº¿u lÃ  khuyáº¿n mÃ£i mua X táº·ng Y)
+  /// Thông tin quà tặng (nếu là khuyến mãi mua X tặng Y)
   final CartGiftProduct? giftProduct;
   final List<CartGiftOption> giftOptions;
   final int giftRewardQuantity;
   final int? selectedGiftVariantId;
   final int? selectedGiftSizeBridgeId;
+  CartGiftOption? get selectedGiftOption {
+    if (selectedGiftVariantId == null || giftOptions.isEmpty) return null;
+    for (final option in giftOptions) {
+      final sameVariant = option.variantId == selectedGiftVariantId;
+      final optionSize = option.sizeBridgeId;
+      final selectedSize = selectedGiftSizeBridgeId ?? optionSize;
+      if (sameVariant && selectedSize == (optionSize ?? selectedSize)) {
+        return option;
+      }
+    }
+    return null;
+  }
   static const Map<String, String> _vietnameseDiacritics = {
     'Ã ': 'a',
     'Ã¡': 'a',
@@ -434,10 +449,10 @@ class CartItem {
         variant!.product!.name.trim().isNotEmpty) {
       return variant!.product!.name;
     }
-    return 'Sáº£n pháº©m #$variantId';
+    return 'Sản phẩm #$variantId';
   }
 
-  /// Text mÃ u-size
+  /// Text màu-size
   String get displayVariant {
     if (variant == null) return '';
     final parts = <String>[];
@@ -457,14 +472,14 @@ class CartItem {
     return null;
   }
 
-  /// GiÃ¡ gá»‘c Ä‘á»ƒ hiá»ƒn thá»‹ (náº¿u khÃ´ng cÃ³ originalPrice thÃ¬ láº¥y variant.price)
+  /// Giá gốc để hiển thị (nếu không có originalPrice thì lấy variant.price)
   double get displayOriginalPrice =>
       (originalPrice ?? variant?.price ?? price).toDouble();
 
-  /// GiÃ¡ sau khi tÃ­nh khuyáº¿n mÃ£i (line price)
+  /// Giá sau khi tính khuyến mãi (line price)
   double get displayFinalPrice => price;
 
-  /// CÃ³ giáº£m theo % khÃ´ng
+  /// Có giảm theo % không
   bool get hasPercentDiscount =>
       discountPercent != null &&
       discountPercent! > 0 &&
@@ -473,7 +488,7 @@ class CartItem {
   String? get discountPercentText =>
       hasPercentDiscount ? '${discountPercent!.toStringAsFixed(0)}%' : null;
 
-  /// CÃ³ khuyáº¿n mÃ£i táº·ng quÃ  khÃ´ng
+  /// Có khuyến mãi tặng quà không
   bool get hasGiftPromotion => resolvedGiftProduct != null;
   bool get hasGiftOptions => giftOptions.isNotEmpty;
 

@@ -1,45 +1,107 @@
-// Model cho Thẻ thành viên
+// Model cho Thẻ thành viên (V2 - chỉ tích điểm)
 class TheThanhVien {
   final int? maThe;
   final int? maKhachHang;
-  final int? maHangThe;
   final DateTime? ngayCap;
-  final DateTime? ngayHetHan;
-  final String? trangThai;
+  final bool? trangThai;
 
-  // Thông tin hạng thẻ
-  String? tenHang;
-  double? giamGia;
-  String? voucherSinhNhat;
-  String? uuDai;
+  // Thông tin điểm tích lũy
+  final double? diemHienTai;
+  final double? diemPending;
+  final double? diemNamHienTai;
+  final int? namDiem;
+  final DateTime? lastResetAt;
 
   TheThanhVien({
     this.maThe,
     this.maKhachHang,
-    this.maHangThe,
     this.ngayCap,
-    this.ngayHetHan,
     this.trangThai,
-    this.tenHang,
-    this.giamGia,
-    this.voucherSinhNhat,
-    this.uuDai,
+    this.diemHienTai,
+    this.diemPending,
+    this.diemNamHienTai,
+    this.namDiem,
+    this.lastResetAt,
   });
 
   factory TheThanhVien.fromJson(Map<String, dynamic> json) {
     return TheThanhVien(
       maThe: json['mathe'],
       maKhachHang: json['makhachhang'],
-      maHangThe: json['mahangthe'],
       ngayCap: json['ngaycap'] != null ? DateTime.parse(json['ngaycap']) : null,
-      ngayHetHan: json['ngayhethan'] != null
-          ? DateTime.parse(json['ngayhethan'])
-          : null,
       trangThai: json['trangthai'],
-      tenHang: json['tenhang'],
-      giamGia: json['giamgia']?.toDouble(),
-      voucherSinhNhat: json['voucher_sinhnhat'],
-      uuDai: json['uudai'],
+      diemHienTai: json['diem_hien_tai']?.toDouble(),
+      diemPending: json['diem_pending']?.toDouble(),
+      diemNamHienTai: json['diem_nam_hien_tai']?.toDouble(),
+      namDiem: json['nam_diem'],
+      lastResetAt: json['last_reset_at'] != null
+          ? DateTime.parse(json['last_reset_at'])
+          : null,
+    );
+  }
+}
+
+// Model cho giao dịch điểm pending
+class PendingPointTransaction {
+  final double? diem;
+  final int? maDonHang;
+  final DateTime? availableAt;
+  final String? note;
+
+  PendingPointTransaction({
+    this.diem,
+    this.maDonHang,
+    this.availableAt,
+    this.note,
+  });
+
+  factory PendingPointTransaction.fromJson(Map<String, dynamic> json) {
+    return PendingPointTransaction(
+      diem: json['diem']?.toDouble(),
+      maDonHang: json['madonhang'],
+      availableAt: json['available_at'] != null
+          ? DateTime.parse(json['available_at'])
+          : null,
+      note: json['note'],
+    );
+  }
+}
+
+// Model cho tổng hợp điểm
+class PointsSummary {
+  final double diemHienTai;
+  final double diemPending;
+  final double diemNamHienTai;
+  final int? namDiem;
+  final DateTime? lastResetAt;
+  final List<PendingPointTransaction> pendingTransactions;
+
+  PointsSummary({
+    required this.diemHienTai,
+    required this.diemPending,
+    required this.diemNamHienTai,
+    this.namDiem,
+    this.lastResetAt,
+    this.pendingTransactions = const [],
+  });
+
+  factory PointsSummary.fromJson(Map<String, dynamic> json) {
+    List<PendingPointTransaction> transactions = [];
+    if (json['pending_transactions'] != null) {
+      transactions = (json['pending_transactions'] as List)
+          .map((tx) => PendingPointTransaction.fromJson(tx))
+          .toList();
+    }
+
+    return PointsSummary(
+      diemHienTai: json['diem_hien_tai']?.toDouble() ?? 0,
+      diemPending: json['diem_pending']?.toDouble() ?? 0,
+      diemNamHienTai: json['diem_nam_hien_tai']?.toDouble() ?? 0,
+      namDiem: json['nam_diem'],
+      lastResetAt: json['last_reset_at'] != null
+          ? DateTime.parse(json['last_reset_at'])
+          : null,
+      pendingTransactions: transactions,
     );
   }
 }

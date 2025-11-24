@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, RefreshCcw, Search, Package } from 'lucide-react';
 import exService from '../services/doihangService';
@@ -92,12 +92,19 @@ export default function DoiHangPage() {
     load();
   }, [filters.trangthai, filters.madonhang, filters.makhachhang]);
 
-  const run = async (fn) => {
+  const run = async (fn, targetStatusHint) => {
     try {
-      await fn();
+      const result = await fn();
       await load();
+      const targetStatus = targetStatusHint || result?.trangThai || result?.trangthai;
+      if (targetStatus) {
+        const meta = getStatusMeta(targetStatus);
+        if (meta?.value || meta?.label) {
+          setFilters((prev) => ({ ...prev, trangthai: meta.value || meta.label }));
+        }
+      }
     } catch (e) {
-      window.alert(e?.response?.data?.message || e.message || 'Lỗi xảy ra');
+      window.alert(e?.response?.data?.message || e.message || 'L?i x?y ra');
     }
   };
 
@@ -108,9 +115,9 @@ export default function DoiHangPage() {
     if (!dialog) return;
     const fd = new FormData(e.currentTarget);
     if (dialog.type === 'accept') {
-      await run(() => exService.accept(dialog.id, fd.get('diachi'), fd.get('huongdan')));
+      await run(() => exService.accept(dialog.id, fd.get('diachi'), fd.get('huongdan')), 'DA_DUYET_CHO_GUI_HANG_CU');
     } else if (dialog.type === 'reject') {
-      await run(() => exService.reject(dialog.id, fd.get('lydo')));
+      await run(() => exService.reject(dialog.id, fd.get('lydo')), 'TU_CHOI');
     }
     closeDialog();
   };
@@ -180,22 +187,7 @@ export default function DoiHangPage() {
 
       {/* Stats Cards */}
       <div className="mb-6 flex items-center gap-3 overflow-x-auto pb-2">
-        <button
-          onClick={() => setFilters((prev) => ({ ...prev, trangthai: '' }))}
-          className={`flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
-            !filters.trangthai
-              ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-              : "border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:bg-blue-50"
-          }`}
-        >
-          <div className={`h-2 w-2 rounded-full ${!filters.trangthai ? "bg-white" : "bg-gray-400"}`}></div>
-          <span>Tất cả</span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-            !filters.trangthai ? "bg-white/20 text-white" : "bg-gray-100 text-gray-600"
-          }`}>
-            {counts.total || 0}
-          </span>
-        </button>
+       
 
         {STATUS_DEFINITIONS.map((status) => {
           const isActive = filters.trangthai === status.value;
@@ -306,7 +298,7 @@ export default function DoiHangPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-4 py-3">
                   <div>
                     <p className="text-xs font-medium text-gray-500">Phiếu đổi</p>
-                    <p className="text-xl font-bold text-gray-900">DH-{item.maDoiHang || item.id}</p>
+                    <p className="text-xl font-bold text-gray-900">Mã đơn{item.maDoiHang || item.id}</p>
                     <p className="text-xs text-gray-500">{formatDate(item.ngayYeuCau)}</p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -360,15 +352,7 @@ export default function DoiHangPage() {
                   </div>
 
                   <div>
-                    <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Giá & Số lượng</p>
-                    <p className="text-sm text-gray-700">
-                      SL: <span className="font-semibold text-gray-900">{item.soLuong}</span>
-                    </p>
-                    <p className="text-sm text-gray-700">Giá cũ: {formatCurrency(item.giacu)}</p>
-                    <p className="text-sm text-gray-700">Giá mới: {formatCurrency(item.giamoi)}</p>
-                    <p className="mt-2 text-sm font-semibold text-green-600">
-                      Chênh lệch: {formatCurrency(item.chenhlech)}
-                    </p>
+                    
                   </div>
 
                   <div>

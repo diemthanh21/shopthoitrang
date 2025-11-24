@@ -1,16 +1,39 @@
 const service = require('../services/chitietsanpham.service');
 
+const parseNumber = (value) => {
+  if (value === undefined || value === null || value === '') return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+};
+
 const ChiTietSanPhamController = {
   async getAll(req, res, next) {
     try {
-      const { masanpham, search, minPrice, maxPrice, limit, offset, orderBy, orderDir } = req.query;
-      const { items, total } = await service.list({
+      const {
         masanpham,
+        maSanPham,
         search,
         minPrice,
         maxPrice,
-        limit: limit ? Number(limit) : 50,
-        offset: offset ? Number(offset) : 0,
+        limit,
+        offset,
+        orderBy,
+        orderDir,
+      } = req.query;
+
+      const productId = parseNumber(masanpham ?? maSanPham);
+      const min = parseNumber(minPrice);
+      const max = parseNumber(maxPrice);
+      const lim = parseNumber(limit) ?? 50;
+      const off = parseNumber(offset) ?? 0;
+
+      const { items, total } = await service.list({
+        masanpham: productId,
+        search,
+        minPrice: min,
+        maxPrice: max,
+        limit: lim,
+        offset: off,
         orderBy,
         orderDir,
       });

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
 import '../services/api_client.dart';
 import '../models/notification_model.dart';
+import 'order_detail_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -17,12 +19,32 @@ class _NotificationScreenState extends State<NotificationScreen>
   late TabController _tabController;
   late NotificationService _notificationService;
 
+  static const Color primaryBlue = Color(0xFF0891B2);
+  static const Color lightBlue = Color(0xFFE0F2FE);
+
+  // ========================= DATA =========================
   List<PromotionNotification> _promos = [];
   List<OrderNotification> _orderUpdates = [];
   bool _loadingPromos = true;
   bool _loadingOrders = true;
   String? _errorPromos;
   String? _errorOrders;
+
+  // ========================= SEARCH + PAGINATION =========================
+  final int _pageSize = 10;
+
+  String _promoQuery = '';
+  String _orderQuery = '';
+
+  int _promoPage = 1;
+  int _orderPage = 1;
+
+  final TextEditingController _promoSearchCtrl = TextEditingController();
+  final TextEditingController _orderSearchCtrl = TextEditingController();
+
+  // debounce timer
+  Future<void>? _promoDebounce;
+  Future<void>? _orderDebounce;
 
   @override
   void initState() {
@@ -34,6 +56,8 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   @override
   void dispose() {
+    _promoSearchCtrl.dispose();
+    _orderSearchCtrl.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -42,6 +66,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     await Future.wait([_loadPromos(), _loadOrderUpdates()]);
   }
 
+  // ========================= HELPERS =========================
   String _formatDiscountInfo(PromotionNotification promo) {
     if (promo.discountPercent != null) {
       return 'Giảm ${promo.discountPercent!.toStringAsFixed(0)}%';
@@ -60,6 +85,25 @@ class _NotificationScreenState extends State<NotificationScreen>
     return amount.toStringAsFixed(0);
   }
 
+  String _formatTimestamp(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} phút trước';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} giờ trước';
+    } else if (diff.inDays < 7) {
+      return '${diff.inDays} ngày trước';
+    } else {
+      return '${dt.day}/${dt.month}/${dt.year}';
+    }
+  }
+
+  String _formatSimpleDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  // ========================= LOADERS =========================
   Future<void> _loadPromos() async {
     try {
       setState(() {
@@ -67,13 +111,13 @@ class _NotificationScreenState extends State<NotificationScreen>
         _errorPromos = null;
       });
 
-      // Lấy thông báo khuyến mãi từ server
       final promos = await _notificationService.getPromotions();
 
       if (mounted) {
         setState(() {
           _promos = promos;
           _loadingPromos = false;
+          _promoPage = 1; // reset page on reload
         });
       }
     } catch (e) {
@@ -102,13 +146,16 @@ class _NotificationScreenState extends State<NotificationScreen>
         return;
       }
 
-      // Lấy cập nhật đơn hàng từ server
-      final orders = await _notificationService.getOrderUpdates();
+      final customerId = auth.user?.maKhachHang?.toString();
+      final orders = await _notificationService.getOrderUpdates(
+        customerId: customerId,
+      );
 
       if (mounted) {
         setState(() {
           _orderUpdates = orders;
           _loadingOrders = false;
+          _orderPage = 1; // reset page on reload
         });
       }
     } catch (e) {
@@ -122,90 +169,204 @@ class _NotificationScreenState extends State<NotificationScreen>
     }
   }
 
+  // ========================= SEARCH FILTERS =========================
+  List<PromotionNotification> get _filteredPromos {
+    final q = _promoQuery.trim().toLowerCase();
+    if (q.isEmpty) return _promos;
+
+    return _promos.where((p) {
+      final title = p.title.toLowerCase();
+      final msg = p.message.toLowerCase();
+      final code = (p.voucherCode ?? '').toLowerCase();
+      final tags = _formatDiscountInfo(p).toLowerCase();
+      return title.contains(q) ||
+          msg.contains(q) ||
+          code.contains(q) ||
+          tags.contains(q);
+    }).toList();
+  }
+
+  List<OrderNotification> get _filteredOrders {
+    final q = _orderQuery.trim().toLowerCase();
+    if (q.isEmpty) return _orderUpdates;
+
+    return _orderUpdates.where((o) {
+      final code = o.orderCode.toLowerCase();
+      final status = o.status.toLowerCase();
+      final msg = (o.message ?? '').toLowerCase();
+      return code.contains(q) || status.contains(q) || msg.contains(q);
+    }).toList();
+  }
+
+  List<PromotionNotification> get _pagedPromos {
+    final list = _filteredPromos;
+    final end = (_promoPage * _pageSize).clamp(0, list.length);
+    return list.take(end).toList();
+  }
+
+  List<OrderNotification> get _pagedOrders {
+    final list = _filteredOrders;
+    final end = (_orderPage * _pageSize).clamp(0, list.length);
+    return list.take(end).toList();
+  }
+
+  bool get _promoHasMore =>
+      _pagedPromos.length < _filteredPromos.length;
+
+  bool get _orderHasMore =>
+      _pagedOrders.length < _filteredOrders.length;
+
+  void _onPromoSearchChanged(String value) {
+    // debounce nhẹ để không setState liên tục
+    _promoDebounce = Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() {
+        _promoQuery = value;
+        _promoPage = 1; // reset page when searching
+      });
+    });
+  }
+
+  void _onOrderSearchChanged(String value) {
+    _orderDebounce = Future.delayed(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      setState(() {
+        _orderQuery = value;
+        _orderPage = 1; // reset page when searching
+      });
+    });
+  }
+
+  // ========================= DIALOGS =========================
   void _showPromotionDetail(BuildContext context, PromotionNotification promo) {
+    final chips = <Widget>[];
+    if (promo.discountPercent != null) {
+      chips.add(_buildPromoChip(
+        'Giảm ${promo.discountPercent!.toStringAsFixed(0)}%',
+        Colors.red.shade700,
+      ));
+    }
+    if (promo.discountAmount != null) {
+      chips.add(_buildPromoChip(
+        'Giảm ${_formatMoney(promo.discountAmount!)}',
+        Colors.red.shade700,
+      ));
+    } else if (promo.voucherCode == null && promo.message.isNotEmpty) {
+      chips.add(_buildPromoChip(promo.message, Colors.blueGrey.shade700));
+    }
+
+    final voucherCode = promo.voucherCode;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(promo.title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              promo.message,
-              style: const TextStyle(fontSize: 15),
-            ),
-            const SizedBox(height: 16),
-            if (promo.voucherCode != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.local_offer, color: Colors.green.shade700),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Mã khuyến mãi:',
-                          style: TextStyle(fontSize: 12, color: Colors.black54),
-                        ),
-                        Text(
-                          promo.voucherCode!,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                promo.message,
+                style: const TextStyle(fontSize: 15),
               ),
+              const SizedBox(height: 16),
+              if (voucherCode != null && voucherCode.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: lightBlue,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: primaryBlue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.local_offer, color: primaryBlue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Mã khuyến mãi',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            Text(
+                              voucherCode,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: primaryBlue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Sao chép',
+                        icon: const Icon(Icons.copy, color: primaryBlue),
+                        onPressed: () {
+                          Clipboard.setData(
+                            ClipboardData(text: voucherCode),
+                          );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Đã sao chép mã khuyến mãi'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              if (chips.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: chips,
+                ),
+              ],
               const SizedBox(height: 12),
-            ],
-            if (promo.discountPercent != null ||
-                promo.discountAmount != null) ...[
+              if (promo.validFrom != null || promo.validUntil != null) ...[
+                if (promo.validFrom != null)
+                  _buildDetailRow(
+                      'Từ ngày:', _formatSimpleDate(promo.validFrom!)),
+                if (promo.validUntil != null) ...[
+                  const SizedBox(height: 8),
+                  _buildDetailRow(
+                      'Đến ngày:', _formatSimpleDate(promo.validUntil!)),
+                ],
+                const SizedBox(height: 8),
+              ],
               _buildDetailRow(
-                'Giảm giá:',
-                _formatDiscountInfo(promo),
-              ),
-              const SizedBox(height: 8),
-            ],
-            if (promo.validFrom != null) ...[
-              _buildDetailRow(
-                'Từ ngày:',
-                '${promo.validFrom!.day}/${promo.validFrom!.month}/${promo.validFrom!.year}',
-              ),
-              const SizedBox(height: 8),
-            ],
-            if (promo.validUntil != null) ...[
-              _buildDetailRow(
-                'Đến ngày:',
-                '${promo.validUntil!.day}/${promo.validUntil!.month}/${promo.validUntil!.year}',
+                'Cập nhật:',
+                _formatTimestamp(promo.createdAt),
               ),
             ],
-          ],
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Đóng'),
           ),
-          if (promo.voucherCode != null)
+          if (voucherCode != null)
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryBlue,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () {
+                Clipboard.setData(ClipboardData(text: voucherCode));
                 Navigator.of(context).pop();
-                // Copy voucher code or navigate to use it
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Mã ${promo.voucherCode} đã được sao chép!'),
+                    content: Text('Mã $voucherCode đã được sao chép!'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
@@ -255,13 +416,45 @@ class _NotificationScreenState extends State<NotificationScreen>
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              // Navigate to order details page if you have one
-              // Navigator.pushNamed(context, '/order-detail', arguments: order.orderId);
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              if (order.orderId == 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('Không tìm thấy mã đơn hàng để xem chi tiết'),
+                  ),
+                );
+                return;
+              }
+              navigator.push(
+                MaterialPageRoute(
+                  builder: (_) => OrderDetailScreen(orderId: order.orderId),
+                ),
+              );
             },
             child: const Text('Xem chi tiết'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPromoChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
       ),
     );
   }
@@ -290,6 +483,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     );
   }
 
+  // ========================= UI =========================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -313,6 +507,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     );
   }
 
+  // ---------------- PROMOS TAB ----------------
   Widget _buildPromosTab() {
     if (_loadingPromos) {
       return const Center(child: CircularProgressIndicator());
@@ -345,30 +540,53 @@ class _NotificationScreenState extends State<NotificationScreen>
       );
     }
 
-    if (_promos.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.notifications_none, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có thông báo khuyến mãi',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
+    final visiblePromos = _pagedPromos;
 
     return RefreshIndicator(
-      onRefresh: _loadPromos,
+      onRefresh: () async {
+        await _loadPromos();
+      },
       child: ListView.separated(
         padding: const EdgeInsets.all(8),
-        itemCount: _promos.length,
+        itemCount: visiblePromos.length + 1, // + search/header/footer
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          final item = _promos[index];
+          if (index == 0) {
+            return _buildSearchBar(
+              controller: _promoSearchCtrl,
+              hint: "Tìm khuyến mãi theo tiêu đề / nội dung / mã...",
+              onChanged: _onPromoSearchChanged,
+              onClear: () {
+                setState(() {
+                  _promoSearchCtrl.clear();
+                  _promoQuery = '';
+                  _promoPage = 1;
+                });
+              },
+            );
+          }
+
+          final realIndex = index - 1;
+
+          if (realIndex >= visiblePromos.length) {
+            // footer
+            if (_filteredPromos.isEmpty) {
+              return _buildEmptyState(
+                icon: Icons.notifications_none,
+                text: _promoQuery.isEmpty
+                    ? 'Chưa có thông báo khuyến mãi'
+                    : 'Không tìm thấy khuyến mãi phù hợp',
+              );
+            }
+            if (_promoHasMore) {
+              return _buildLoadMore(
+                onTap: () => setState(() => _promoPage++),
+              );
+            }
+            return const SizedBox.shrink();
+          }
+
+          final item = visiblePromos[realIndex];
           return _NotificationCard(
             title: item.title,
             message: item.message,
@@ -377,12 +595,13 @@ class _NotificationScreenState extends State<NotificationScreen>
             timestamp: item.createdAt,
             isRead: item.isRead,
             onTap: () {
-              // Mark as read
               setState(() {
-                _promos[index] = item.copyWith(isRead: true);
+                final pos = _promos.indexWhere((e) => e.id == item.id);
+                if (pos != -1) {
+                  _promos[pos] = item.copyWith(isRead: true);
+                }
               });
               _notificationService.markAsRead(item.id.toString(), 'promo');
-              // Show promotion detail
               _showPromotionDetail(context, item);
             },
           );
@@ -391,6 +610,7 @@ class _NotificationScreenState extends State<NotificationScreen>
     );
   }
 
+  // ---------------- ORDERS TAB ----------------
   Widget _buildOrdersTab() {
     final auth = context.watch<AuthProvider>();
     if (!auth.isAuthenticated) {
@@ -449,31 +669,52 @@ class _NotificationScreenState extends State<NotificationScreen>
       );
     }
 
-    if (_orderUpdates.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.shopping_bag_outlined,
-                size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có cập nhật đơn hàng',
-              style: TextStyle(color: Colors.grey[600], fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
+    final visibleOrders = _pagedOrders;
 
     return RefreshIndicator(
-      onRefresh: _loadOrderUpdates,
+      onRefresh: () async {
+        await _loadOrderUpdates();
+      },
       child: ListView.separated(
         padding: const EdgeInsets.all(8),
-        itemCount: _orderUpdates.length,
+        itemCount: visibleOrders.length + 1,
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (context, index) {
-          final update = _orderUpdates[index];
+          if (index == 0) {
+            return _buildSearchBar(
+              controller: _orderSearchCtrl,
+              hint: "Tìm đơn hàng theo mã / trạng thái / ghi chú...",
+              onChanged: _onOrderSearchChanged,
+              onClear: () {
+                setState(() {
+                  _orderSearchCtrl.clear();
+                  _orderQuery = '';
+                  _orderPage = 1;
+                });
+              },
+            );
+          }
+
+          final realIndex = index - 1;
+
+          if (realIndex >= visibleOrders.length) {
+            if (_filteredOrders.isEmpty) {
+              return _buildEmptyState(
+                icon: Icons.shopping_bag_outlined,
+                text: _orderQuery.isEmpty
+                    ? 'Chưa có cập nhật đơn hàng'
+                    : 'Không tìm thấy đơn hàng phù hợp',
+              );
+            }
+            if (_orderHasMore) {
+              return _buildLoadMore(
+                onTap: () => setState(() => _orderPage++),
+              );
+            }
+            return const SizedBox.shrink();
+          }
+
+          final update = visibleOrders[realIndex];
           return _OrderUpdateCard(
             orderId: update.orderCode,
             status: update.status,
@@ -482,13 +723,14 @@ class _NotificationScreenState extends State<NotificationScreen>
             timestamp: update.statusUpdatedAt ?? update.orderDate,
             isRead: update.isRead,
             onTap: () {
-              // Mark as read
               setState(() {
-                _orderUpdates[index] = update.copyWith(isRead: true);
+                final pos = _orderUpdates.indexWhere((e) => e.orderId == update.orderId);
+                if (pos != -1) {
+                  _orderUpdates[pos] = update.copyWith(isRead: true);
+                }
               });
               _notificationService.markAsRead(
                   update.orderId.toString(), 'order');
-              // Show order details dialog or navigate
               _showOrderDetail(context, update);
             },
           );
@@ -496,8 +738,82 @@ class _NotificationScreenState extends State<NotificationScreen>
       ),
     );
   }
+
+  // ========================= SMALL COMPONENTS =========================
+  Widget _buildSearchBar({
+    required TextEditingController controller,
+    required String hint,
+    required ValueChanged<String> onChanged,
+    required VoidCallback onClear,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.search, color: Colors.grey.shade600),
+          const SizedBox(width: 6),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: onChanged,
+              decoration: InputDecoration(
+                hintText: hint,
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          if (controller.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: onClear,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoadMore({required VoidCallback onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: OutlinedButton.icon(
+          onPressed: onTap,
+          icon: const Icon(Icons.expand_more),
+          label: const Text("Xem thêm"),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({required IconData icon, required String text}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 80),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              text,
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
+// ========================= CARDS =========================
 class _NotificationCard extends StatelessWidget {
   final String title;
   final String message;
@@ -836,7 +1152,7 @@ class _OrderUpdateCard extends StatelessWidget {
   }
 }
 
-// Models
+// ========================= MODELS (giữ như cũ nếu bạn còn dùng) =========================
 class NotificationItem {
   final String id;
   final String title;

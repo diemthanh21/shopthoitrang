@@ -659,7 +659,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  // BOTTOM SHEET: ch?n bi?n th? khi th�m v�o gi?
+  // BOTTOM SHEET: Chọn phiên bản khi thêm vào giỏ hàng
   void _showAddToCartVariantSelector() {
     final product = _fullProduct ?? widget.product;
     ProductVariant? tempSelectedVariant = _selectedVariant;
@@ -2713,17 +2713,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CheckoutScreen(
-                                source: CheckoutSource.buyNow,
-                                variant: tempSelectedVariant!,
-                                quantity: tempQuantity,
-                                price: tempSelectedVariant!.price,
-                                product: product,
-                                sizeBridgeId: tempSelectedVariantSize?.id,
-                              ),
-                            ),
-                          );
-                        },
+                               builder: (context) => CheckoutScreen(
+                                 source: CheckoutSource.buyNow,
+                                 variant: tempSelectedVariant!,
+                                 quantity: tempQuantity,
+                                 price: tempSelectedVariant!.price,
+                                 product: product,
+                                 sizeBridgeId: tempSelectedVariantSize?.id,
+                                  buyNowGiftOption: tempSelectedGiftOption,
+                               ),
+                             ),
+                           );
+                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
                           padding: const EdgeInsets.symmetric(vertical: 16),

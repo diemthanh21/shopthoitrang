@@ -187,6 +187,10 @@ class OrderService {
               paymentMethod: order.paymentMethod,
               paymentStatus: order.paymentStatus,
               orderStatus: order.orderStatus,
+              shippingAddress: order.shippingAddress,
+              shippingFee: order.shippingFee,
+              shippingProvinceSnapshot: order.shippingProvinceSnapshot,
+              appliedVoucherIds: order.appliedVoucherIds,
               items: items,
             );
             print('🔁 Fetched ${items.length} items via fallback endpoint');

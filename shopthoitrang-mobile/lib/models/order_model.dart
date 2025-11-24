@@ -13,6 +13,8 @@ class Order {
   final String orderStatus; // trangthaidonhang
   final List<OrderItem> items; // chitietdonhang
   final DiaChiKhachHang? shippingAddress; // dia chi giao hang
+  final double shippingFee;
+  final String? shippingProvinceSnapshot;
   final List<int> appliedVoucherIds;
 
   Order({
@@ -26,6 +28,8 @@ class Order {
     required this.orderStatus,
     this.items = const [],
     this.shippingAddress,
+    this.shippingFee = 0,
+    this.shippingProvinceSnapshot,
     this.appliedVoucherIds = const [],
   });
 
@@ -41,8 +45,7 @@ class Order {
           : null,
       total: (json['thanhtien'] ?? 0).toDouble(),
       paymentMethod: json['phuongthucthanhtoan'] ?? json['paymentMethod'] ?? '',
-      paymentStatus:
-          json['trangthaithanhtoan'] ?? json['paymentStatus'] ?? '',
+      paymentStatus: json['trangthaithanhtoan'] ?? json['paymentStatus'] ?? '',
       orderStatus: json['trangthaidonhang'] ?? json['orderStatus'] ?? '',
       items: (json['items'] as List<dynamic>?)
               ?.map((item) => OrderItem.fromJson(item))
@@ -60,6 +63,11 @@ class Order {
               macDinh: json['diaChi']['macdinh'] == true,
             )
           : null,
+      shippingFee:
+          _parseDouble(json['phivanchuyen'] ?? json['shippingFee'] ?? 0),
+      shippingProvinceSnapshot: json['tinh_giaohang_snapshot'] ??
+          json['shippingProvinceSnapshot'] ??
+          json['shippingProvince'],
       appliedVoucherIds: _parseVoucherIds(json),
     );
   }
@@ -91,6 +99,9 @@ class Order {
           'macdinh': shippingAddress!.macDinh,
         }
       },
+      'phivanchuyen': shippingFee,
+      'tinh_giaohang_snapshot':
+          shippingProvinceSnapshot ?? shippingAddress?.tinh,
     };
   }
 
@@ -126,6 +137,12 @@ class Order {
 
     return result;
   }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0;
+  }
 }
 
 /// Order item model (chitietdonhang table)
@@ -140,6 +157,10 @@ class OrderItem {
   final String? variantName; // phan loai (join)
   final String? imageUrl; // hinhanh (join)
   final int? sizeBridgeId; // chitietsize_id (chitietsanpham_kichthuoc.id)
+  final int? giftVariantId;
+  final int? giftSizeBridgeId;
+  final int giftQuantity;
+  final int? giftPromotionId;
 
   OrderItem({
     this.id,
@@ -152,6 +173,10 @@ class OrderItem {
     this.variantName,
     this.imageUrl,
     this.sizeBridgeId,
+    this.giftVariantId,
+    this.giftSizeBridgeId,
+    this.giftQuantity = 0,
+    this.giftPromotionId,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -186,6 +211,10 @@ class OrderItem {
       sizeBridgeId: json['sizeBridgeId'] ??
           json['chitietsize_id'] ??
           json['chitietsizeId'],
+      giftVariantId: json['giftVariantId'] ?? json['gift_variant_id'],
+      giftSizeBridgeId: json['giftSizeBridgeId'] ?? json['gift_size_bridge_id'],
+      giftQuantity: json['giftQuantity'] ?? json['gift_quantity'] ?? 0,
+      giftPromotionId: json['giftPromotionId'] ?? json['gift_promotion_id'],
     );
   }
 
@@ -201,6 +230,10 @@ class OrderItem {
       if (variantName != null) 'variantName': variantName,
       if (imageUrl != null) 'hinhanh': imageUrl,
       if (sizeBridgeId != null) 'chitietsizeId': sizeBridgeId,
+      if (giftVariantId != null) 'giftVariantId': giftVariantId,
+      if (giftSizeBridgeId != null) 'giftSizeBridgeId': giftSizeBridgeId,
+      if (giftQuantity > 0) 'giftQuantity': giftQuantity,
+      if (giftPromotionId != null) 'giftPromotionId': giftPromotionId,
     };
   }
 

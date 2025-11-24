@@ -1,6 +1,8 @@
 const chatBoxRepo = require('../repositories/chatbox.repository');
 const chatMsgRepo = require('../repositories/noidungchat.repository');
 const supabase = require('../../config/db');
+const path = require('path');
+const crypto = require('crypto');
 
 // Helper: pick a default staff id (first staff row or env fallback)
 async function getDefaultStaffId() {
@@ -197,8 +199,23 @@ const ChatController = {
   // Employee or Customer send message
   async sendMessage(req, res) {
     try {
-      const { machatbox, noidung } = req.body;
-      if (!machatbox || !noidung) return res.status(400).json({ message: 'Thiếu machatbox hoặc noidung' });
+      const { machatbox } = req.body || {};
+      let { noidung } = req.body || {};
+      if (!machatbox || noidung === undefined || noidung === null) {
+        return res.status(400).json({ message: 'Thi?u machatbox ho?c n?i dung' });
+      }
+      if (typeof noidung === 'object') {
+        try {
+          noidung = JSON.stringify(noidung);
+        } catch (_) {
+          noidung = String(noidung);
+        }
+      } else {
+        noidung = noidung.toString();
+      }
+      const requestedType = (req.body?.messageType || '').toString().trim().toLowerCase();
+      const allowedTypes = new Set(['text', 'media']);
+      const messageType = allowedTypes.has(requestedType) ? requestedType : 'text';
       const user = req.user || {};
       const role = (user.role || '').toString().toLowerCase();
       // Detect staff by role or by presence of staff id fields in token
@@ -221,7 +238,9 @@ const ChatController = {
         noidung,
         thoigiangui: new Date().toISOString(),
         daxem: false,
+        message_type: messageType === 'media' ? 'media' : 'text',
       };
+      
       if (isStaff) {
         // prefer numeric staff id
         let sid = staffIdFromToken;
@@ -285,6 +304,45 @@ const ChatController = {
     } catch (err) {
       console.error('[ChatController.sendMessage] error:', err);
       res.status(500).json({ message: err.message || 'Lỗi khi gửi tin nhắn' });
+    }
+  },
+
+  async uploadMedia(req, res) {
+    try {
+      const file = req.file;
+      if (!file) return res.status(400).json({ message: 'Thiếu file để tải lên' });
+      const mime = file.mimetype || 'application/octet-stream';
+      if (!mime.startsWith('image/') && !mime.startsWith('video/')) {
+        return res.status(400).json({ message: 'Chỉ hỗ trợ hình ảnh hoặc video' });
+      }
+
+      const bucket = process.env.CHAT_MEDIA_BUCKET || 'noidungchat';
+      const chatBoxIdRaw = req.body?.machatbox;
+      const chatBoxId = chatBoxIdRaw ? parseInt(chatBoxIdRaw, 10) : null;
+      const folder = chatBoxId && !Number.isNaN(chatBoxId) ? `chatbox-${chatBoxId}` : 'general';
+      const ext = path.extname(file.originalname || '').toLowerCase() || (mime.startsWith('image/') ? '.jpg' : '.mp4');
+      const uniqueName = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`;
+      const objectPath = `${folder}/${uniqueName}`;
+
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(objectPath, file.buffer, {
+          contentType: mime,
+          upsert: false,
+        });
+      if (error) throw error;
+
+      const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${bucket}/${objectPath}`;
+      return res.json({
+        url: publicUrl,
+        path: objectPath,
+        mimeType: mime,
+        size: file.size,
+        bucket,
+      });
+    } catch (err) {
+      console.error('[ChatController.uploadMedia] error:', err);
+      res.status(500).json({ message: err.message || 'Không thể tải file lên' });
     }
   },
 

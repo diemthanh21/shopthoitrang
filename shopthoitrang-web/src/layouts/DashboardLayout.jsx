@@ -104,8 +104,9 @@ const accountRole =
     {
       label: "Khách hàng",
       icon: User,
-      items: [{ label: "Thông tin khách hàng", link: "/khachhang" },
-         { label: "Danh sách thẻ", link: "/hangthe" },
+      items: [
+        { label: "Thông tin khách hàng", link: "/khachhang" },
+        { label: "Thẻ thành viên", link: "/thethanhvien" },
       ],
       
     },
@@ -132,7 +133,7 @@ const accountRole =
       icon: Building2,
       items: [
         { label: "Banner", link: "/banner" },
-       
+        { label: "Phí vận chuyển", link: "/phivanchuyen" },
       ],
     },
   ];

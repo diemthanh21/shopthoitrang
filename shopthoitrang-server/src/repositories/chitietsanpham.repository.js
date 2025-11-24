@@ -31,18 +31,28 @@ const ChiTietSanPhamRepository = {
   } = {}) {
     let q = supabase.from(TABLE).select(BASE_SELECT, { count: 'exact' });
 
-    if (masanpham) q = q.eq('masanpham', Number(masanpham));
+    const productId = Number(masanpham);
+    if (Number.isFinite(productId)) {
+      q = q.eq('masanpham', productId);
+    }
     if (search && search.trim()) {
       q = q.or(
         `kichthuoc.ilike.%${search}%,mausac.ilike.%${search}%,chatlieu.ilike.%${search}%,mota.ilike.%${search}%`
       );
     }
-    if (minPrice !== undefined) q = q.gte('giaban', Number(minPrice));
-    if (maxPrice !== undefined) q = q.lte('giaban', Number(maxPrice));
+    if (minPrice !== undefined && Number.isFinite(Number(minPrice))) {
+      q = q.gte('giaban', Number(minPrice));
+    }
+    if (maxPrice !== undefined && Number.isFinite(Number(maxPrice))) {
+      q = q.lte('giaban', Number(maxPrice));
+    }
+
+    const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 50;
+    const safeOffset = Number.isFinite(Number(offset)) ? Number(offset) : 0;
 
     q = q
       .order(orderBy, { ascending: (orderDir || 'asc').toLowerCase() !== 'desc' })
-      .range(offset, offset + limit - 1);
+      .range(safeOffset, safeOffset + safeLimit - 1);
 
     const { data, error, count } = await q;
     if (error) throw error;

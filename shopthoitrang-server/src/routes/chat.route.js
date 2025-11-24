@@ -3,6 +3,14 @@ const router = express.Router();
 const ctrl = require('../controllers/chat.controller');
 const authenticateToken = require('../middlewares/auth.middleware');
 const { requireRole, requireAuthenticated, requireCustomer } = require('../middlewares/role.middleware');
+const multer = require('multer');
+
+const chatMediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: Number(process.env.CHAT_MEDIA_MAX_BYTES || 50 * 1024 * 1024),
+  },
+});
 
 /**
  * @swagger
@@ -100,6 +108,33 @@ router.post('/send', requireRole('employee','admin','customer'), ctrl.sendMessag
  *       201: { description: Đã gửi }
  */
 router.post('/send-product', requireRole('employee','admin','customer'), ctrl.sendProductMessage);
+
+/**
+ * @swagger
+ * /api/chat/upload:
+ *   post:
+ *     summary: Tải ảnh/video đính kèm và nhận URL public
+ *     tags: [Chat]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               machatbox: { type: integer }
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200: { description: Tải thành công }
+ */
+router.post(
+  '/upload',
+  requireRole('employee','admin','customer'),
+  chatMediaUpload.single('file'),
+  ctrl.uploadMedia
+);
 
 /**
  * @swagger

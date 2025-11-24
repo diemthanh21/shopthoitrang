@@ -15,9 +15,18 @@ const HangThePage = () => {
     try {
       setLoading(true);
       const data = await hangtheService.getAll();
+      console.log('fetchHangThe received data:', data, 'isArray:', Array.isArray(data));
+      if (!Array.isArray(data)) {
+        console.error('Data is not an array!', typeof data, data);
+        message.error('Dữ liệu hạng thẻ không hợp lệ');
+        setHangThe([]);
+        return;
+      }
       setHangThe(data);
     } catch (error) {
+      console.error('fetchHangThe error:', error);
       message.error('Không thể tải dữ liệu hạng thẻ');
+      setHangThe([]);
     } finally {
       setLoading(false);
     }

@@ -98,6 +98,35 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> postMultipart(String path,
+      {Map<String, String>? fields,
+      List<http.MultipartFile>? files,
+      Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    merged.removeWhere(
+        (key, _) => key.toLowerCase() == 'content-type');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(merged);
+    if (fields != null) request.fields.addAll(fields);
+    if (files != null) request.files.addAll(files);
+    try {
+      final streamed = await request.send().timeout(timeout);
+      final res = await http.Response.fromStream(streamed);
+      return _handleResponse(res);
+    } on SocketException {
+      throw ApiException('Không thể kết nối máy chủ');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Lỗi không xác định: $e');
+    }
+  }
+
   Map<String, dynamic> _handleResponse(http.Response res) {
     final text = res.body.isEmpty ? '{}' : res.body;
     Map<String, dynamic> json;

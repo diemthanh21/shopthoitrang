@@ -13,13 +13,16 @@ import '../models/product_model.dart';
 import '../models/membership_model.dart';
 import '../models/cart_model.dart';
 import '../models/coupon_model.dart';
+import '../models/shipping_config.dart';
 import '../services/order_service.dart';
 import '../services/cart_service.dart';
 import '../services/address_service.dart';
 import '../services/payment_service.dart';
+import '../services/shipping_service.dart';
 import '../providers/auth_provider.dart';
 import 'address_selection_screen.dart';
 import 'coupon_selection_screen.dart';
+import '../utils/order_gift_cache.dart';
 
 enum CheckoutSource { buyNow, cart }
 
@@ -35,6 +38,7 @@ class CheckoutScreen extends StatefulWidget {
   final Product? product;
   final List<int>? selectedItemIds;
   final int? sizeBridgeId;
+  final CartGiftOption? buyNowGiftOption;
 
   const CheckoutScreen({
     super.key,
@@ -45,6 +49,7 @@ class CheckoutScreen extends StatefulWidget {
     this.product,
     this.selectedItemIds,
     this.sizeBridgeId,
+    this.buyNowGiftOption,
   });
 
   @override
@@ -56,6 +61,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final CartService _cartService = CartService();
   final AddressService _addressService = AddressService();
   final PaymentService _paymentService = PaymentService();
+  final ShippingService _shippingService = ShippingService();
   final TextEditingController _noteController = TextEditingController();
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(locale: 'vi_VN', symbol: ' VND', decimalDigits: 0);
@@ -68,6 +74,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   double _shippingFee = 0;
   double _orderCouponDiscount = 0;
   double _shippingCouponDiscount = 0;
+  ShippingConfig? _shippingConfig;
   Coupon? _selectedDiscountCoupon;
   Coupon? _selectedFreeshipCoupon;
   DiaChiKhachHang? _selectedAddress;
@@ -80,6 +87,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     super.initState();
     _loadOrderItems();
     _loadDefaultAddress();
+    _loadShippingConfig();
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -95,12 +103,47 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           orElse: () => addresses.first,
         );
         setState(() => _selectedAddress = defaultAddr);
+        _recalculateShippingFee(address: defaultAddr);
       }
     } catch (e) {
       debugPrint('Error loading address: $e');
     }
   }
 
+  Future<void> _loadShippingConfig() async {
+    try {
+      final config = await _shippingService.getConfig();
+      if (!mounted) return;
+      setState(() {
+        _shippingConfig = config;
+      });
+      _recalculateShippingFee(address: _selectedAddress, config: config);
+    } catch (e) {
+      debugPrint('Error loading shipping config: $e');
+    }
+  }
+
+  void _recalculateShippingFee({
+    DiaChiKhachHang? address,
+    ShippingConfig? config,
+  }) {
+    final cfg = config ?? _shippingConfig;
+    final targetAddress = address ?? _selectedAddress;
+    if (cfg == null || !cfg.isActive || targetAddress == null) {
+      setState(() {
+        _shippingFee = 0;
+        _shippingCouponDiscount =
+            _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+      });
+      return;
+    }
+    final fee = cfg.feeForProvince(targetAddress.tinh);
+    setState(() {
+      _shippingFee = fee;
+      _shippingCouponDiscount =
+          _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+    });
+  }
 
   Future<void> _loadOrderItems() async {
     setState(() => _isLoading = true);
@@ -112,12 +155,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         }
         final quantity = widget.quantity ?? 1;
         final unitPrice = widget.price ?? widget.variant!.price;
+        final opt = widget.buyNowGiftOption;
+        final giftQty = _calculateGiftQuantity(opt, quantity);
         final orderItems = [
           OrderItem(
             variantId: widget.variant!.id,
             quantity: quantity,
             price: unitPrice,
             sizeBridgeId: widget.sizeBridgeId,
+            giftVariantId: opt?.variantId,
+            giftSizeBridgeId: opt?.sizeBridgeId,
+            giftQuantity: giftQty,
+            giftPromotionId: opt?.promoId,
           ),
         ];
         final subtotal =
@@ -128,6 +177,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             variant: widget.variant!,
             quantity: quantity,
             unitPrice: unitPrice,
+            giftOption: opt,
+            giftQuantity: giftQty,
           ),
         ];
 
@@ -151,23 +202,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             )
             .toList();
 
-        final orderItems = filtered
-            .map(
-              (item) => OrderItem(
-                id: item.id,
-                variantId: item.variantId,
-                productId: item.variant?.product?.id,
-                productName: item.variant?.product?.name,
-                variantName: _formatVariantName(item),
-                imageUrl: item.variant?.images.isNotEmpty == true
-                    ? item.variant!.images.first.url
-                    : null,
-                quantity: item.quantity,
-                price: item.price,
-                sizeBridgeId: item.sizeBridgeId,
-              ),
-            )
-            .toList();
+        final orderItems = filtered.map((item) {
+          final selectedGift = item.selectedGiftOption;
+          final giftVariantId = item.selectedGiftVariantId ??
+              selectedGift?.variantId ??
+              item.giftProduct?.id;
+          final giftSizeBridgeId =
+              item.selectedGiftSizeBridgeId ?? selectedGift?.sizeBridgeId;
+          final giftPromotionId = selectedGift?.promoId;
+          final giftQty = item.giftRewardQuantity;
+
+          return OrderItem(
+            id: item.id,
+            variantId: item.variantId,
+            productId: item.variant?.product?.id,
+            productName: item.variant?.product?.name,
+            variantName: _formatVariantName(item),
+            imageUrl: item.variant?.images.isNotEmpty == true
+                ? item.variant!.images.first.url
+                : null,
+            quantity: item.quantity,
+            price: item.price,
+            sizeBridgeId: item.sizeBridgeId,
+            giftVariantId: giftVariantId,
+            giftSizeBridgeId: giftSizeBridgeId,
+            giftQuantity: giftQty,
+            giftPromotionId: giftPromotionId,
+          );
+        }).toList();
 
         final subtotal =
             orderItems.fold<double>(0, (sum, item) => sum + item.total);
@@ -193,6 +255,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     }
   }
+
+  int _calculateGiftQuantity(CartGiftOption? option, int orderedQty) {
+    if (option == null) return 0;
+    if (orderedQty <= 0) return 0;
+    final requiredBuy = option.buyQty > 0 ? option.buyQty : 1;
+    final reward = option.giftQty > 0 ? option.giftQty : 0;
+    if (reward == 0) return 0;
+    final eligibleSets = orderedQty ~/ requiredBuy;
+    if (eligibleSets <= 0) return 0;
+    final total = eligibleSets * reward;
+    if (option.eligibleQuantity > 0) {
+      return math.min(total, option.eligibleQuantity);
+    }
+    return total;
+  }
+
   Future<void> _placeOrder() async {
     if (_selectedAddress == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -228,12 +306,37 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         orderStatus: 'Cho xac nhan',
         items: _orderItems,
         shippingAddress: _selectedAddress,
+        shippingFee: _shippingFee,
+        shippingProvinceSnapshot: _selectedAddress?.tinh,
         appliedVoucherIds: _collectVoucherIds(),
       );
 
       final createdOrder = await _orderService.createOrder(order);
 
       if (createdOrder != null && mounted) {
+        if (createdOrder.id != null) {
+          final gifts = <OrderGiftCacheEntry>[];
+          for (var i = 0;
+              i < _orderItems.length && i < _productSummaries.length;
+              i++) {
+            final summary = _productSummaries[i];
+            final item = _orderItems[i];
+            if (summary.giftName != null) {
+              gifts.add(OrderGiftCacheEntry(
+                orderId: createdOrder.id!,
+                parentVariantId: item.variantId,
+                giftName: summary.giftName!,
+                variantLabel: summary.giftVariantLabel,
+                imageUrl: summary.giftImageUrl,
+                quantity: summary.giftQuantity ?? 0,
+              ));
+            }
+          }
+          if (gifts.isNotEmpty) {
+            await OrderGiftCache.save(createdOrder.id!, gifts);
+          }
+        }
+
         if (widget.source == CheckoutSource.cart) {
           for (final item in _orderItems) {
             if (item.id != null) {
@@ -324,7 +427,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     if (paymentPayload == null) {
       throw Exception(
-        _paymentService.lastError ?? 'Không thể mở cổng thanh toán. Vui lòng thử lại.',
+        _paymentService.lastError ??
+            'Không thể mở cổng thanh toán. Vui lòng thử lại.',
       );
     }
 
@@ -443,13 +547,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   _buildProductsSection(),
-
                   const SizedBox(height: 12),
-
                   _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,7 +592,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           subtitle: 'Mien phi giao dich',
                           value: 'Bank',
                         ),
-                          const Divider(height: 8),
+                        const Divider(height: 8),
                         _buildPaymentOption(
                           icon: Icons.account_balance,
                           title: 'Chuyen khoan MOMO',
@@ -506,13 +606,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 12),
-
                   _buildCouponSection(),
-
                   const SizedBox(height: 12),
-
                   _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -660,7 +756,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ),
         ),
       ),
-
     );
   }
 
@@ -758,6 +853,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildProductItem(CheckoutProductSummary item) {
+    final hasDiscount = item.originalPrice != null &&
+        item.originalPrice! > item.unitPrice + 0.01;
+    final discountValue = hasDiscount
+        ? (item.originalPrice! - item.unitPrice) * item.quantity
+        : 0.0;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -835,6 +936,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     decoration: TextDecoration.lineThrough,
                   ),
                 ),
+              if (hasDiscount)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    'Giảm ${_formatCurrency(discountValue)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               if (item.promotionLabel != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
@@ -857,27 +970,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               if (item.giftName != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.card_giftcard,
-                        size: 16,
-                        color: Colors.pink[300],
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          item.giftVariantLabel != null
-                              ? '${item.giftName!} (${item.giftVariantLabel})'
-                              : item.giftName!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  child: _buildGiftInfoTile(item),
                 ),
             ],
           ),
@@ -887,320 +980,165 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Widget _buildCouponSection() {
-
     final hasDiscount = _selectedDiscountCoupon != null;
 
     final hasFreeship = _selectedFreeshipCoupon != null;
 
     return _buildCard(
-
       child: Column(
-
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
-
           Row(
-
             children: [
-
               Container(
-
                 padding: const EdgeInsets.all(8),
-
                 decoration: BoxDecoration(
-
                   color: kLightBlue,
-
                   borderRadius: BorderRadius.circular(8),
-
                 ),
-
                 child: const Icon(
-
                   Icons.discount_outlined,
-
                   color: kPrimaryBlue,
-
                   size: 20,
-
                 ),
-
               ),
-
               const SizedBox(width: 12),
-
               const Text(
-
                 'Ma giam gia',
-
                 style: TextStyle(
-
                   fontSize: 16,
-
                   fontWeight: FontWeight.w600,
-
                 ),
-
               ),
-
             ],
-
           ),
-
           const SizedBox(height: 12),
-
           if (!hasDiscount && !hasFreeship)
-
             Text(
-
               'Ban chua chon ma giam gia nao.',
-
               style: TextStyle(
-
                 fontSize: 14,
-
                 color: Colors.grey[600],
-
               ),
-
             ),
-
           if (hasDiscount)
-
             _buildSelectedCouponRow(
-
               coupon: _selectedDiscountCoupon!,
-
               discountValue: _orderCouponDiscount,
-
               label: 'Giam gia don hang',
-
               onRemove: () => _clearCouponSelection(isShipping: false),
-
             ),
-
           if (hasFreeship)
-
             _buildSelectedCouponRow(
-
               coupon: _selectedFreeshipCoupon!,
-
               discountValue: _shippingCouponDiscount,
-
               label: 'Giam phi van chuyen',
-
               onRemove: () => _clearCouponSelection(isShipping: true),
-
             ),
-
           const SizedBox(height: 16),
-
           OutlinedButton.icon(
-
             onPressed: _openCouponSelection,
-
             icon: const Icon(Icons.local_offer_outlined),
-
             label: const Text('Chon / nhap ma giam gia'),
-
             style: OutlinedButton.styleFrom(
-
               foregroundColor: kPrimaryBlue,
-
               side: const BorderSide(color: kPrimaryBlue),
-
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-
               shape: RoundedRectangleBorder(
-
                 borderRadius: BorderRadius.circular(12),
-
               ),
-
             ),
-
           ),
-
         ],
-
       ),
-
     );
-
   }
 
-
-
   Widget _buildSelectedCouponRow({
-
     required Coupon coupon,
-
     required double discountValue,
-
     required String label,
-
     required VoidCallback onRemove,
-
   }) {
-
     final applied = discountValue > 0;
 
     return Container(
-
       margin: const EdgeInsets.only(top: 8),
-
       padding: const EdgeInsets.all(12),
-
       decoration: BoxDecoration(
-
         color: kLightBlue.withOpacity(0.3),
-
         borderRadius: BorderRadius.circular(12),
-
         border: Border.all(color: kPrimaryBlue.withOpacity(0.2)),
-
       ),
-
       child: Row(
-
         children: [
-
           Expanded(
-
             child: Column(
-
               crossAxisAlignment: CrossAxisAlignment.start,
-
               children: [
-
                 Text(
-
                   label,
-
                   style: const TextStyle(
-
                     fontSize: 13,
-
                     color: kDarkBlue,
-
                     fontWeight: FontWeight.w500,
-
                   ),
-
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
-
                   coupon.code,
-
                   style: const TextStyle(
-
                     fontSize: 15,
-
                     fontWeight: FontWeight.w600,
-
                   ),
-
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
-
                   _couponValueLabel(coupon),
-
                   style: TextStyle(
-
                     fontSize: 13,
-
                     color: Colors.grey[700],
-
                   ),
-
                 ),
-
                 if (!applied)
-
                   Padding(
-
                     padding: const EdgeInsets.only(top: 2),
-
                     child: Text(
-
                       'Chua du dieu kien ap dung',
-
                       style: TextStyle(
-
                         fontSize: 12,
-
                         color: Colors.red[400],
-
                       ),
-
                     ),
-
                   ),
-
               ],
-
             ),
-
           ),
-
           Column(
-
             crossAxisAlignment: CrossAxisAlignment.end,
-
             children: [
-
               Text(
-
                 applied
-
                     ? '-${_formatCurrency(discountValue)}'
-
                     : '-${_formatCurrency(0)}',
-
                 style: const TextStyle(
-
                   fontSize: 15,
-
                   fontWeight: FontWeight.w600,
-
                   color: kPrimaryBlue,
-
                 ),
-
               ),
-
               IconButton(
-
                 onPressed: onRemove,
-
                 icon: const Icon(Icons.close_rounded, size: 18),
-
                 color: Colors.grey[600],
-
                 tooltip: 'Bo chon',
-
               ),
-
             ],
-
           ),
-
         ],
-
       ),
-
     );
-
   }
-
-
 
   String _couponValueLabel(Coupon coupon) {
     switch (coupon.discountType) {
@@ -1258,6 +1196,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         if (result != null) {
           setState(() => _selectedAddress = result);
+          _recalculateShippingFee(address: result);
         }
       },
       child: Container(
@@ -1351,10 +1290,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
                 if (result != null) {
                   setState(() => _selectedAddress = result);
+                  _recalculateShippingFee(address: result);
                 }
               },
               style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
@@ -1452,7 +1393,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     title,
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
                       color: isSelected ? Colors.black87 : Colors.black54,
                     ),
                   ),
@@ -1552,7 +1494,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             fontSize: isTotal ? 18 : 14,
             fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
             color: valueColor ??
-                (isTotal ? const Color.fromARGB(255, 0, 0, 216) : Colors.black87),
+                (isTotal
+                    ? const Color.fromARGB(255, 0, 0, 216)
+                    : Colors.black87),
           ),
         ),
       ],
@@ -1573,6 +1517,73 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   String _formatCurrency(double value) => _currencyFormatter.format(value);
+
+  Widget _buildGiftInfoTile(CheckoutProductSummary item) {
+    final giftQty = item.giftQuantity ?? 0;
+    final hasImage = item.giftImageUrl != null && item.giftImageUrl!.isNotEmpty;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFFE082)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: hasImage
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      item.giftImageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.card_giftcard,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  )
+                : const Icon(Icons.card_giftcard, color: Colors.orange),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.giftName ?? 'Quà tặng kèm',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (item.giftVariantLabel != null &&
+                    item.giftVariantLabel!.isNotEmpty)
+                  Text(
+                    item.giftVariantLabel!,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                Text(
+                  giftQty > 0 ? 'Số lượng: x$giftQty' : 'Tặng kèm',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class CheckoutProductSummary {
@@ -1586,6 +1597,8 @@ class CheckoutProductSummary {
   final String? promotionLabel;
   final String? giftName;
   final String? giftVariantLabel;
+  final int? giftQuantity;
+  final String? giftImageUrl;
 
   CheckoutProductSummary({
     required this.name,
@@ -1598,6 +1611,8 @@ class CheckoutProductSummary {
     this.promotionLabel,
     this.giftName,
     this.giftVariantLabel,
+    this.giftQuantity,
+    this.giftImageUrl,
   });
 
   factory CheckoutProductSummary.fromCartItem(CartItem item) {
@@ -1626,6 +1641,9 @@ class CheckoutProductSummary {
       promotionLabel: item.promotionLabel,
       giftName: item.giftProductName,
       giftVariantLabel: item.giftVariantLabel,
+      giftQuantity:
+          item.giftRewardQuantity > 0 ? item.giftRewardQuantity : null,
+      giftImageUrl: item.giftProduct?.imageUrl,
     );
   }
 
@@ -1634,9 +1652,28 @@ class CheckoutProductSummary {
     required ProductVariant variant,
     required int quantity,
     required double unitPrice,
+    CartGiftOption? giftOption,
+    int giftQuantity = 0,
   }) {
-    final imageUrl =
-        variant.images.isNotEmpty ? variant.images.first.url : product?.coverImage;
+    final imageUrl = variant.images.isNotEmpty
+        ? variant.images.first.url
+        : product?.coverImage;
+    String? giftVariantLabel;
+    if (giftOption != null) {
+      if (giftOption.label != null && giftOption.label!.isNotEmpty) {
+        giftVariantLabel = giftOption.label;
+      } else {
+        final parts = <String>[];
+        if (giftOption.sizeLabel != null && giftOption.sizeLabel!.isNotEmpty) {
+          parts.add('Size ${giftOption.sizeLabel}');
+        }
+        if (giftOption.color != null && giftOption.color!.isNotEmpty) {
+          parts.add(giftOption.color!);
+        }
+        giftVariantLabel = parts.isNotEmpty ? parts.join(' / ') : null;
+      }
+    }
+
     return CheckoutProductSummary(
       name: product?.name ?? 'San pham',
       variantLabel: variant.displayName,
@@ -1645,6 +1682,10 @@ class CheckoutProductSummary {
       unitPrice: unitPrice,
       lineTotal: unitPrice * quantity,
       originalPrice: variant.price,
+      giftName: giftOption?.name,
+      giftVariantLabel: giftVariantLabel,
+      giftQuantity: giftQuantity > 0 ? giftQuantity : null,
+      giftImageUrl: giftOption?.imageUrl,
     );
   }
 }

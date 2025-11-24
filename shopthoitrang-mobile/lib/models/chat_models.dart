@@ -33,8 +33,12 @@ class ChatMessage {
   final DateTime time;
   final bool read;
   final Map<String, dynamic>? staff; // { manhanvien, tendangnhap }
-  final String messageType; // 'text' | 'product'
+  final String messageType; // 'text' | 'product' | 'media'
   final Map<String, dynamic>? productSnapshot; // when product card
+  final String? mediaUrl;
+  final String? mediaMimeType;
+  final String? mediaName;
+  final int? mediaSize;
 
   ChatMessage({
     required this.id,
@@ -46,54 +50,63 @@ class ChatMessage {
     this.staff,
     required this.messageType,
     this.productSnapshot,
+    this.mediaUrl,
+    this.mediaMimeType,
+    this.mediaName,
+    this.mediaSize,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
-    // Attempt to parse type/product from either explicit columns (message_type, product_snapshot)
-    // or from JSON-encoded noidung fallback.
     String type = (json['message_type'] ?? '').toString();
     Map<String, dynamic>? snapshot;
     if (json['product_snapshot'] is Map) {
       snapshot = Map<String, dynamic>.from(json['product_snapshot']);
     }
-    // Fallback: parse noidung if it looks like a JSON structure
-    if (snapshot == null && (type.isEmpty || type == 'product')) {
-      final raw = json['noidung'];
-      // Case 1: already an object
-      if (raw is Map) {
-        if (raw['type'] == 'product' && raw['product'] is Map) {
-          type = 'product';
-          snapshot = Map<String, dynamic>.from(raw['product'] as Map);
-        }
-      }
-      // Case 2: stringified JSON
-      else if (raw is String) {
-        final s = raw.trim();
-        if (s.startsWith('{')) {
-          try {
-            final decoded = _tryDecode(s);
-            if (decoded is Map &&
-                decoded['type'] == 'product' &&
-                decoded['product'] is Map) {
-              type = 'product';
-              snapshot = Map<String, dynamic>.from(decoded['product'] as Map);
-            }
-          } catch (_) {
-            // Last resort: simply mark it as product if signature is present
-            if (s.contains('"type"') && s.contains('"product"')) {
-              type = 'product';
-            }
+
+    Map<String, dynamic>? parsedPayload;
+    final rawContent = json['noidung'];
+    String contentString = '';
+    if (rawContent is Map<String, dynamic>) {
+      parsedPayload = Map<String, dynamic>.from(rawContent);
+      contentString = jsonEncode(rawContent);
+    } else if (rawContent is String) {
+      contentString = rawContent;
+      final trimmed = rawContent.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          final decoded = _tryDecode(trimmed);
+          if (decoded is Map<String, dynamic>) {
+            parsedPayload = decoded;
           }
-        }
+        } catch (_) {}
+      }
+    } else if (rawContent != null) {
+      contentString = rawContent.toString();
+    }
+
+    if (parsedPayload != null) {
+      final payloadType = parsedPayload['type']?.toString();
+      if (payloadType == 'product' && parsedPayload['product'] is Map) {
+        snapshot = Map<String, dynamic>.from(parsedPayload['product'] as Map);
+        type = 'product';
+      } else if (payloadType == 'media') {
+        type = 'media';
+      } else if (type.isEmpty && payloadType is String && payloadType.isNotEmpty) {
+        type = payloadType;
       }
     }
     if (type.isEmpty) type = 'text';
+
+    Map<String, dynamic>? mediaSnapshot;
+    if (type == 'media' && parsedPayload != null) {
+      mediaSnapshot = parsedPayload;
+    }
 
     return ChatMessage(
       id: json['machat'] ?? json['id'] ?? 0,
       chatBoxId: json['machatbox'] ?? 0,
       sender: json['nguoigui'] ?? 'KH',
-      content: json['noidung'] ?? '',
+      content: contentString,
       time: json['thoigiangui'] != null
           ? DateTime.tryParse(json['thoigiangui']) ?? DateTime.now()
           : DateTime.now(),
@@ -101,6 +114,16 @@ class ChatMessage {
       staff: json['nhanvien'],
       messageType: type,
       productSnapshot: snapshot,
+      mediaUrl: mediaSnapshot?['url']?.toString(),
+      mediaMimeType: mediaSnapshot?['mediaType']?.toString() ??
+          mediaSnapshot?['mimeType']?.toString(),
+      mediaName: mediaSnapshot?['name']?.toString(),
+      mediaSize: () {
+        final rawSize = mediaSnapshot?['size'];
+        if (rawSize is num) return rawSize.toInt();
+        if (rawSize != null) return int.tryParse(rawSize.toString());
+        return null;
+      }(),
     );
   }
 }

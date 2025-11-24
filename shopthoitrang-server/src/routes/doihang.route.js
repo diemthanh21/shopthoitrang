@@ -82,7 +82,6 @@ router.get('/khachhang/:makhachhang', ctrl.getByCustomer);
  *               soluong: { type: integer }
  *               lydo: { type: string }
  *               trangthai: { type: string }
- *               ghichu: { type: string }
  *     responses:
  *       201:
  *         description: Tạo thành công
@@ -109,7 +108,6 @@ router.post('/', ctrl.create);
  *             type: object
  *             properties:
  *               trangthai: { type: string }
- *               ghichu: { type: string }
  *     responses:
  *       200:
  *         description: Cập nhật thành công
@@ -141,7 +139,7 @@ router.delete('/:id', ctrl.delete);
 router.post('/:id/accept', ctrl.accept);              // body: { diachiguihang }
 router.post('/:id/reject', ctrl.reject);              // body: { lydo }
 router.post('/:id/mark-received-old', ctrl.markReceivedOld);
-router.post('/:id/mark-invalid', ctrl.markInvalid);   // body: { ghichu }
+router.post('/:id/mark-invalid', ctrl.markInvalid);   // body: { note }
 router.post('/:id/mark-valid', ctrl.markValid);
 router.post('/:id/calc-diff', ctrl.calcDiff);
 router.get('/:id/diff-preview', ctrl.diffPreview);

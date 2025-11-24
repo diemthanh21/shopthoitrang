@@ -29,6 +29,12 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
       NumberFormat.currency(locale: 'vi_VN', symbol: '₫', decimalDigits: 0);
   final DateFormat _dateFormatter = DateFormat('dd/MM/yyyy');
 
+  // Màu chủ đạo xanh biển
+  static const Color primaryBlue = Color(0xFF0D47A1);
+  static const Color lightBlue = Color(0xFF1976D2);
+  static const Color accentBlue = Color(0xFF42A5F5);
+  static const Color backgroundBlue = Color(0xFFE3F2FD);
+
   bool _isLoading = true;
   List<Coupon> _discountCoupons = [];
   List<Coupon> _freeshipCoupons = [];
@@ -187,9 +193,13 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: backgroundBlue,
       appBar: AppBar(
         title: const Text('Chọn mã giảm giá'),
         centerTitle: true,
+        backgroundColor: primaryBlue,
+        foregroundColor: Colors.white,
+        elevation: 0,
         actions: [
           if (_selectedDiscountCoupon != null ||
               _selectedFreeshipCoupon != null)
@@ -197,13 +207,17 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
               onPressed: _clearSelections,
               child: const Text(
                 'Bỏ chọn',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
               ),
             ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: lightBlue,
+              ),
+            )
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
@@ -212,9 +226,9 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                 _buildSectionHeader('Mã freeship (chọn tối đa 1)'),
                 const SizedBox(height: 8),
                 if (_freeshipCoupons.isEmpty)
-                  const Text(
+                  Text(
                     'Không có mã freeship khả dụng',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.blue[800]),
                   )
                 else
                   ..._freeshipCoupons.map(
@@ -228,9 +242,9 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                 _buildSectionHeader('Mã giảm giá khác (chọn tối đa 1)'),
                 const SizedBox(height: 8),
                 if (_discountCoupons.isEmpty)
-                  const Text(
+                  Text(
                     'Không có mã giảm giá khả dụng',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.blue[800]),
                   )
                 else
                   ..._discountCoupons.map(
@@ -243,15 +257,19 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
               ],
             ),
       bottomNavigationBar: SafeArea(
-        child: Padding(
+        child: Container(
+          color: Colors.white,
           padding: const EdgeInsets.all(16),
           child: ElevatedButton(
             onPressed: _submit,
             style: ElevatedButton.styleFrom(
+              backgroundColor: primaryBlue,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
+              elevation: 2,
             ),
             child: const Text(
               'Áp dụng',
@@ -264,53 +282,92 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
   }
 
   Widget _buildManualInput() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nhập mã giảm giá',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _codeController,
-                decoration: InputDecoration(
-                  hintText: 'Nhập mã...',
-                  border: OutlineInputBorder(
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: primaryBlue.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Nhập mã giảm giá',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              color: primaryBlue,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _codeController,
+                  decoration: InputDecoration(
+                    hintText: 'Nhập mã...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: accentBlue),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: lightBlue, width: 2),
+                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton(
+                onPressed: _applyManualCode,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: lightBlue,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                  shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  elevation: 0,
+                ),
+                child: const Text(
+                  'Áp dụng',
+                  style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            ElevatedButton(
-              onPressed: _applyManualCode,
-              style: ElevatedButton.styleFrom(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text('Áp dụng'),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSectionHeader(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primaryBlue.withOpacity(0.1), Colors.transparent],
+        ),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w700,
+          color: primaryBlue,
+        ),
       ),
     );
   }
@@ -336,17 +393,45 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
       onTap: applicable ? onTap : null,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? Colors.blue : Colors.grey[300]!,
-            width: selected ? 1.5 : 1,
+            color: selected ? lightBlue : Colors.blue[200]!,
+            width: selected ? 2 : 1,
           ),
-          color: selected ? Colors.blue.withOpacity(0.05) : Colors.white,
+          gradient: selected
+              ? LinearGradient(
+                  colors: [
+                    backgroundBlue,
+                    Colors.white,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: selected ? null : Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: selected 
+                  ? lightBlue.withOpacity(0.3) 
+                  : Colors.blue.withOpacity(0.08),
+              blurRadius: selected ? 8 : 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Row(
           children: [
+            Container(
+              width: 4,
+              height: 60,
+              decoration: BoxDecoration(
+                color: selected ? lightBlue : accentBlue,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,14 +441,26 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                       Expanded(
                         child: Text(
                           displayName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
+                            color: primaryBlue,
                           ),
                         ),
                       ),
                       if (selected)
-                        const Icon(Icons.check_circle, color: Colors.blue),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: lightBlue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                        ),
                     ],
                   ),
                   if (displayName.toUpperCase() != coupon.code.toUpperCase())
@@ -375,35 +472,41 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.grey[200],
+                          color: accentBlue.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: accentBlue.withOpacity(0.5),
+                            width: 1,
+                          ),
                         ),
                         child: Text(
                           'Mã: ${coupon.code}',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.grey[800],
+                            color: primaryBlue,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black87,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: lightBlue,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   if (coupon.minOrderValue != null &&
                       coupon.minOrderValue! > 0)
                     Padding(
-                      padding: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.only(top: 4),
                       child: Text(
                         'Đơn tối thiểu ${_formatCurrency(coupon.minOrderValue!)}',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: Colors.blue[700],
                         ),
                       ),
                     ),
@@ -414,14 +517,14 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.access_time,
-                              size: 16, color: Colors.grey[600]),
+                              size: 16, color: accentBlue),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               validity,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.grey[700],
+                                color: Colors.blue[800],
                               ),
                             ),
                           ),
@@ -430,14 +533,24 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                     ),
                   if (timeStatus != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        timeStatus,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              applicable ? Colors.orange[700] : Colors.red[400],
-                          fontWeight: FontWeight.w600,
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: applicable 
+                              ? Colors.orange[50] 
+                              : Colors.red[50],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          timeStatus,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: applicable 
+                                ? Colors.orange[700] 
+                                : Colors.red[400],
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -448,7 +561,7 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                         usageInfo,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[700],
+                          color: Colors.blue[700],
                         ),
                       ),
                     ),
@@ -459,40 +572,69 @@ class _CouponSelectionScreenState extends State<CouponSelectionScreen> {
                         endCondition,
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey[600],
+                          color: Colors.blue[600],
                         ),
                       ),
                     ),
                   if (condition != null && condition.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Điều kiện áp dụng',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w600,
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: backgroundBlue.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: accentBlue.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Điều kiện áp dụng',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: primaryBlue,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            condition,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              condition,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   if (!applicable && reason != null)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        reason,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.red[400],
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.red[50],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline, size: 14, color: Colors.red[400]),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                reason,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.red[400],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

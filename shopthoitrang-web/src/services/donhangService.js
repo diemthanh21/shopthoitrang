@@ -4,11 +4,15 @@ import api from "./api";
 const normalize = (r) => ({
   maDonHang: r.madonhang ?? r.maDonHang ?? r.id,
   maKhachHang: r.makhachhang ?? r.maKhachHang ?? null,
+  manhanvien: r.manhanvien ?? r.maNhanVien ?? null, // employee approver
   ngayDatHang: r.ngaydathang ?? r.ngayDatHang ?? null, // ISO string / date
   thanhTien: r.thanhtien ?? r.thanhTien ?? 0, // number
   phuongThucThanhToan: r.phuongthucthanhtoan ?? r.phuongThucThanhToan ?? null,
   trangThaiThanhToan: r.trangthaithanhtoan ?? r.trangThaiThanhToan ?? null,
   trangThaiDonHang: r.trangthaidonhang ?? r.trangThaiDonHang ?? null,
+  lydohuy: r.lydohuy ?? r.lyDoHuy ?? null, // cancellation reason
+  maGiamGiaInfo: r.maGiamGiaInfo || r.magiamgiainfo || undefined, // discount code details
+  phiVanChuyen: r.phiVanChuyen ?? r.phivanchuyen ?? 0, // shipping fee
   // Include items if server provided them
   items: Array.isArray(r.items)
     ? r.items.map((it) => ({
@@ -26,6 +30,7 @@ const normalize = (r) => ({
         },
         imageUrl: it.imageUrl ?? it.hinhAnh ?? undefined,
         thanhTien: it.thanhTien ?? (it.soluong || it.soLuong || 0) * (it.dongia || it.donGia || 0),
+        promotion: it.promotion || undefined, // khuyến mãi
       }))
     : undefined,
   // pass-through detailed customer and address if present
@@ -71,11 +76,13 @@ const create = async (d) => {
 const update = async (id, d) => {
   const res = await api.put(`${PREFIX}/${id}`, {
     makhachhang: d.maKhachHang,
+    manhanvien: d.manhanvien ?? d.maNhanVien ?? undefined,
     ngaydathang: d.ngayDatHang,
     thanhtien: d.thanhTien,
     phuongthucthanhtoan: d.phuongThucThanhToan,
     trangthaithanhtoan: d.trangThaiThanhToan,
     trangthaidonhang: d.trangThaiDonHang,
+    lydohuy: d.lydohuy ?? d.lyDoHuy ?? undefined,
   });
   return normalize(res.data);
 };
