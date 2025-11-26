@@ -49,6 +49,14 @@ class MaGiamGia {
   }
 
   toJSON() {
+    const total = this.soLuong !== undefined && this.soLuong !== null
+      ? Number(this.soLuong)
+      : null;
+    const used = this.soLuongDaDung !== undefined && this.soLuongDaDung !== null
+      ? Number(this.soLuongDaDung)
+      : 0;
+    const remaining = total === null ? null : Math.max(0, total - used);
+
     return {
       mavoucher: this.maVoucher,
       macode: this.maCode,
@@ -68,6 +76,7 @@ class MaGiamGia {
       giam_toi_da: this.giamToiDa,
       dieukien_don_toi_thieu: this.dieuKienDonToiThieu,
       soluong_da_dung: this.soLuongDaDung,
+      soluong_con_lai: remaining,
       chi_ap_dung_sinhnhat: this.chiApDungSinhNhat,
       created_at: this.createdAt,
       updated_at: this.updatedAt,

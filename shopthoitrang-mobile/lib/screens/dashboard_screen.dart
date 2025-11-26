@@ -21,21 +21,36 @@ const Color kLightBlue = Color(0xFFE1F5FE);
 const Color kDarkBlue = Color(0xFF01579B);
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({
+    super.key,
+    this.initialIndex = 0,
+    this.initialOrdersStatus,
+  });
+
+  final int initialIndex;
+  final String? initialOrdersStatus;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _currentIndex = 0;
+  static const int _maxTabIndex = 4;
+  late int _currentIndex;
   final CartService _cartService = CartService();
   int _cartItemCount = 0;
 
   @override
   void initState() {
     super.initState();
+    _currentIndex = _normalizeIndex(widget.initialIndex);
     _loadCartCount();
+  }
+
+  int _normalizeIndex(int raw) {
+    if (raw < 0) return 0;
+    if (raw > _maxTabIndex) return _maxTabIndex;
+    return raw;
   }
 
   Future<void> _loadCartCount() async {
@@ -210,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const _HomeTab(),
           const ProductListScreen(),
           const NotificationScreen(),
-          const OrdersScreen(),
+          OrdersScreen(initialStatus: widget.initialOrdersStatus),
           const ProfileScreen(),
         ],
       ),

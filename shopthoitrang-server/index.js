@@ -7,6 +7,7 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const expressOasGenerator = require('express-oas-generator');
 const { swaggerUi, specs } = require('./src/swagger');
+const startMembershipPointsJob = require('./src/jobs/membershipPoints.job');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/chitietsanpham', require('./src/routes/chitietsanpham.route'));
 app.use('/api/chotca', require('./src/routes/chotca.route'));
 app.use('/api/chucnang', require('./src/routes/chucnang.route'));
 app.use('/api/ctbanner', require('./src/routes/ctbanner.route'));
+app.use('/api/momo', require('./src/routes/momo.route'));
 app.use('/api/danhgia', require('./src/routes/danhgia.route'));
 app.use('/api/danhmucsanpham', require('./src/routes/danhmucsanpham.route'));
 app.use('/api/diachikhachhang', require('./src/routes/diachikhachhang.route'));
@@ -90,3 +92,4 @@ app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`);
   console.log(`📚 Swagger docs at http://localhost:${PORT}/api-docs`);
 });
+startMembershipPointsJob();

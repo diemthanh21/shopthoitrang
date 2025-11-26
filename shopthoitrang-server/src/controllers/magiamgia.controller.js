@@ -4,7 +4,11 @@ const service = require('../services/magiamgia.service');
 const MaGiamGiaController = {
   async getAll(req, res) {
     try {
-      const data = await service.list(req.query);
+      const context =
+        req.user?.role === 'customer'
+          ? { customerId: req.user.makhachhang }
+          : null;
+      const data = await service.list(req.query, context || {});
       res.json(data.map((r) => r.toJSON()));
     } catch (err) {
       console.error('GET /magiamgia error:', err);

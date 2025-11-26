@@ -49,25 +49,38 @@ const normalize = (r) => {
   const rawDetails = Array.isArray(r.items) && r.items.length ? r.items : r.chitietdoihang || [];
   const details = rawDetails.map(mapDetail);
   const primary = details[0] || {};
-  const attachments = details.flatMap((detail, idx) => {
+  let imageCount = 0;
+  let videoCount = 0;
+  const attachments = [];
+  const appendMedia = (value, type) => {
+    if (!value) return;
+    const list = Array.isArray(value) ? value : [value];
+    list.forEach((entry) => {
+      if (typeof entry !== 'string') return;
+      const url = entry.trim();
+      if (!url) return;
+      if (type === 'image') {
+        imageCount += 1;
+        attachments.push({
+          type: 'image',
+          url,
+          label: `Ảnh minh chứng #${imageCount}`,
+        });
+      } else {
+        videoCount += 1;
+        attachments.push({
+          type: 'video',
+          url,
+          label: `Video minh chứng #${videoCount}`,
+        });
+      }
+    });
+  };
+  details.forEach((detail) => {
     const ev = detail.evidence;
-    if (!ev) return [];
-    const list = [];
-    if (ev.imageEvidence) {
-      list.push({
-        type: 'image',
-        url: ev.imageEvidence,
-        label: `Ảnh minh chứng #${idx + 1}`,
-      });
-    }
-    if (ev.videoEvidence) {
-      list.push({
-        type: 'video',
-        url: ev.videoEvidence,
-        label: `Video minh chứng #${idx + 1}`,
-      });
-    }
-    return list;
+    if (!ev) return;
+    appendMedia(ev.imageEvidence, 'image');
+    appendMedia(ev.videoEvidence, 'video');
   });
 
   return {

@@ -27,14 +27,11 @@ const CANCEL_ORDER_STATUSES = new Set([
   'cancel'
 ]);
 const RETURN_SUCCESS_STATUSES = new Set([
-  'da xu ly',
   'da hoan tien',
-  'da_duyet_- cho gui hang',
-  'da hoan tien'
+  'du dieu kien hoan tien',
+  'da xu ly'
 ]);
-const EXCHANGE_SUCCESS_STATUSES = new Set([
-  'da doi xong'
-]);
+const EXCHANGE_SUCCESS_STATUSES = new Set(['da doi xong']);
 
 const normalizeStatus = (value) =>
   (value || '')

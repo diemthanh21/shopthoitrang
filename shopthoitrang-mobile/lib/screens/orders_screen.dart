@@ -26,7 +26,9 @@ const Color kLightBlue = Color(0xFFE1F5FE);
 const Color kDarkBlue = Color(0xFF01579B);
 
 class OrdersScreen extends StatefulWidget {
-  const OrdersScreen({super.key});
+  final String? initialStatus;
+
+  const OrdersScreen({super.key, this.initialStatus});
 
   @override
   State<OrdersScreen> createState() => _OrdersScreenState();
@@ -61,8 +63,21 @@ class _OrdersScreenState extends State<OrdersScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _statuses.length, vsync: this);
+    _tabController = TabController(
+      length: _statuses.length,
+      vsync: this,
+      initialIndex: _resolveInitialTabIndex(),
+    );
     _loadOrders();
+  }
+
+  int _resolveInitialTabIndex() {
+    final target = widget.initialStatus?.trim();
+    if (target == null || target.isEmpty) return 0;
+    final idx = _statuses.indexWhere(
+      (status) => status.toLowerCase() == target.toLowerCase(),
+    );
+    return idx >= 0 ? idx : 0;
   }
 
   @override

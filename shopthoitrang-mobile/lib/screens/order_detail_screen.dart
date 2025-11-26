@@ -2,11 +2,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/coupon_model.dart';
 import '../models/order_model.dart';
+import '../models/review_model.dart';
+import '../providers/auth_provider.dart';
 import '../services/order_service.dart';
 import '../services/api_client.dart';
 import '../services/trahang_service.dart';
+import '../services/review_service.dart';
 import 'return_request_screen.dart';
 import 'exchange_request_screen.dart';
 import 'review_screen.dart';
@@ -39,6 +43,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   double _shippingFee = 0;
   double _autoVoucherDiscount = 0;
   List<OrderGiftCacheEntry> _cachedGiftEntries = [];
+  final ReviewService _reviewService = reviewService;
+  Map<int, Review> _reviewsByOrderDetail = {};
+  bool _loadingReviews = false;
+  String? _reviewError;
 
   static const _supabaseProjectRef = 'ergnrfsqzghjseovmzkg';
 
@@ -71,6 +79,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         _updatePricingSummary();
         _loadVoucherDetails();
         _loadGiftCache();
+        _loadReviewsForOrder();
 
         // Debug log
         if (order != null) {
@@ -378,6 +387,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                       // Danh sách sản phẩm
                       _buildProductsSection(currencyFormatter),
                       const SizedBox(height: 8),
+
+                      if (_isReviewEligible()) ...[
+                        _buildReviewSection(),
+                        const SizedBox(height: 8),
+                      ],
 
                       // Thanh toán
                       _buildPaymentSection(currencyFormatter),
@@ -776,6 +790,60 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _loadReviewsForOrder() async {
+    final order = _order;
+    if (order == null || !_isReviewEligible()) {
+      if (!mounted) return;
+      setState(() {
+        _reviewsByOrderDetail = {};
+        _loadingReviews = false;
+        _reviewError = null;
+      });
+      return;
+    }
+    final auth = Provider.of<AuthProvider?>(context, listen: false);
+    if (auth == null || !auth.isAuthenticated || auth.user == null) {
+      return;
+    }
+    setState(() {
+      _loadingReviews = true;
+      _reviewError = null;
+    });
+    final reviews = await _reviewService.getReviews(
+      customerId: auth.user!.maKhachHang,
+    );
+    if (!mounted) return;
+    if (reviews == null) {
+      setState(() {
+        _loadingReviews = false;
+        _reviewsByOrderDetail = {};
+        _reviewError = _reviewService.lastError;
+      });
+      return;
+    }
+    final map = <int, Review>{};
+    for (final review in reviews) {
+      final detailId = review.orderDetailId;
+      if (detailId != null) {
+        final hasItem = order.items.any((item) => item.id == detailId);
+        if (hasItem) {
+          map[detailId] = review;
+          continue;
+        }
+      }
+      if (review.orderId == order.id &&
+          order.items.length == 1 &&
+          order.items.first.id != null) {
+        map[order.items.first.id!] = review;
+      }
+    }
+    setState(() {
+      _reviewsByOrderDetail = map;
+      _loadingReviews = false;
+      _reviewError = null;
+    });
+  }
+
   Widget _buildGiftTile(_GiftInfo gift) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -840,6 +908,328 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildReviewSection() {
+    final order = _order;
+    if (order == null || order.items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.rate_review_outlined, color: Colors.orange),
+              const SizedBox(width: 8),
+              const Text(
+                'Đánh giá sản phẩm',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              if (_loadingReviews)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                IconButton(
+                  onPressed: _loadReviewsForOrder,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  tooltip: 'Tải lại',
+                ),
+            ],
+          ),
+          if (_reviewError != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red[400]),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _reviewError!,
+                    style: TextStyle(color: Colors.red[400]),
+                  ),
+                ),
+                TextButton(
+                  onPressed: _loadReviewsForOrder,
+                  child: const Text('Thử lại'),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          ...order.items.map(_buildReviewProductTile),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewProductTile(OrderItem item) {
+    final review = item.id != null ? _reviewsByOrderDetail[item.id!] : null;
+    final hasReview = review != null;
+    final imageUrl = _buildImageUrl(item.imageUrl);
+    final name = item.productName ?? 'Sản phẩm';
+    final comment = review?.comment?.trim();
+    final variantLabel =
+        hasReview && review != null ? _formatVariantLabel(review) : null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE0E7FF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 60,
+                          height: 60,
+                          color: Colors.grey[300],
+                          child: const Icon(Icons.image_not_supported),
+                        ),
+                      )
+                    : Container(
+                        width: 60,
+                        height: 60,
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.image, color: Colors.white),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    hasReview
+                        ? Row(
+                            children: [
+                              _buildStarRow(review!.rating, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${review.rating}/5',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.orange,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Text(
+                            'Chưa đánh giá',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                    if (hasReview && variantLabel != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          variantLabel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    if (hasReview && comment != null && comment.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          comment,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (hasReview) ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showReviewPreview(review!, item),
+                    icon: const Icon(Icons.visibility_outlined, size: 18),
+                    label: const Text('Xem đánh giá'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      _openReviewForItem(item, existingReview: review),
+                  icon: Icon(hasReview ? Icons.edit : Icons.rate_review),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        hasReview ? Colors.indigo : Colors.orange,
+                    foregroundColor: Colors.white,
+                  ),
+                  label: Text(hasReview ? 'Chỉnh sửa' : 'Đánh giá'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarRow(int rating, {double size = 18}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(
+        5,
+        (index) => Icon(
+          index < rating ? Icons.star : Icons.star_border,
+          color: Colors.amber,
+          size: size,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReviewForItem(OrderItem item, {Review? existingReview}) async {
+    if (_order == null) return;
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReviewScreen(
+          order: _order!,
+          item: item,
+          existingReview: existingReview,
+        ),
+      ),
+    );
+    if (result == true) {
+      _loadReviewsForOrder();
+    }
+  }
+
+  void _showReviewPreview(Review review, OrderItem item) {
+    final variantLabel = _formatVariantLabel(review);
+    final dateText = review.reviewDate != null
+        ? DateFormat('dd/MM/yyyy HH:mm').format(review.reviewDate!)
+        : null;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.reviews, color: Colors.orange),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    item.productName ?? 'Sản phẩm',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildStarRow(review.rating),
+            if (variantLabel != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                variantLabel,
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+            ],
+            if (dateText != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Đánh giá ngày $dateText',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+            if (review.comment != null && review.comment!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                review.comment!,
+                style: const TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _openReviewForItem(item, existingReview: review);
+                },
+                icon: const Icon(Icons.edit),
+                label: const Text('Chỉnh sửa đánh giá'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _formatVariantLabel(Review review) {
+    final parts = <String>[];
+    if (review.variantColor != null &&
+        review.variantColor!.trim().isNotEmpty) {
+      parts.add('Màu: ${review.variantColor}');
+    }
+    if (review.variantSize != null && review.variantSize!.trim().isNotEmpty) {
+      parts.add('Size: ${review.variantSize}');
+    }
+    if (parts.isEmpty) return null;
+    return parts.join(' • ');
   }
 
   Widget _buildShippingAddressSection() {
@@ -1045,7 +1435,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
     final canReturn = _isReturnEligible();
     final canExchange = _isExchangeEligible();
-    final canReview = _isReturnEligible();
+    final canReview = _isReviewEligible();
 
     return Row(
       children: [
@@ -1217,7 +1607,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     // Show action area for all statuses except canceled. For 'Đã giao' we'll present return/review actions.
     return status != 'Đã hủy';
   }
-
+  bool _isReviewEligible() {
+    if (_order == null) return false;
+    final status = _order!.orderStatus.trim().toLowerCase();
+    return status == 'da giao';
+  }
   bool _isReturnEligible() {
     if (_order == null) return false;
     if (_order!.orderStatus.trim().toLowerCase() != 'đã giao') return false;
@@ -1392,6 +1786,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             backgroundColor: Colors.green,
           ),
         );
+        _loadReviewsForOrder();
       }
     });
   }

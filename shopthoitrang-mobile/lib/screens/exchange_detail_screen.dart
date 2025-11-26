@@ -149,20 +149,28 @@ class _ExchangeDetailScreenState extends State<ExchangeDetailScreen> {
     final imageLinks = <String>{};
     final videoLinks = <String>{};
     
+    void addLink(dynamic value, Set<String> target) {
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isNotEmpty) target.add(trimmed);
+      } else if (value is List) {
+        for (final entry in value) {
+          if (entry is String) {
+            final trimmed = entry.trim();
+            if (trimmed.isNotEmpty) target.add(trimmed);
+          }
+        }
+      }
+    }
+    
     for (final detail in details) {
       if (detail is! Map<String, dynamic>) continue;
       final parsed = _parseAttachmentNote(
         detail['hinhanh'],
       );
       if (parsed == null) continue;
-      final img = parsed['imageEvidence'];
-      if (img is String && img.trim().isNotEmpty) {
-        imageLinks.add(img.trim());
-      }
-      final vid = parsed['videoEvidence'];
-      if (vid is String && vid.trim().isNotEmpty) {
-        videoLinks.add(vid.trim());
-      }
+      addLink(parsed['imageEvidence'], imageLinks);
+      addLink(parsed['videoEvidence'], videoLinks);
     }
     
     final imageList = imageLinks.toList();

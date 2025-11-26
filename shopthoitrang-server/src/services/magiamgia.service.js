@@ -1,9 +1,288 @@
 // src/services/magiamgia.service.js
 const repo = require('../repositories/magiamgia.repository');
+const customerRepo = require('../repositories/taikhoankhachhang.repository');
+const supabase = require('../../config/db');
+
+const DATE_COLUMNS = ['ngay_su_dung', 'ngaysudung'];
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const MS_PER_MINUTE = 60 * 1000;
+
+const toLocalDateTime = (inputDate = new Date()) => {
+  const offsetMinutes = inputDate.getTimezoneOffset();
+  return new Date(inputDate.getTime() - offsetMinutes * MS_PER_MINUTE);
+};
+
+const toLocalDateString = (date = new Date()) =>
+  toLocalDateTime(date).toISOString().slice(0, 10);
+
+const toNumber = (value, fallback = null) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const normalizeDateString = (value) => {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return toLocalDateString(value);
+  }
+  const str = value.toString();
+  if (DATE_ONLY_REGEX.test(str)) return str;
+  const parsed = new Date(str);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return toLocalDateString(parsed);
+};
+
+const parseBirthMonth = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.getMonth() + 1;
+};
+
+async function fetchUsageWithinYear(customerId, voucherIds, startIso, endIso) {
+  if (!customerId || !Array.isArray(voucherIds) || !voucherIds.length) return [];
+  const uniqueIds = [...new Set(voucherIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!uniqueIds.length) return [];
+
+  let lastError = null;
+
+  for (const column of DATE_COLUMNS) {
+    const { data, error } = await supabase
+      .from('magiamgia_sudung')
+      .select(`mavoucher, ${column}`)
+      .eq('makhachhang', customerId)
+      .in('mavoucher', uniqueIds)
+      .gte(column, startIso)
+      .lt(column, endIso);
+
+    if (!error) {
+      return data || [];
+    }
+
+    lastError = error;
+
+    if (error?.message && error.message.toLowerCase().includes(column.toLowerCase())) {
+      continue;
+    }
+
+    throw error;
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return [];
+}
+
+async function buildCustomerBirthdayContext(customerId, vouchers, now = new Date()) {
+  if (!customerId) {
+    const localNow = toLocalDateTime(now);
+    return { birthMonth: null, currentMonth: localNow.getMonth() + 1, usedBirthdayVoucherIds: new Set() };
+  }
+
+  const customer = await customerRepo.getById(customerId);
+  const birthMonth =
+    parseBirthMonth(customer?.ngaySinh || customer?.ngaysinh) ?? null;
+  const localNow = toLocalDateTime(now);
+  const currentMonth = localNow.getMonth() + 1;
+
+  const birthdayVoucherIds = (vouchers || [])
+    .filter((voucher) => voucher?.chiApDungSinhNhat)
+    .map((voucher) => voucher.maVoucher)
+    .filter((id) => Number.isInteger(id));
+
+  let usedBirthdayVoucherIds = new Set();
+  if (birthMonth && birthdayVoucherIds.length) {
+    const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString();
+    const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1).toISOString();
+    const usageRows = await fetchUsageWithinYear(
+      customerId,
+      birthdayVoucherIds,
+      startOfYear,
+      startOfNextYear
+    );
+    usedBirthdayVoucherIds = new Set(
+      (usageRows || []).map((row) => Number(row.mavoucher))
+    );
+  }
+
+  return { birthMonth, currentMonth, usedBirthdayVoucherIds };
+}
 
 class MaGiamGiaService {
-  async list(filters) {
-    return repo.getAll(filters);
+  async list(filters = {}, customerContext = {}) {
+    const vouchers = await repo.getAll(filters);
+    if (!Array.isArray(vouchers) || vouchers.length === 0) return [];
+
+    if (!customerContext?.customerId) {
+      return vouchers;
+    }
+
+    return this.filterVouchersForCustomer(vouchers, customerContext.customerId);
+  }
+
+  async filterVouchersForCustomer(vouchers, customerId) {
+    if (!Array.isArray(vouchers) || !vouchers.length) return [];
+    const now = new Date();
+    const localNow = toLocalDateTime(now);
+    const todayStr = toLocalDateString(localNow);
+    const { birthMonth, currentMonth, usedBirthdayVoucherIds } = await buildCustomerBirthdayContext(
+      customerId,
+      vouchers,
+      now
+    );
+
+    return vouchers.filter((voucher) => {
+      const total = toNumber(voucher.soLuong, null);
+      const used = toNumber(voucher.soLuongDaDung || voucher.soluong_da_dung || 0, 0);
+      if (total !== null && used >= total) {
+        return false;
+      }
+
+      if (voucher.ngayBatDau) {
+        const start = normalizeDateString(voucher.ngayBatDau);
+        if (start && todayStr < start) {
+          return false;
+        }
+      }
+      if (voucher.ngayKetThuc) {
+        const end = normalizeDateString(voucher.ngayKetThuc);
+        if (end && todayStr > end) {
+          return false;
+        }
+      }
+
+      if (voucher.chiApDungSinhNhat) {
+        if (!birthMonth || birthMonth !== currentMonth) {
+          return false;
+        }
+        if (usedBirthdayVoucherIds.has(voucher.maVoucher)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  async ensureCustomerVoucherEligibility(voucherIds = [], customerId) {
+    if (!Array.isArray(voucherIds) || !voucherIds.length) return [];
+    const normalizedIds = voucherIds
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (!normalizedIds.length) {
+      const e = new Error('Danh sách voucher không hợp lệ');
+      e.status = 400;
+      throw e;
+    }
+
+    const vouchers = await repo.getByIds(normalizedIds);
+    if (!vouchers.length) {
+      const e = new Error('Không tìm thấy voucher để sử dụng');
+      e.status = 400;
+      throw e;
+    }
+    const foundIds = new Set(vouchers.map((v) => v.maVoucher));
+    if (foundIds.size !== normalizedIds.length) {
+      const missing = normalizedIds.filter((id) => !foundIds.has(id));
+      const e = new Error(`Voucher không hợp lệ: ${missing.join(', ')}`);
+      e.status = 400;
+      throw e;
+    }
+
+      const now = new Date();
+      const todayStr = toLocalDateString(now);
+      const { birthMonth, currentMonth, usedBirthdayVoucherIds } = await buildCustomerBirthdayContext(
+        customerId,
+        vouchers,
+        now
+      );
+
+    for (const voucher of vouchers) {
+      const total = toNumber(voucher.soLuong, null);
+      const used = toNumber(voucher.soLuongDaDung || voucher.soluong_da_dung || 0, 0);
+      if (total !== null && used >= total) {
+        const e = new Error(`Voucher ${voucher.maCode || voucher.mavoucher} đã hết lượt sử dụng`);
+        e.status = 400;
+        throw e;
+      }
+
+        if (voucher.ngayBatDau) {
+          const start = normalizeDateString(voucher.ngayBatDau);
+          if (start && todayStr < start) {
+            const e = new Error(`Voucher ${voucher.maCode || voucher.mavoucher} chưa áp dụng`);
+            e.status = 400;
+            throw e;
+          }
+        }
+        if (voucher.ngayKetThuc) {
+          const end = normalizeDateString(voucher.ngayKetThuc);
+          if (end && todayStr > end) {
+            const e = new Error(`Voucher ${voucher.maCode || voucher.mavoucher} đã hết hạn`);
+            e.status = 400;
+            throw e;
+          }
+        }
+
+      if (voucher.chiApDungSinhNhat) {
+        if (!birthMonth) {
+          const e = new Error('Vui lòng cập nhật ngày sinh để sử dụng voucher sinh nhật');
+          e.status = 400;
+          throw e;
+        }
+        if (birthMonth !== currentMonth) {
+          const e = new Error('Voucher sinh nhật chỉ áp dụng trong tháng sinh nhật của bạn');
+          e.status = 400;
+          throw e;
+        }
+        if (usedBirthdayVoucherIds.has(voucher.maVoucher)) {
+          const e = new Error('Bạn đã sử dụng voucher sinh nhật trong năm nay');
+          e.status = 400;
+          throw e;
+        }
+      }
+    }
+
+    return vouchers;
+  }
+
+  async incrementUsageCounts(vouchers = []) {
+    if (!Array.isArray(vouchers) || !vouchers.length) return;
+    const uniqueEntries = [];
+    const seen = new Set();
+    vouchers.forEach((voucher) => {
+      const id = Number(voucher?.maVoucher ?? voucher?.mavoucher ?? voucher);
+      if (!Number.isInteger(id) || id <= 0) return;
+      if (seen.has(id)) return;
+      uniqueEntries.push({ id, voucher });
+      seen.add(id);
+    });
+
+    for (const entry of uniqueEntries) {
+      const id = entry.id;
+      const { data: existing, error: fetchErr } = await supabase
+        .from('magiamgia')
+        .select('soluong_da_dung')
+        .eq('mavoucher', id)
+        .maybeSingle();
+
+      if (fetchErr) {
+        console.error(`[MaGiamGiaService.incrementUsageCounts] Failed to read voucher ${id}:`, fetchErr);
+        continue;
+      }
+
+      const currentUsed = toNumber(existing?.soluong_da_dung || 0, 0);
+      const newUsed = currentUsed + 1;
+      const { error } = await supabase
+        .from('magiamgia')
+        .update({ soluong_da_dung: newUsed })
+        .eq('mavoucher', id);
+      if (error) {
+        console.error(`[MaGiamGiaService.incrementUsageCounts] Failed to update voucher ${id}:`, error);
+      }
+    }
   }
 
   async get(id) {

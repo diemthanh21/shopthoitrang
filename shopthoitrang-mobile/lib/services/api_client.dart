@@ -98,6 +98,26 @@ class ApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> delete(String path,
+      {Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    try {
+      final res = await _http.delete(uri, headers: merged).timeout(timeout);
+      return _handleResponse(res);
+    } on SocketException {
+      throw ApiException('Không thể kết nối máy chủ');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Lỗi không xác định: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> postMultipart(String path,
       {Map<String, String>? fields,
       List<http.MultipartFile>? files,

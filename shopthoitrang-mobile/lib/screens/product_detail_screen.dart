@@ -24,16 +24,7 @@ import '../models/product_promotion_info.dart';
 const Color kPrimaryBlue = Color(0xFF0D6EFD);
 
 /// Thông tin khuyến mãi cho sản phẩm
-class _PromotionInfo {
-  final String label; // ví dụ: "Giảm 10% mỗi sản phẩm", "Mua 1 tặng 1"
-  final DateTime? endAt;
-  final double? percent; // % giảm (nếu có)
-  const _PromotionInfo({
-    required this.label,
-    this.endAt,
-    this.percent,
-  });
-}
+
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -76,7 +67,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final Map<int, int> _recommendSold = {};
 
   // Khuyến mãi
-  _PromotionInfo? _promotion;
+  ProductPromotionInfo? _promotion;
   List<CartGiftOption> _giftOptions = [];
   CartGiftOption? _selectedGiftOption;
   String? _giftPromoLabel;
@@ -215,6 +206,170 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     return options;
+  }
+
+  String _formatPromotionCurrency(num value) =>
+      '${_decimalFormatter.format(value)}đ';
+
+  String? _promotionDiscountLabel(ProductPromotionInfo promo) {
+    if (promo.percent != null && promo.percent! > 0) {
+      final percent = promo.percent!;
+      final formatted =
+          percent % 1 == 0 ? percent.toStringAsFixed(0) : percent.toStringAsFixed(1);
+      return 'Giảm $formatted%';
+    }
+    if (promo.amountOff != null && promo.amountOff! > 0) {
+      return 'Giảm ${_formatPromotionCurrency(promo.amountOff!)}';
+    }
+    return null;
+  }
+
+  Widget _buildPromotionTag(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPromotionHighlight(ProductPromotionInfo promo) {
+    final List<Widget> tags = [];
+    if (promo.label.isNotEmpty) {
+      tags.add(_buildPromotionTag(promo.label, Colors.red.shade700));
+    }
+    final extraLabel = _promotionDiscountLabel(promo);
+    if (extraLabel != null && extraLabel.trim().isNotEmpty) {
+      final normalized = promo.label.trim();
+      if (normalized.isEmpty || normalized != extraLabel.trim()) {
+        tags.add(_buildPromotionTag(extraLabel, Colors.red.shade700));
+      }
+    }
+
+    final timeRows = <Widget>[];
+    if (promo.startAt != null) {
+      timeRows.add(Text(
+        'Bắt đầu: ${_promotionDateFormat.format(promo.startAt!)}',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[700],
+        ),
+      ));
+    }
+    if (promo.endAt != null) {
+      timeRows.add(Text(
+        'Kết thúc: ${_promotionDateFormat.format(promo.endAt!)}',
+        style: TextStyle(
+          fontSize: 12,
+          color: Colors.grey[700],
+        ),
+      ));
+    }
+
+    final voucher = promo.voucherCode;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF3FF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kPrimaryBlue.withOpacity(0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.local_offer, size: 18, color: kPrimaryBlue),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      promo.programName.isNotEmpty
+                          ? promo.programName
+                          : 'Khuyến mãi',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.red,
+                      ),
+                    ),
+                    if (promo.description != null &&
+                        promo.description!.trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          promo.description!.trim(),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: tags,
+            ),
+          ],
+          if (voucher != null && voucher.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kPrimaryBlue.withOpacity(0.35)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.confirmation_number_outlined,
+                      size: 16, color: kPrimaryBlue),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Mã: $voucher',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (timeRows.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: timeRows,
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Future<void> _loadReviews() async {
@@ -443,16 +598,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       final now = vietnamNow();
       final int productId = widget.product.id;
-      _PromotionInfo? chosen;
+      ProductPromotionInfo? chosen;
 
       for (final item in rawList) {
         if (item is! Map) continue;
         final j = Map<String, dynamic>.from(item);
 
-        final rawStart = j['ngaybatdau'] ?? j['ngayBatDau'];
-        final rawEnd = j['ngayketthuc'] ?? j['ngayKetThuc'];
-        final start = parseVietnamDateTime(rawStart);
-        final end = parseVietnamDateTime(rawEnd);
+        final info = ProductPromotionInfo.fromJson(j);
+        final start = info.startAt;
+        final end = info.endAt;
 
         bool active = true;
         if (start != null && now.isBefore(start)) active = false;
@@ -494,60 +648,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         }
 
         if (!productIds.contains(productId)) continue;
-
-        double? percent;
-        final rawPercent =
-            j['tylegiam'] ?? j['tyLeGiam'] ?? j['tiLeGiam'] ?? j['phanTram'];
-        if (rawPercent is num && rawPercent > 0) {
-          percent = rawPercent.toDouble();
-        } else if (rawPercent != null) {
-          final p = double.tryParse(rawPercent.toString());
-          if (p != null && p > 0) percent = p;
-        }
-
-        String? label;
-        final loai = j['loaikhuyenmai'] is Map<String, dynamic>
-            ? j['loaikhuyenmai'] as Map<String, dynamic>
-            : null;
-        final rawType =
-            (j['loaikhuyenmai'] is String ? j['loaikhuyenmai'] : j['loai'])
-                ?.toString();
-
-        label = (loai?['tenloai'] ??
-                loai?['tenLoai'] ??
-                j['tenloai'] ??
-                j['tenLoai'])
-            ?.toString()
-            .trim();
-        if ((label == null || label.isEmpty) && rawType != null) {
-          label = rawType == 'GIAM_PERCENT'
-              ? 'Giảm %'
-              : rawType == 'TANG'
-                  ? 'Tặng'
-                  : rawType;
-        }
-
-        if (label == null || label.isEmpty) {
-          final ct =
-              (j['tenchuongtrinh'] ?? j['tenChuongTrinh'] ?? '').toString();
-          if (ct.isNotEmpty) {
-            label = ct;
-          } else if (percent != null) {
-            final formatted = (percent % 1 == 0)
-                ? percent.toStringAsFixed(0)
-                : percent.toStringAsFixed(1);
-            label = 'Giảm $formatted%';
-          } else {
-            label = '';
-          }
-        }
-
-        final info = _PromotionInfo(
-          label: label,
-          endAt: end,
-          percent: percent,
-        );
-
         if (chosen == null ||
             (chosen.endAt != null &&
                 info.endAt != null &&
@@ -559,7 +659,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             _giftOptions = giftOptions;
             _selectedGiftOption =
                 giftOptions.isNotEmpty ? giftOptions.first : null;
-            _giftPromoLabel = label;
+            _giftPromoLabel =
+                info.programName.isNotEmpty ? info.programName : info.label;
           }
         }
       }
@@ -1544,56 +1645,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 6),
 
-                        if (_promotion != null &&
-                            (_promotion!.label.isNotEmpty ||
-                                _promotion!.endAt != null))
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEAF3FF),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: kPrimaryBlue.withOpacity(0.4),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.local_offer,
-                                    size: 18, color: kPrimaryBlue),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      if (_promotion!.label.isNotEmpty)
-                                        Text(
-                                          _promotion!.label,
-                                          style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.red,
-                                          ),
-                                        ),
-                                      if (_promotion!.endAt != null)
-                                        Text(
-                                          'Kết thúc sau: ${_promotionDateFormat.format(_promotion!.endAt!)}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[700],
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
+                        if (_promotion != null)
+                          _buildPromotionHighlight(_promotion!),
                         const SizedBox(height: 16),
 
                         const Text(
@@ -2948,7 +3001,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               color: Colors.black26, size: 40),
                         ),
                       ),
-                    if (promo != null && promo.label.isNotEmpty)
+                    if (promo != null && promo.programName.isNotEmpty)
                       Align(
                         alignment: Alignment.topLeft,
                         child: Container(
@@ -2960,7 +3013,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             borderRadius: BorderRadius.circular(30),
                           ),
                           child: Text(
-                            promo.label,
+                            promo.programName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(

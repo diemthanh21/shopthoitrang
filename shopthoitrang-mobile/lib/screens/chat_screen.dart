@@ -1,5 +1,12 @@
-import 'package:flutter/material.dart';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/chat_models.dart';
 import '../models/product_model.dart';
 import '../services/chat_service.dart';
@@ -22,9 +29,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scrollCtrl = ScrollController();
   final _textCtrl = TextEditingController();
   final _focusNode = FocusNode();
+  final ImagePicker _picker = ImagePicker();
   bool _loading = true;
   List<ChatMessage> _messages = [];
   bool _sentProductCard = false;
+  bool _uploadingMedia = false;
+
+  static const int _maxImageBytes = 50 * 1024 * 1024; // 50MB bucket limit
+  static const int _maxVideoBytes = 50 * 1024 * 1024;
 
   @override
   void initState() {
@@ -36,7 +48,7 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _loading = true);
     try {
       final list = await _svc.getMessages(widget.chatBox.id);
-      setState(() => _messages = list);
+      setState(() => _messages = _applyMessageFilters(list));
       
       try {
         await _svc.markAllRead(widget.chatBox.id);
@@ -80,28 +92,45 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  bool _isSystemMessage(ChatMessage m) {
+    final sender = m.sender.trim().toUpperCase();
+    if (sender == 'SYSTEM') return true;
+    final text = m.content.trim();
+    return text.startsWith('[SYSTEM]');
+  }
+
+  List<ChatMessage> _applyMessageFilters(List<ChatMessage> source) {
+    return source.where((m) => !_isSystemMessage(m)).toList();
+  }
+
+  void _appendMessage(ChatMessage msg) {
+    if (_isSystemMessage(msg)) return;
+    setState(() {
+      _messages.add(msg);
+    });
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
   Future<void> _send() async {
     final text = _textCtrl.text.trim();
     if (text.isEmpty) return;
     try {
       final msg = await _svc.sendMessage(widget.chatBox.id, text);
-      setState(() {
-        _messages.add(msg);
-        _textCtrl.clear();
-      });
+      _textCtrl.clear();
+      _appendMessage(msg);
       _jumpToBottom();
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gửi thất bại: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      _showSnack('G?i th?t b?i: ' + e.toString());
     }
   }
 
@@ -134,12 +163,82 @@ class _ChatScreenState extends State<ChatScreen> {
         price: price,
       );
       setState(() {
-        _messages.add(msg);
         _sentProductCard = true;
       });
+      _appendMessage(msg);
       _jumpToBottom();
     } catch (e) {
       debugPrint('Failed to send product card: $e');
+    }
+  }
+
+  Future<void> _pickMedia({required bool isVideo}) async {
+    if (_uploadingMedia) return;
+    try {
+      final XFile? picked = isVideo
+          ? await _picker.pickVideo(
+              source: ImageSource.gallery,
+              maxDuration: const Duration(minutes: 3),
+            )
+          : await _picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 90,
+              maxWidth: 1600,
+            );
+      if (picked == null) return;
+      final file = File(picked.path);
+      final size = await file.length();
+      final limit = isVideo ? _maxVideoBytes : _maxImageBytes;
+      if (size > limit) {
+        final limitMb = (limit / (1024 * 1024)).toStringAsFixed(0);
+        _showSnack('Dung lượng tệp vượt quá ${limitMb}MB. Vui lòng chọn tệp khác.');
+        return;
+      }
+      await _uploadAndSendMedia(file);
+    } catch (e) {
+      _showSnack('Không thể chọn tệp: $e');
+    }
+  }
+
+  Future<void> _uploadAndSendMedia(File file) async {
+    setState(() => _uploadingMedia = true);
+    try {
+      final uploadInfo = await _svc.uploadMedia(
+        chatBoxId: widget.chatBox.id,
+        file: file,
+      );
+      final url = uploadInfo['url']?.toString();
+      if (url == null || url.isEmpty) {
+        throw Exception('Thiếu URL của tệp sau khi tải lên');
+      }
+      final mime = (uploadInfo['mimeType'] ??
+              uploadInfo['mediaType'] ??
+              lookupMimeType(file.path) ??
+              (file.path.toLowerCase().endsWith('.mp4')
+                  ? 'video/mp4'
+                  : 'image/jpeg'))
+          .toString();
+      final rawSize = uploadInfo['size'];
+      final size = rawSize is int
+          ? rawSize
+          : int.tryParse(rawSize?.toString() ?? '') ?? await file.length();
+      final name = uploadInfo['name']?.toString() ?? p.basename(file.path);
+
+      final msg = await _svc.sendMediaMessage(
+        chatBoxId: widget.chatBox.id,
+        url: url,
+        mimeType: mime,
+        fileName: name,
+        fileSize: size,
+      );
+      _appendMessage(msg);
+      _jumpToBottom();
+    } catch (e) {
+      _showSnack('Không thể gửi tệp: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingMedia = false);
+      }
     }
   }
 
@@ -263,6 +362,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           final isCustomer = m.sender == 'KH';
                           final isProduct = m.messageType == 'product' &&
                               m.productSnapshot != null;
+                          final isMedia = m.messageType == 'media';
                           
                           // Show date separator if needed
                           final showDateSeparator = i == 0 ||
@@ -273,7 +373,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             children: [
                               if (showDateSeparator)
                                 _buildDateSeparator(m.time),
-                              _buildMessageBubble(m, isCustomer, isProduct),
+                              _buildMessageBubble(m, isCustomer, isProduct, isMedia),
                             ],
                           );
                         },
@@ -328,7 +428,12 @@ class _ChatScreenState extends State<ChatScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Widget _buildMessageBubble(ChatMessage m, bool isCustomer, bool isProduct) {
+  Widget _buildMessageBubble(
+    ChatMessage m,
+    bool isCustomer,
+    bool isProduct,
+    bool isMedia,
+  ) {
     return Align(
       alignment: isCustomer ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -399,7 +504,9 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                       ),
-                    if (isProduct)
+                    if (isMedia)
+                      _buildMediaBubble(m, isCustomer)
+                    else if (isProduct)
                       _buildProductBubble(m, isCustomer)
                     else ...[
                       if (_looksLikeProductJson(m.content))
@@ -444,6 +551,149 @@ class _ChatScreenState extends State<ChatScreen> {
             if (isCustomer) const SizedBox(width: 8),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMediaBubble(ChatMessage m, bool isCustomer) {
+    final url = m.mediaUrl ?? '';
+    if (url.isEmpty) {
+      return Text(
+        'Tệp không khả dụng',
+        style: TextStyle(
+          color: isCustomer ? Colors.white : Colors.black87,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+    final mime = (m.mediaMimeType ?? '').toLowerCase();
+    final isImage = mime.startsWith('image/');
+    final isVideo = mime.startsWith('video/');
+    final parsed = Uri.tryParse(url);
+    final fallbackName = (parsed != null && parsed.pathSegments.isNotEmpty)
+        ? parsed.pathSegments.last
+        : 'file';
+    final fileName = m.mediaName ?? fallbackName;
+    final sizeText = m.mediaSize != null ? _formatFileSize(m.mediaSize!) : null;
+
+    if (isImage) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => _showImagePreview(url),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                url,
+                width: 220,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    width: 220,
+                    height: 180,
+                    alignment: Alignment.center,
+                    child: CircularProgressIndicator(
+                      value: progress.expectedTotalBytes != null
+                          ? progress.cumulativeBytesLoaded /
+                              progress.expectedTotalBytes!
+                          : null,
+                      color: isCustomer ? Colors.white : kPrimaryBlue,
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  width: 220,
+                  height: 180,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.broken_image,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            fileName,
+            style: TextStyle(
+              color: isCustomer ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (sizeText != null)
+            Text(
+              sizeText,
+              style: TextStyle(
+                color: isCustomer
+                    ? Colors.white.withOpacity(0.85)
+                    : Colors.grey[600],
+                fontSize: 12,
+              ),
+            ),
+        ],
+      );
+    }
+
+    final icon = isVideo ? Icons.play_circle_fill : Icons.insert_drive_file;
+    final label = isVideo ? 'Mở video' : 'Tải tệp';
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isCustomer
+            ? Colors.white.withOpacity(0.15)
+            : kLightBlue.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 32,
+            color: isCustomer ? Colors.white : kPrimaryBlue,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isCustomer ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (sizeText != null)
+                  Text(
+                    sizeText,
+                    style: TextStyle(
+                      color: isCustomer
+                          ? Colors.white.withOpacity(0.85)
+                          : Colors.grey[700],
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.open_in_new,
+              color: isCustomer ? Colors.white : kPrimaryBlue,
+            ),
+            onPressed: () => _openMediaLink(url),
+            tooltip: label,
+          ),
+        ],
       ),
     );
   }
@@ -584,65 +834,110 @@ class _ChatScreenState extends State<ChatScreen> {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(24),
+              if (_uploadingMedia)
+                Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '?ang t?i t?p ??nh k?m...',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
-                  child: TextField(
-                    controller: _textCtrl,
-                    focusNode: _focusNode,
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    decoration: InputDecoration(
-                      hintText: 'Nhập tin nhắn...',
-                      hintStyle: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[500],
+                ),
+              Row(
+                children: [
+                  IconButton(
+                    onPressed:
+                        _uploadingMedia ? null : () => _pickMedia(isVideo: false),
+                    icon: Icon(
+                      Icons.photo_outlined,
+                      color: _uploadingMedia ? Colors.grey : kPrimaryBlue,
+                    ),
+                    tooltip: 'G?i h?nh ?nh',
+                  ),
+                  IconButton(
+                    onPressed:
+                        _uploadingMedia ? null : () => _pickMedia(isVideo: true),
+                    icon: Icon(
+                      Icons.videocam_outlined,
+                      color: _uploadingMedia ? Colors.grey : kPrimaryBlue,
+                    ),
+                    tooltip: 'G?i video',
+                  ),
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                      prefixIcon: Icon(
-                        Icons.sentiment_satisfied_alt,
-                        size: 22,
-                        color: Colors.grey[400],
+                      child: TextField(
+                        controller: _textCtrl,
+                        focusNode: _focusNode,
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        decoration: InputDecoration(
+                          hintText: 'Nh?p tin nh?n...',
+                          hintStyle: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.sentiment_satisfied_alt,
+                            size: 22,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        onSubmitted: (_) => _send(),
                       ),
                     ),
-                    onSubmitted: (_) => _send(),
                   ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kPrimaryBlue, kDarkBlue],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: kPrimaryBlue.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [kPrimaryBlue, kDarkBlue],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: kPrimaryBlue.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: IconButton(
-                  onPressed: _send,
-                  icon: const Icon(
-                    Icons.send_rounded,
-                    color: Colors.white,
-                    size: 20,
+                    child: IconButton(
+                      onPressed: _send,
+                      icon: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      constraints: const BoxConstraints(),
+                    ),
                   ),
-                  padding: const EdgeInsets.all(12),
-                  constraints: const BoxConstraints(),
-                ),
+                ],
               ),
             ],
           ),
@@ -653,6 +948,52 @@ class _ChatScreenState extends State<ChatScreen> {
 
   String _formatTime(DateTime t) {
     return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatFileSize(int bytes) {
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(0)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _showImagePreview(String url) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        child: InteractiveViewer(
+          maxScale: 4,
+          minScale: 0.5,
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.broken_image, size: 48),
+                  SizedBox(height: 12),
+                  Text('Không thể hiển thị hình ảnh'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openMediaLink(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      _showSnack('Liên kết không hợp lệ');
+      return;
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _showSnack('Không mở được liên kết');
+    }
   }
 
   bool _looksLikeProductJson(String content) {

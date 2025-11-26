@@ -17,8 +17,17 @@ class PaymentCheckoutPayload {
   bool get hasHtml => autoSubmitHtml != null && autoSubmitHtml!.isNotEmpty;
 }
 
+class MomoVerifyResult {
+  final bool paid;
+  final String? orderStatus;
+  final String? message;
+
+  MomoVerifyResult({required this.paid, this.orderStatus, this.message});
+}
+
 class PaymentService {
   final String baseUrl = '${AppConfig.apiBaseUrl}/sepay';
+  final String momoBaseUrl = '${AppConfig.apiBaseUrl}/momo';
   String? lastError;
 
   Future<PaymentCheckoutPayload?> createSepayPayment({
@@ -140,5 +149,103 @@ class PaymentService {
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('token') ?? prefs.getString('auth_token');
+  }
+
+  Future<PaymentCheckoutPayload?> createMomoPayment({
+    required int orderId,
+  }) async {
+    final token = await _getToken();
+    if (token == null) {
+      lastError = 'Chua dang nhap';
+      return null;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$momoBaseUrl/create'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({ 'orderId': orderId }),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+
+        // Accept a wide range of possible keys (top-level or under 'data')
+        String? payUrl = data['payUrl'] as String? ??
+            data['deeplink'] as String? ??
+            data['shortLink'] as String? ??
+            data['qrCodeUrl'] as String? ??
+            (data['url'] as String?) ??
+            (data['payment_url'] as String?) ??
+            (data['paymentUrl'] as String?) ??
+            (data['data'] is Map<String, dynamic> ? (data['data']['payUrl'] as String?) : null) ??
+            (data['data'] is Map<String, dynamic> ? (data['data']['deeplink'] as String?) : null) ??
+            (data['data'] is Map<String, dynamic> ? (data['data']['shortLink'] as String?) : null) ??
+            (data['data'] is Map<String, dynamic> ? (data['data']['qrCodeUrl'] as String?) : null) ??
+            (data['data'] is Map<String, dynamic> ? (data['data']['url'] as String?) : null);
+
+        // Some gateways return nested 'data': { data: { payUrl, ... } }
+        if ((payUrl == null || payUrl.isEmpty) && data['success'] == true && data['data'] is Map<String, dynamic>) {
+          final inner = data['data'] as Map<String, dynamic>;
+          payUrl = inner['payUrl'] as String? ?? inner['deeplink'] as String? ?? inner['shortLink'] as String? ?? inner['qrCodeUrl'] as String?;
+        }
+
+        if (payUrl != null && payUrl.isNotEmpty) {
+          lastError = null;
+          return PaymentCheckoutPayload(autoSubmitHtml: null, launchUrl: payUrl);
+        }
+
+        // Provide a clearer error message from server if available
+        final serverMsg = (data['message'] ?? (data['data'] is Map<String, dynamic> ? (data['data']['message']) : null))?.toString();
+        lastError = serverMsg?.isNotEmpty == true ? serverMsg : 'Khong tim thay duong dan thanh toan MOMO';
+        return null;
+      } else {
+        lastError = _extractError(response.body);
+        return null;
+      }
+    } catch (e) {
+      lastError = e.toString();
+      return null;
+    }
+  }
+
+  Future<MomoVerifyResult> verifyMomoPayment({ required int orderId }) async {
+    final token = await _getToken();
+    if (token == null) {
+      lastError = 'Chua dang nhap';
+      return MomoVerifyResult(paid: false, message: lastError);
+    }
+    try {
+      final resp = await http.post(
+        Uri.parse('$momoBaseUrl/verify'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({ 'orderId': orderId }),
+      );
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final data = json.decode(resp.body) as Map<String, dynamic>;
+        final paid = data['paid'] == true || (data['resultCode']?.toString() == '0');
+        final order = data['order'] as Map<String, dynamic>?;
+        final status = order != null
+            ? (order['trangthaidonhang'] ?? order['trangThaiDonHang'])?.toString()
+            : data['trangthaidonhang']?.toString();
+        lastError = null;
+        return MomoVerifyResult(
+          paid: paid,
+          orderStatus: status,
+          message: data['message']?.toString(),
+        );
+      }
+      lastError = _extractError(resp.body);
+      return MomoVerifyResult(paid: false, message: lastError);
+    } catch (e) {
+      lastError = e.toString();
+      return MomoVerifyResult(paid: false, message: lastError);
+    }
   }
 }

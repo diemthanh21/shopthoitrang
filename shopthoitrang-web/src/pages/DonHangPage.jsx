@@ -212,7 +212,7 @@ export default function DonHangPage() {
 
   // helper hiển thị NV duyệt
   const fmtEmployee = (id) => {
-    if (id == null || id === "") return "---";
+    if (id == null || id === "") return "";
     
     const keyNum = Number(id);
     
@@ -1047,10 +1047,10 @@ function OrderDetailDrawer({ orderId, onClose, fmtEmployee }) {
                               {fmtEmployee(log.maNhanVien)}
                             </td>
                             <td className="px-3 py-2">
-                              {log.trangThaiCu || "---"}
+                              {log.trangThaiCu || ""}
                             </td>
                             <td className="px-3 py-2 font-medium">
-                              {log.trangThaiMoi || "---"}
+                              {log.trangThaiMoi || ""}
                             </td>
                             <td className="px-3 py-2 text-gray-600">
                               {log.ghiChu || ""}
@@ -1138,8 +1138,8 @@ function OrderDetailDrawer({ orderId, onClose, fmtEmployee }) {
                                   </div>
                                 </td>
                                 <td className="px-3 py-2 text-sm">
-                                  <div>Màu: {it?.variant?.color ?? "---"}</div>
-                                  <div>Size: {it?.variant?.size ?? "---"}</div>
+                                  <div>Màu: {it?.variant?.color ?? ""}</div>
+                                  <div>Size: {it?.variant?.size ?? ""}</div>
                                 </td>
                                 <td className="px-3 py-2 text-sm text-right">
                                   {hasDiscount ? (
@@ -1185,8 +1185,8 @@ function OrderDetailDrawer({ orderId, onClose, fmtEmployee }) {
                                         </div>
                                         <div className="text-green-700 flex flex-wrap gap-x-4 gap-y-0.5">
                                           <span>Tên: {gift.tensanphamtang || gift.tensanpham || `#${gift.masanphamtang}`}</span>
-                                          <span>Màu: {gift.mausac || '---'}</span>
-                                          <span>Size: {gift.kichthuoc || '---'}</span>
+                                          <span>Màu: {gift.mausac || ''}</span>
+                                          <span>Size: {gift.kichthuoc || ''}</span>
                                           <span>Số lượng: {gift.soluongtang || 1}</span>
                                         </div>
                                         {gift.tenkhuyenmai && (

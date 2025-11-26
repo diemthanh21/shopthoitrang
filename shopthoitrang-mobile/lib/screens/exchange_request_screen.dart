@@ -31,9 +31,9 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
   late final ProductService _productService = ProductService(_apiClient);
   final List<_ExchangeEntry> _entries = [];
   final ImagePicker _picker = ImagePicker();
-  File? _imageEvidence;
+  final List<File> _imageEvidence = [];
+  final List<String> _imageEvidenceUrls = [];
   File? _videoEvidence;
-  String? _imageEvidenceUrl;
   String? _videoEvidenceUrl;
   bool _uploadingEvidence = false;
 
@@ -43,6 +43,8 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
   static const Color darkOcean = Color(0xFF004D6D);
   static const Color accentOcean = Color(0xFF00A8E8);
   static const Color backgroundOcean = Color(0xFFE8F4F8);
+  static const int _maxImageCount = 5;
+  static const int _maxMediaBytes = 50 * 1024 * 1024;
 
   @override
   void dispose() {
@@ -280,15 +282,41 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
     return false;
   }
 
+  Future<bool> _validateFileSize(File file) async {
+    final size = await file.length();
+    if (size > _maxMediaBytes) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Dung lượng vượt quá 50MB.')),
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _pickImageEvidence() async {
+    if (_imageEvidence.length >= _maxImageCount) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Chỉ được chọn tối đa $_maxImageCount hình ảnh minh chứng.'),
+          ),
+        );
+      }
+      return;
+    }
     if (!await _ensureMediaPermission()) return;
     try {
       final picked =
           await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600);
       if (picked != null && mounted) {
+        final file = File(picked.path);
+        if (!await _validateFileSize(file)) return;
         setState(() {
-          _imageEvidence = File(picked.path);
-          _imageEvidenceUrl = null;
+          _imageEvidence.add(file);
+          _imageEvidenceUrls.clear();
         });
       }
     } catch (e) {
@@ -308,8 +336,10 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
         maxDuration: const Duration(minutes: 2),
       );
       if (picked != null && mounted) {
+        final file = File(picked.path);
+        if (!await _validateFileSize(file)) return;
         setState(() {
-          _videoEvidence = File(picked.path);
+          _videoEvidence = file;
           _videoEvidenceUrl = null;
         });
       }
@@ -322,10 +352,13 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
     }
   }
 
-  void _removeImageEvidence() {
+  void _removeImageEvidenceAt(int index) {
+    if (index < 0 || index >= _imageEvidence.length) return;
     setState(() {
-      _imageEvidence = null;
-      _imageEvidenceUrl = null;
+      _imageEvidence.removeAt(index);
+      if (index < _imageEvidenceUrls.length) {
+        _imageEvidenceUrls.removeAt(index);
+      }
     });
   }
 
@@ -350,18 +383,37 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
   }
 
   Future<bool> _ensureEvidenceUploaded() async {
-    if (_imageEvidence == null || _videoEvidence == null) return false;
+    if (_imageEvidence.isEmpty && _videoEvidence == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng cung cấp ít nhất một hình ảnh hoặc video.'),
+          ),
+        );
+      }
+      return false;
+    }
     try {
       setState(() => _uploadingEvidence = true);
-      if (_imageEvidenceUrl == null) {
-        _imageEvidenceUrl =
-            await _uploadEvidenceFile(_imageEvidence!, isVideo: false);
+      _imageEvidenceUrls.clear();
+      for (final img in _imageEvidence) {
+        final url = await _uploadEvidenceFile(img, isVideo: false);
+        if (url == null) {
+          throw Exception('Không thể tải hình ảnh');
+        }
+        _imageEvidenceUrls.add(url);
       }
-      if (_videoEvidenceUrl == null) {
+      if (_videoEvidence != null) {
         _videoEvidenceUrl =
             await _uploadEvidenceFile(_videoEvidence!, isVideo: true);
+        if (_videoEvidenceUrl == null) {
+          throw Exception('Không thể tải video');
+        }
+      } else {
+        _videoEvidenceUrl = null;
       }
-      return _imageEvidenceUrl != null && _videoEvidenceUrl != null;
+      return _imageEvidenceUrls.length == _imageEvidence.length &&
+          (_videoEvidence == null || _videoEvidenceUrl != null);
     } catch (e) {
       final message = e is ApiException ? e.message : e.toString();
       if (mounted) {
@@ -518,6 +570,7 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
               available > 0 || entry.orderItemIndex == index;
           final subtitle =
               'Đã đặt: ${item.quantity}${enabled ? '' : ' (hết số lượng)'}';
+          final variantLabel = (item.variantName ?? '').trim();
           return DropdownMenuItem<int>(
             value: index,
             enabled: enabled,
@@ -531,6 +584,16 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
                     color: enabled ? darkOcean : Colors.grey,
                   ),
                 ),
+                if (variantLabel.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    variantLabel,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: enabled ? Colors.grey[700] : Colors.grey,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
@@ -741,14 +804,15 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
               color: accentOcean.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(Icons.camera_alt, 
-              color: primaryOcean, 
-              size: 20
+            child: Icon(
+              Icons.camera_alt,
+              color: primaryOcean,
+              size: 20,
             ),
           ),
           const SizedBox(width: 12),
           const Text(
-            'Minh chứng (hình ảnh & video)',
+            'Minh chứng (ảnh/video)',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
@@ -759,25 +823,109 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
           const Text('*', style: TextStyle(color: Colors.red, fontSize: 16)),
         ],
       ),
-      const SizedBox(height: 16),
-      _buildMediaPickerRow(
-        label: 'Hình ảnh',
-        icon: Icons.photo_library,
-        file: _imageEvidence,
-        uploaded: _imageEvidenceUrl != null,
-        onPick: _pickImageEvidence,
-        onRemove: _imageEvidence != null ? _removeImageEvidence : null,
-        isVideo: false,
+      const SizedBox(height: 8),
+      Text(
+        'Tối đa 5 ảnh và 1 video, mỗi tệp ≤ 50MB. Vui lòng cung cấp ít nhất một minh chứng để hỗ trợ duyệt nhanh hơn.',
+        style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.4),
       ),
-      const SizedBox(height: 20),
-      _buildMediaPickerRow(
-        label: 'Video',
-        icon: Icons.videocam,
-        file: _videoEvidence,
-        uploaded: _videoEvidenceUrl != null,
-        onPick: _pickVideoEvidence,
-        onRemove: _videoEvidence != null ? _removeVideoEvidence : null,
-        isVideo: true,
+      const SizedBox(height: 14),
+      if (_imageEvidence.isNotEmpty)
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: List.generate(_imageEvidence.length, (index) {
+            final file = _imageEvidence[index];
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.file(
+                    file,
+                    width: 90,
+                    height: 90,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: GestureDetector(
+                    onTap: () => _removeImageEvidenceAt(index),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: const Icon(Icons.close, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        )
+      else
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: backgroundOcean,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.image_outlined, color: Colors.grey[600]),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Chưa có hình ảnh minh chứng nào.',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ),
+            ],
+          ),
+        ),
+      if (_videoEvidence != null) ...[
+        const SizedBox(height: 16),
+        _buildVideoPreview(),
+      ],
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _pickImageEvidence,
+              icon: const Icon(Icons.photo_library_outlined),
+              label: Text('Thêm ảnh (${_imageEvidence.length}/$_maxImageCount)'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: lightOcean,
+                side: const BorderSide(color: lightOcean),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _pickVideoEvidence,
+              icon: const Icon(Icons.videocam_outlined),
+              label: Text(_videoEvidence == null ? 'Thêm video' : 'Đổi video'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: darkOcean,
+                side: BorderSide(color: darkOcean.withOpacity(0.6)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       if (_uploadingEvidence)
         Padding(
@@ -785,138 +933,58 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
           child: LinearProgressIndicator(
             backgroundColor: backgroundOcean,
             valueColor: AlwaysStoppedAnimation<Color>(lightOcean),
-          ),
         ),
+      ),
     ]);
   }
 
-  Widget _buildMediaPickerRow({
-    required String label,
-    required IconData icon,
-    required VoidCallback onPick,
-    VoidCallback? onRemove,
-    File? file,
-    bool uploaded = false,
-    bool isVideo = false,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            color: darkOcean,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ElevatedButton.icon(
-              onPressed: onPick,
-              icon: Icon(icon, size: 20),
-              label: Text(file == null ? 'Chọn $label' : 'Chọn lại'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: lightOcean,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                elevation: 2,
-              ),
+  Widget _buildVideoPreview() {
+    final file = _videoEvidence;
+    if (file == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: backgroundOcean.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: lightOcean.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
             ),
-            const SizedBox(width: 12),
-            if (file != null)
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (!isVideo)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: lightOcean.withOpacity(0.3), width: 2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Image.file(
-                            file,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: backgroundOcean.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: lightOcean.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.movie, color: lightOcean, size: 24),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _fileName(file),
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: darkOcean,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (uploaded)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: const [
-                                Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Đã tải lên',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (uploaded) const SizedBox(width: 8),
-                        if (onRemove != null)
-                          TextButton.icon(
-                            onPressed: onRemove,
-                            icon: const Icon(Icons.delete_outline, size: 16),
-                            label: const Text('Xóa'),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.red.shade600,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+            child: const Icon(Icons.movie, color: primaryOcean),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _fileName(file),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: darkOcean,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-          ],
-        ),
-      ],
+                const SizedBox(height: 4),
+                Text(
+                  'Video minh chứng',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: _removeVideoEvidence,
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1229,10 +1297,10 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
           const SnackBar(content: Text('Không có sản phẩm để đổi')));
       return;
     }
-    if (_imageEvidence == null || _videoEvidence == null) {
+    if (_imageEvidence.isEmpty && _videoEvidence == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content:
-              Text('Vui lòng cung cấp đầy đủ hình ảnh và video minh chứng')));
+              Text('Vui lòng cung cấp ít nhất một hình ảnh hoặc video minh chứng')));
       return;
     }
     for (final entry in _entries) {
@@ -1251,7 +1319,7 @@ class _ExchangeRequestScreenState extends State<ExchangeRequestScreen> {
       return;
     }
     final evidencePayload = jsonEncode({
-      'imageEvidence': _imageEvidenceUrl,
+      'imageEvidence': _imageEvidenceUrls,
       'videoEvidence': _videoEvidenceUrl,
     });
 

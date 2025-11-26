@@ -1,6 +1,7 @@
 ﻿﻿const repo = require('../repositories/donhang.repository');
 const chitietdonhangService = require('./chitietdonhang.service');
 const membershipService = require('./membership.service');
+const magiamgiaService = require('./magiamgia.service');
 const lichSuService = require('./lichsudonhang.service');
 const supabase = require('../../config/db');
 const khuyenmaiRepo = require('../repositories/khuyenmai.repository');
@@ -65,6 +66,12 @@ const isPendingConfirmationStatus = status => {
 const mapUpdateBodyToPayload = (body = {}, existing = null) => {
   const b = body || {};
   const payload = { ...b }; // giữ nguyên các field sẵn có
+
+  // Loại bỏ các field không thuộc bảng donhang
+  delete payload.diachi;
+  delete payload.diaChi;
+  delete payload.shippingAddress;
+  delete payload.items;
 
   // map trạng thái đơn
   const st =
@@ -1148,51 +1155,56 @@ class DonHangService {
     if (giftConsumptions.length) {   await this._consumeGiftPromotions(giftConsumptions);  }
     
     // Save discount code usage history (using voucher_ids from mobile)
-    try {
-      // Mobile app gửi voucher_ids (array of voucher IDs)
-      const voucherIds = body.voucher_ids || body.voucherIds || body.appliedVoucherIds || [];
-      
-      console.log('[DonHangService.create] Checking voucher IDs:', {
-        voucher_ids: body.voucher_ids,
-        voucherIds: body.voucherIds,
-        appliedVoucherIds: body.appliedVoucherIds,
-        final: voucherIds
-      });
-      
-      if (Array.isArray(voucherIds) && voucherIds.length > 0 && order?.madonhang) {
-        console.log(`[DonHangService.create] Saving ${voucherIds.length} voucher usage records for order ${order.madonhang}`);
+      try {
+        const voucherIds = body.voucher_ids || body.voucherIds || body.appliedVoucherIds || [];
         
-        const usageRecords = voucherIds.map(voucherId => ({
-          mavoucher: Number(voucherId),
-          makhachhang: body.makhachhang,
-          madonhang: order.madonhang,
-          ngay_su_dung: new Date().toISOString(),
-        }));
+        console.log('[DonHangService.create] Checking voucher IDs:', {
+          voucher_ids: body.voucher_ids,
+          voucherIds: body.voucherIds,
+          appliedVoucherIds: body.appliedVoucherIds,
+          final: voucherIds
+        });
         
-        console.log('[DonHangService.create] Usage records to insert:', JSON.stringify(usageRecords, null, 2));
-        
-        const { data: insertedData, error: usageErr } = await supabase
-          .from('magiamgia_sudung')
-          .insert(usageRecords)
-          .select();
+        if (Array.isArray(voucherIds) && voucherIds.length > 0 && order?.madonhang) {
+          const validatedVouchers = await magiamgiaService.ensureCustomerVoucherEligibility(
+            voucherIds,
+            body.makhachhang
+          );
+
+          console.log(`[DonHangService.create] Saving ${voucherIds.length} voucher usage records for order ${order.madonhang}`);
           
-        if (usageErr) {
-          console.error('[DonHangService.create] ❌ Error saving voucher usage:', {
-            code: usageErr.code,
-            message: usageErr.message,
-            details: usageErr.details,
-            hint: usageErr.hint
-          });
+          const usageRecords = voucherIds.map(voucherId => ({
+            mavoucher: Number(voucherId),
+            makhachhang: body.makhachhang,
+            madonhang: order.madonhang,
+            ngay_su_dung: new Date().toISOString(),
+          }));
+          
+          console.log('[DonHangService.create] Usage records to insert:', JSON.stringify(usageRecords, null, 2));
+          
+          const { data: insertedData, error: usageErr } = await supabase
+            .from('magiamgia_sudung')
+            .insert(usageRecords)
+            .select();
+            
+          if (usageErr) {
+            console.error('[DonHangService.create] ❌ Error saving voucher usage:', {
+              code: usageErr.code,
+              message: usageErr.message,
+              details: usageErr.details,
+              hint: usageErr.hint
+            });
+          } else {
+            console.log(`[DonHangService.create] ✅ Saved ${voucherIds.length} voucher usage record(s):`, insertedData);
+            await magiamgiaService.incrementUsageCounts(validatedVouchers);
+          }
         } else {
-          console.log(`[DonHangService.create] ✅ Saved ${voucherIds.length} voucher usage record(s):`, insertedData);
+          console.log('[DonHangService.create] No voucher IDs provided or invalid format');
         }
-      } else {
-        console.log('[DonHangService.create] No voucher IDs provided or invalid format');
+      } catch (discountErr) {
+        console.error('[DonHangService.create] Voucher usage tracking failed:', discountErr.message || discountErr);
+        throw discountErr;
       }
-    } catch (discountErr) {
-      console.error('[DonHangService.create] Voucher usage tracking failed:', discountErr.message || discountErr);
-      // Don't fail the order if usage tracking fails
-    }
     
     return order;
   }
@@ -1226,6 +1238,7 @@ class DonHangService {
 
       const variants = promo.sanPhamTangVariants.map(entry => ({ ...entry }));
       let changed = false;
+      const stockAdjustments = [];
 
       for (const consumption of entries) {
         const target = variants.find(entry => {
@@ -1235,11 +1248,23 @@ class DonHangService {
             ((entrySize ?? null) === (consumption.sizeBridgeId ?? null));
         });
         if (!target) continue;
-        const currentQty = Number(target.quantity ?? target.limit ?? target.soLuong ?? 0);
+        const currentQty = Number(target.quantity ?? target.limit ?? target.soLuong ?? target.so_luong ?? 0);
         if (!(currentQty > 0)) continue;
-        const newQty = Math.max(0, currentQty - consumption.quantity);
+        const requestedQty = Math.max(0, Math.floor(Number(consumption.quantity) || 0));
+        if (!(requestedQty > 0)) continue;
+        const usedQty = Math.min(currentQty, requestedQty);
+        if (!(usedQty > 0)) continue;
+        const newQty = currentQty - usedQty;
         target.quantity = newQty;
+        if (Object.prototype.hasOwnProperty.call(target, 'limit')) {
+          target.limit = newQty;
+        }
         changed = true;
+        stockAdjustments.push({
+          variantId: consumption.variantId,
+          sizeBridgeId: consumption.sizeBridgeId,
+          quantity: usedQty,
+        });
       }
 
       if (!changed) continue;
@@ -1259,8 +1284,90 @@ class DonHangService {
 
       try {
         await khuyenmaiRepo.update(promo.maKhuyenMai, updatePayload);
+        if (stockAdjustments.length) {
+          await this._deductGiftVariantStock(stockAdjustments);
+        }
       } catch (err) {
         console.error('[DonHangService] Failed to update promotion quota', promoId, err?.message || err);
+      }
+    }
+  }
+
+  async _deductGiftVariantStock(adjustments = []) {
+    if (!Array.isArray(adjustments) || adjustments.length === 0) return;
+
+    const sizeTotals = new Map();
+    const variantTotals = new Map();
+
+    for (const entry of adjustments) {
+      const qty = Number(entry.quantity);
+      if (!(qty > 0)) continue;
+      const sizeBridgeId = Number(entry.sizeBridgeId);
+      if (Number.isInteger(sizeBridgeId) && sizeBridgeId > 0) {
+        sizeTotals.set(sizeBridgeId, (sizeTotals.get(sizeBridgeId) || 0) + qty);
+        continue;
+      }
+      const variantId = Number(entry.variantId);
+      if (Number.isInteger(variantId) && variantId > 0) {
+        variantTotals.set(variantId, (variantTotals.get(variantId) || 0) + qty);
+      }
+    }
+
+    for (const [sizeBridgeId, totalQty] of sizeTotals.entries()) {
+      try {
+        const { data: sizeRow, error: fetchErr } = await supabase
+          .from('chitietsanpham_kichthuoc')
+          .select('so_luong')
+          .eq('id', sizeBridgeId)
+          .maybeSingle();
+        if (fetchErr) {
+          console.error('[DonHangService] Failed to fetch gift size stock', sizeBridgeId, fetchErr);
+          continue;
+        }
+        if (!sizeRow) continue;
+        const currentStock = Number(sizeRow.so_luong) || 0;
+        const newStock = Math.max(0, currentStock - totalQty);
+        if (newStock === currentStock) continue;
+        const { error: updErr } = await supabase
+          .from('chitietsanpham_kichthuoc')
+          .update({ so_luong: newStock })
+          .eq('id', sizeBridgeId);
+        if (updErr) {
+          console.error('[DonHangService] Failed to deduct gift size stock', sizeBridgeId, updErr);
+        } else {
+          console.log(`[DonHangService] Deducted gift size stock id=${sizeBridgeId}: ${currentStock} -> ${newStock}`);
+        }
+      } catch (err) {
+        console.error('[DonHangService] Gift size stock update exception:', err?.message || err);
+      }
+    }
+
+    for (const [variantId, totalQty] of variantTotals.entries()) {
+      try {
+        const { data: variantRow, error: fetchErr } = await supabase
+          .from('chitietsanpham')
+          .select('soluongton')
+          .eq('machitietsanpham', variantId)
+          .maybeSingle();
+        if (fetchErr) {
+          console.error('[DonHangService] Failed to fetch gift variant stock', variantId, fetchErr);
+          continue;
+        }
+        if (!variantRow) continue;
+        const currentStock = Number(variantRow.soluongton) || 0;
+        const newStock = Math.max(0, currentStock - totalQty);
+        if (newStock === currentStock) continue;
+        const { error: updErr } = await supabase
+          .from('chitietsanpham')
+          .update({ soluongton: newStock })
+          .eq('machitietsanpham', variantId);
+        if (updErr) {
+          console.error('[DonHangService] Failed to deduct gift variant stock', variantId, updErr);
+        } else {
+          console.log(`[DonHangService] Deducted gift variant stock id=${variantId}: ${currentStock} -> ${newStock}`);
+        }
+      } catch (err) {
+        console.error('[DonHangService] Gift variant stock update exception:', err?.message || err);
       }
     }
   }
