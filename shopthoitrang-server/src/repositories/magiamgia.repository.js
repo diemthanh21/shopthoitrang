@@ -4,6 +4,13 @@ const MaGiamGia = require('../models/magiamgia.model');
 
 const TABLE = 'magiamgia';
 
+function buildLocalDateString() {
+  const now = new Date();
+  const offsetMinutes = now.getTimezoneOffset();
+  const localMs = now.getTime() - offsetMinutes * 60 * 1000;
+  return new Date(localMs).toISOString().slice(0, 10);
+}
+
 const MaGiamGiaRepository = {
   async getAll(filters = {}) {
     let query = supabase.from(TABLE).select('*');
@@ -22,8 +29,8 @@ const MaGiamGiaRepository = {
 
     // active = 'true' -> đang trong khoảng ngày bắt đầu / kết thúc
     if (filters.active === 'true') {
-      const today = new Date().toISOString().slice(0, 10); // yyyy-mm-dd
-      query = query.lte('ngaybatdau', today).gte('ngayketthuc', today);
+      const todayLocal = buildLocalDateString();
+      query = query.lte('ngaybatdau', todayLocal).gte('ngayketthuc', todayLocal);
     }
 
     const { data, error } = await query.order('mavoucher', { ascending: true });
@@ -53,6 +60,22 @@ const MaGiamGiaRepository = {
 
     if (error) throw error;
     return new MaGiamGia(data);
+  },
+
+  async getByIds(ids = []) {
+    if (!Array.isArray(ids) || !ids.length) return [];
+    const normalizedIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (!normalizedIds.length) return [];
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .in('mavoucher', normalizedIds);
+
+    if (error) throw error;
+    return (data || []).map((row) => new MaGiamGia(row));
   },
 
   async update(id, fields) {

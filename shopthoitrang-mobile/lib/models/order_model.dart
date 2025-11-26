@@ -16,6 +16,8 @@ class Order {
   final double shippingFee;
   final String? shippingProvinceSnapshot;
   final List<int> appliedVoucherIds;
+  final int pointsUsed;
+  final double pointsDiscountValue;
 
   Order({
     this.id,
@@ -31,6 +33,8 @@ class Order {
     this.shippingFee = 0,
     this.shippingProvinceSnapshot,
     this.appliedVoucherIds = const [],
+    this.pointsUsed = 0,
+    this.pointsDiscountValue = 0,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -69,6 +73,12 @@ class Order {
           json['shippingProvinceSnapshot'] ??
           json['shippingProvince'],
       appliedVoucherIds: _parseVoucherIds(json),
+      pointsUsed: json['diem_su_dung'] ??
+          json['pointsUsed'] ??
+          json['points_used'] ??
+          0,
+      pointsDiscountValue:
+          _parseDouble(json['points_discount_value'] ?? json['pointsDiscount'] ?? 0),
     );
   }
 
@@ -86,6 +96,12 @@ class Order {
       if (items.isNotEmpty)
         'items': items.map((item) => item.toJson()).toList(),
       if (appliedVoucherIds.isNotEmpty) 'voucher_ids': appliedVoucherIds,
+      if (pointsUsed > 0) ...{
+        'diem_su_dung': pointsUsed,
+        'pointsUsed': pointsUsed,
+      },
+      if (pointsDiscountValue > 0)
+        'points_discount_value': pointsDiscountValue,
       if (shippingAddress != null) ...{
         'madiachi': shippingAddress!.maDiaChi,
         'diachi': {

@@ -222,6 +222,20 @@ class _ProductCard extends StatelessWidget {
                       fontSize: 14,
                     ),
                   ),
+                  if (promo != null && promo!.programName.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'KM: ${promo!.programName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: _primaryBlue,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 4),
 
                   // Gia

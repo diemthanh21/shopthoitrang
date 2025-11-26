@@ -19,6 +19,7 @@ import '../services/cart_service.dart';
 import '../services/address_service.dart';
 import '../services/payment_service.dart';
 import '../services/shipping_service.dart';
+import '../services/membership_service.dart';
 import '../providers/auth_provider.dart';
 import 'address_selection_screen.dart';
 import 'coupon_selection_screen.dart';
@@ -29,6 +30,7 @@ enum CheckoutSource { buyNow, cart }
 const Color kPrimaryBlue = Color(0xFF00B4D8);
 const Color kLightBlue = Color(0xFFE3F2FD);
 const Color kDarkBlue = Color(0xFF0277BD);
+const double kPointValueInVnd = 100;
 
 class CheckoutScreen extends StatefulWidget {
   final CheckoutSource source;
@@ -62,9 +64,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final AddressService _addressService = AddressService();
   final PaymentService _paymentService = PaymentService();
   final ShippingService _shippingService = ShippingService();
+  final MembershipService _membershipService = MembershipService();
   final TextEditingController _noteController = TextEditingController();
+  final TextEditingController _pointsController = TextEditingController();
   final NumberFormat _currencyFormatter =
       NumberFormat.currency(locale: 'vi_VN', symbol: ' VND', decimalDigits: 0);
+  final NumberFormat _pointsFormatter =
+      NumberFormat.decimalPattern('vi_VN');
 
   String _selectedPaymentMethod = 'COD';
   bool _isLoading = false;
@@ -78,9 +84,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Coupon? _selectedDiscountCoupon;
   Coupon? _selectedFreeshipCoupon;
   DiaChiKhachHang? _selectedAddress;
-  double get _grandTotal =>
-      math.max(0, _totalAmount - _orderCouponDiscount) +
+  PointsSummary? _pointsSummary;
+  int _pointsToUse = 0;
+
+  double get _subtotalAfterDiscounts =>
+      math.max(0, _totalAmount - _orderCouponDiscount);
+  double get _shippingAfterDiscounts =>
       math.max(0, _shippingFee - _shippingCouponDiscount);
+  double get _prePointTotal => _subtotalAfterDiscounts + _shippingAfterDiscounts;
+  int get _availablePoints => (_pointsSummary?.diemHienTai ?? 0).floor();
+  int get _maxPointsCanUse {
+    if (_availablePoints <= 0 || _prePointTotal <= 0) return 0;
+    final maxByTotal = (_prePointTotal / kPointValueInVnd).floor();
+    return math.max(0, math.min(_availablePoints, maxByTotal));
+  }
+
+  int get _effectivePointsToUse =>
+      math.max(0, math.min(_pointsToUse, _maxPointsCanUse));
+
+  double get _pointsDiscountValue =>
+      math.min(_prePointTotal, _effectivePointsToUse * kPointValueInVnd);
+
+  double get _grandTotal => math.max(0, _prePointTotal - _pointsDiscountValue);
 
   @override
   void initState() {
@@ -88,6 +113,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _loadOrderItems();
     _loadDefaultAddress();
     _loadShippingConfig();
+    _loadPointsSummary();
   }
 
   Future<void> _loadDefaultAddress() async {
@@ -123,6 +149,23 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _loadPointsSummary() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final user = auth.user;
+      if (user == null) return;
+      final summary =
+          await _membershipService.getPointsSummary(user.maKhachHang);
+      if (!mounted) return;
+      setState(() {
+        _pointsSummary = summary;
+        _clampPointsUsageLocked();
+      });
+    } catch (e) {
+      debugPrint('Error loading points summary: $e');
+    }
+  }
+
   void _recalculateShippingFee({
     DiaChiKhachHang? address,
     ShippingConfig? config,
@@ -134,6 +177,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _shippingFee = 0;
         _shippingCouponDiscount =
             _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+        _clampPointsUsageLocked();
       });
       return;
     }
@@ -142,6 +186,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       _shippingFee = fee;
       _shippingCouponDiscount =
           _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+      _clampPointsUsageLocked();
     });
   }
 
@@ -191,6 +236,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _computeCouponValue(_selectedDiscountCoupon, forShipping: false);
           _shippingCouponDiscount =
               _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+          _clampPointsUsageLocked();
         });
       } else {
         final cart = await _cartService.getCart();
@@ -245,6 +291,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               _computeCouponValue(_selectedDiscountCoupon, forShipping: false);
           _shippingCouponDiscount =
               _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+          _clampPointsUsageLocked();
         });
       }
     } catch (e) {
@@ -309,6 +356,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         shippingFee: _shippingFee,
         shippingProvinceSnapshot: _selectedAddress?.tinh,
         appliedVoucherIds: _collectVoucherIds(),
+        pointsUsed: _effectivePointsToUse,
+        pointsDiscountValue: _pointsDiscountValue,
       );
 
       final createdOrder = await _orderService.createOrder(order);
@@ -474,6 +523,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             _computeCouponValue(_selectedDiscountCoupon, forShipping: false);
         _shippingCouponDiscount =
             _computeCouponValue(_selectedFreeshipCoupon, forShipping: true);
+        _clampPointsUsageLocked();
       });
     }
   }
@@ -487,17 +537,79 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _selectedDiscountCoupon = null;
         _orderCouponDiscount = 0;
       }
+      _clampPointsUsageLocked();
     });
+  }
+
+  void _handlePointInput(String value) {
+    final parsed = int.tryParse(value) ?? 0;
+    final clamped = math.max(0, math.min(parsed, _maxPointsCanUse));
+    setState(() {
+      _pointsToUse = clamped;
+    });
+    if (parsed != clamped) {
+      _syncPointsInput();
+    }
+  }
+
+  void _applyMaxPoints() {
+    final maxAllowed = _maxPointsCanUse;
+    if (maxAllowed <= 0) {
+      _clearPointsUsage();
+      return;
+    }
+    setState(() {
+      _pointsToUse = maxAllowed;
+    });
+    _syncPointsInput();
+  }
+
+  void _clearPointsUsage() {
+    if (_pointsToUse == 0) {
+      _pointsController.clear();
+      return;
+    }
+    setState(() {
+      _pointsToUse = 0;
+    });
+    _pointsController.clear();
+  }
+
+  void _syncPointsInput() {
+    final text = _pointsToUse > 0 ? _pointsToUse.toString() : '';
+    if (_pointsController.text != text) {
+      _pointsController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
+  }
+
+  void _clampPointsUsageLocked() {
+    final clamped = math.max(0, math.min(_pointsToUse, _maxPointsCanUse));
+    if (clamped != _pointsToUse) {
+      _pointsToUse = clamped;
+      final text = clamped > 0 ? clamped.toString() : '';
+      if (_pointsController.text != text) {
+        _pointsController.value = TextEditingValue(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+      }
+    }
   }
 
   @override
   void dispose() {
     _noteController.dispose();
+    _pointsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final bool isLoggedIn = auth.isAuthenticated && auth.user != null;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
@@ -609,6 +721,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   const SizedBox(height: 12),
                   _buildCouponSection(),
                   const SizedBox(height: 12),
+                  _buildPointsSection(isLoggedIn),
+                  const SizedBox(height: 12),
                   _buildCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -657,17 +771,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           'Phi van chuyen',
                           _formatCurrency(_shippingFee),
                         ),
-                        if (_shippingCouponDiscount > 0) ...[
-                          const SizedBox(height: 8),
+                          if (_shippingCouponDiscount > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildSummaryRow(
+                              'Giam phi van chuyen',
+                              '-${_formatCurrency(_shippingCouponDiscount)}',
+                              valueColor: Colors.redAccent,
+                            ),
+                          ],
+                          if (_pointsDiscountValue > 0) ...[
+                            const SizedBox(height: 8),
+                            _buildSummaryRow(
+                              'Tru ${_pointsFormatter.format(_effectivePointsToUse)} diem',
+                              '-${_formatCurrency(_pointsDiscountValue)}',
+                              valueColor: Colors.redAccent,
+                            ),
+                          ],
+                          const Divider(height: 24),
                           _buildSummaryRow(
-                            'Giam phi van chuyen',
-                            '-${_formatCurrency(_shippingCouponDiscount)}',
-                            valueColor: Colors.redAccent,
-                          ),
-                        ],
-                        const Divider(height: 24),
-                        _buildSummaryRow(
-                          'Tong thanh toan',
+                            'Tong thanh toan',
                           _formatCurrency(_grandTotal),
                           isBold: true,
                           isTotal: true,
@@ -1049,6 +1171,144 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointsSection(bool isLoggedIn) {
+    final int availablePoints = _availablePoints;
+    final int maxPoints = _maxPointsCanUse;
+    final bool hasSummary = _pointsSummary != null;
+    final bool canUsePoints = isLoggedIn && hasSummary && maxPoints > 0;
+    final double redeemedValue = _pointsDiscountValue;
+
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kLightBlue,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.stars_rounded,
+                  color: kPrimaryBlue,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Sử dụng điểm thưởng',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (!isLoggedIn)
+            const Text(
+              'Đăng nhập để sử dụng điểm tích lũy.',
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+            )
+          else if (!hasSummary)
+            Row(
+              children: const [
+                SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 10),
+                Text('Đang tải điểm của bạn...'),
+              ],
+            )
+          else ...[
+            Text(
+              'Điểm khả dụng: ${_pointsFormatter.format(availablePoints)} điểm',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tối đa có thể dùng: ${_pointsFormatter.format(maxPoints)} điểm '
+              '(${_formatCurrency(maxPoints * kPointValueInVnd)})',
+              style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Quy đổi: 1 điểm = ${_formatCurrency(kPointValueInVnd)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _pointsController,
+              enabled: canUsePoints,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                labelText: 'Nhập số điểm muốn sử dụng',
+                suffixText: 'điểm',
+                hintText: canUsePoints
+                    ? 'Ví dụ: 100'
+                    : 'Không thể sử dụng điểm cho đơn này',
+              ),
+              onChanged: _handlePointInput,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: canUsePoints ? _applyMaxPoints : null,
+                    child: const Text('Dùng tối đa'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton(
+                    onPressed: _pointsToUse > 0 ? _clearPointsUsage : null,
+                    child: const Text('Xóa điểm'),
+                  ),
+                ),
+              ],
+            ),
+            if (!canUsePoints && maxPoints == 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Đơn hàng hiện chưa đủ điều kiện hoặc bạn không còn điểm khả dụng.',
+                  style: TextStyle(fontSize: 12, color: Colors.red[400]),
+                ),
+              ),
+            if (redeemedValue > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, size: 18, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Đã trừ ${_formatCurrency(redeemedValue)} từ '
+                      '${_pointsFormatter.format(_effectivePointsToUse)} điểm',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ],
       ),
     );

@@ -7,6 +7,7 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const expressOasGenerator = require('express-oas-generator');
 const { swaggerUi, specs } = require('./src/swagger');
+const startMembershipPointsJob = require('./src/jobs/membershipPoints.job');
 
 const app = express();
 
@@ -90,3 +91,4 @@ app.listen(PORT, () => {
   console.log(`✅ Server is running at http://localhost:${PORT}`);
   console.log(`📚 Swagger docs at http://localhost:${PORT}/api-docs`);
 });
+startMembershipPointsJob();

@@ -68,12 +68,12 @@ class _NotificationScreenState extends State<NotificationScreen>
 
   // ========================= HELPERS =========================
   String _formatDiscountInfo(PromotionNotification promo) {
-    if (promo.discountPercent != null) {
-      return 'Giảm ${promo.discountPercent!.toStringAsFixed(0)}%';
-    } else if (promo.discountAmount != null) {
-      return 'Giảm ${_formatMoney(promo.discountAmount!)}';
-    }
-    return '';
+    final summary = _buildDiscountSummary(promo);
+    final type = _voucherTypeLabel(promo) ?? '';
+    return [summary, type]
+        .where((value) => value != null && value.trim().isNotEmpty)
+        .join(' - ')
+        .trim();
   }
 
   String _formatMoney(double amount) {
@@ -83,6 +83,107 @@ class _NotificationScreenState extends State<NotificationScreen>
       return '${(amount / 1000).toStringAsFixed(0)}K';
     }
     return amount.toStringAsFixed(0);
+  }
+
+  String _formatFullCurrency(num amount) {
+    final fixed = amount.toStringAsFixed(0);
+    final withDots = fixed.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (match) => '${match[1]}.'
+    );
+    return '${withDots}d';
+  }
+
+  String? _voucherTypeLabel(PromotionNotification promo) {
+    switch (promo.discountType) {
+      case 'FREESHIP':
+        return 'Freeship';
+      case 'PERCENT':
+        return 'Giam %';
+      case 'AMOUNT':
+        return 'Giam tien';
+      default:
+        return null;
+    }
+  }
+
+  String _buildDiscountSummary(PromotionNotification promo) {
+    if (promo.discountType == 'FREESHIP') {
+      if (promo.maxDiscountAmount != null) {
+        return 'Freeship toi da ${_formatFullCurrency(promo.maxDiscountAmount!)}';
+      }
+      return 'Freeship';
+    }
+    if (promo.discountType == 'PERCENT') {
+      final percent = promo.discountPercent;
+      final percentText = percent != null
+          ? '${percent % 1 == 0 ? percent.toStringAsFixed(0) : percent.toStringAsFixed(1)}%'
+          : 'Giam %';
+      final maxText = promo.maxDiscountAmount != null
+          ? ' (toi da ${_formatFullCurrency(promo.maxDiscountAmount!)})'
+          : '';
+      return 'Giam ' + percentText + maxText;
+    }
+    if (promo.discountAmount != null) {
+      return 'Giam ${_formatFullCurrency(promo.discountAmount!)}';
+    }
+    if (promo.message.isNotEmpty) {
+      return promo.message;
+    }
+    return '';
+  }
+
+  String? _buildMinOrderLabel(PromotionNotification promo) {
+    if (promo.minOrderAmount == null || promo.minOrderAmount == 0) {
+      return null;
+    }
+    return 'Don toi thieu ${_formatFullCurrency(promo.minOrderAmount!)}';
+  }
+
+  String? _buildQuantityLabel(PromotionNotification promo) {
+    final total = promo.totalQuantity;
+    final used = promo.usedQuantity;
+    final remaining = promo.remainingQuantity;
+    if (total == null && used == null && remaining == null) return null;
+    final parts = <String>[];
+    if (total != null) parts.add('Tong: ' + total.toString());
+    if (used != null) parts.add('Da dung: ' + used.toString());
+    if (remaining != null) parts.add('Con: ' + remaining.toString());
+    return parts.join(' | ');
+  }
+
+  String? _buildBirthdayLabel(PromotionNotification promo) {
+    if (promo.birthdayOnly == true) {
+      return 'Chi ap dung trong thang sinh nhat';
+    }
+    return null;
+  }
+
+  String? _buildDateRangeLabel(PromotionNotification promo) {
+    if (promo.validFrom != null && promo.validUntil != null) {
+      return 'Tu ${_formatSimpleDate(promo.validFrom!)} den ${_formatSimpleDate(promo.validUntil!)}';
+    }
+    if (promo.validFrom != null) {
+      return 'Bat dau ${_formatSimpleDate(promo.validFrom!)}';
+    }
+    if (promo.validUntil != null) {
+      return 'Ket thuc ${_formatSimpleDate(promo.validUntil!)}';
+    }
+    return null;
+  }
+
+  String _buildStatusLabel(PromotionNotification promo) {
+    final now = DateTime.now();
+    if (promo.remainingQuantity != null && promo.remainingQuantity! <= 0) {
+      return 'Trang thai: Het luot';
+    }
+    if (promo.validUntil != null && now.isAfter(promo.validUntil!)) {
+      return 'Trang thai: Da ket thuc';
+    }
+    if (promo.validFrom != null && now.isBefore(promo.validFrom!)) {
+      return 'Trang thai: Sap dien ra';
+    }
+    return 'Trang thai: Dang hoat dong';
   }
 
   String _formatTimestamp(DateTime dt) {
@@ -179,10 +280,18 @@ class _NotificationScreenState extends State<NotificationScreen>
       final msg = p.message.toLowerCase();
       final code = (p.voucherCode ?? '').toLowerCase();
       final tags = _formatDiscountInfo(p).toLowerCase();
+      final type = (_voucherTypeLabel(p) ?? '').toLowerCase();
+      final staff = (p.staffName ?? '').toLowerCase();
+      final minOrder = (_buildMinOrderLabel(p) ?? '').toLowerCase();
+      final qty = (_buildQuantityLabel(p) ?? '').toLowerCase();
       return title.contains(q) ||
           msg.contains(q) ||
           code.contains(q) ||
-          tags.contains(q);
+          tags.contains(q) ||
+          type.contains(q) ||
+          staff.contains(q) ||
+          minOrder.contains(q) ||
+          qty.contains(q);
     }).toList();
   }
 
@@ -240,22 +349,55 @@ class _NotificationScreenState extends State<NotificationScreen>
   // ========================= DIALOGS =========================
   void _showPromotionDetail(BuildContext context, PromotionNotification promo) {
     final chips = <Widget>[];
-    if (promo.discountPercent != null) {
-      chips.add(_buildPromoChip(
-        'Giảm ${promo.discountPercent!.toStringAsFixed(0)}%',
-        Colors.red.shade700,
-      ));
+    final typeLabel = _voucherTypeLabel(promo);
+    final discountSummary = _buildDiscountSummary(promo);
+    final minOrderLabel = _buildMinOrderLabel(promo);
+    final quantityLabel = _buildQuantityLabel(promo);
+    final birthdayLabel = _buildBirthdayLabel(promo);
+    final statusLabel = _buildStatusLabel(promo);
+
+    if (typeLabel != null && typeLabel.isNotEmpty) {
+      chips.add(_buildPromoChip(typeLabel, Colors.indigo.shade700));
     }
-    if (promo.discountAmount != null) {
-      chips.add(_buildPromoChip(
-        'Giảm ${_formatMoney(promo.discountAmount!)}',
-        Colors.red.shade700,
-      ));
-    } else if (promo.voucherCode == null && promo.message.isNotEmpty) {
-      chips.add(_buildPromoChip(promo.message, Colors.blueGrey.shade700));
+    if (discountSummary.isNotEmpty) {
+      chips.add(_buildPromoChip(discountSummary, Colors.red.shade700));
+    }
+    if (minOrderLabel != null && minOrderLabel.isNotEmpty) {
+      chips.add(_buildPromoChip(minOrderLabel, Colors.deepPurple.shade700));
+    }
+    if (birthdayLabel != null && birthdayLabel.isNotEmpty) {
+      chips.add(_buildPromoChip(birthdayLabel, Colors.orange.shade700));
+    }
+    if (statusLabel.isNotEmpty) {
+      chips.add(_buildPromoChip(statusLabel, Colors.teal.shade700));
     }
 
     final voucherCode = promo.voucherCode;
+    final detailRows = <MapEntry<String, String>>[];
+    if (promo.programName != null && promo.programName!.isNotEmpty) {
+      detailRows.add(MapEntry('Ten chuong trinh', promo.programName!));
+    }
+    if (typeLabel != null && typeLabel.isNotEmpty) {
+      detailRows.add(MapEntry('Hinh thuc', typeLabel));
+    }
+    if (discountSummary.isNotEmpty) {
+      detailRows.add(MapEntry('Gia tri giam', discountSummary));
+    }
+    if (minOrderLabel != null && minOrderLabel.isNotEmpty) {
+      detailRows.add(MapEntry('Don toi thieu', minOrderLabel));
+    }
+    if (quantityLabel != null && quantityLabel.isNotEmpty) {
+      detailRows.add(MapEntry('So luong', quantityLabel));
+    }
+    if (birthdayLabel != null && birthdayLabel.isNotEmpty) {
+      detailRows.add(MapEntry('Sinh nhat', birthdayLabel));
+    }
+    if (promo.staffName != null && promo.staffName!.isNotEmpty) {
+      detailRows.add(MapEntry('Nhan vien', promo.staffName!));
+    }
+    if (statusLabel.isNotEmpty) {
+      detailRows.add(MapEntry('Trang thai', statusLabel));
+    }
 
     showDialog(
       context: context,
@@ -266,11 +408,13 @@ class _NotificationScreenState extends State<NotificationScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                promo.message,
-                style: const TextStyle(fontSize: 15),
-              ),
-              const SizedBox(height: 16),
+              if (promo.message.isNotEmpty) ...[
+                Text(
+                  promo.message,
+                  style: const TextStyle(fontSize: 15),
+                ),
+                const SizedBox(height: 16),
+              ],
               if (voucherCode != null && voucherCode.isNotEmpty)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -288,7 +432,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Mã khuyến mãi',
+                              'Ma giam gia',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.black54,
@@ -306,7 +450,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Sao chép',
+                        tooltip: 'Sao chep',
                         icon: const Icon(Icons.copy, color: primaryBlue),
                         onPressed: () {
                           Clipboard.setData(
@@ -314,7 +458,7 @@ class _NotificationScreenState extends State<NotificationScreen>
                           );
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Đã sao chép mã khuyến mãi'),
+                              content: Text('Da sao chep ma giam gia'),
                               duration: Duration(seconds: 2),
                             ),
                           );
@@ -331,20 +475,26 @@ class _NotificationScreenState extends State<NotificationScreen>
                   children: chips,
                 ),
               ],
+              if (detailRows.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ...detailRows.map(
+                  (entry) => _buildDetailRow(entry.key + ':', entry.value),
+                ),
+              ],
               const SizedBox(height: 12),
               if (promo.validFrom != null || promo.validUntil != null) ...[
                 if (promo.validFrom != null)
                   _buildDetailRow(
-                      'Từ ngày:', _formatSimpleDate(promo.validFrom!)),
+                      'Tu ngay:', _formatSimpleDate(promo.validFrom!)),
                 if (promo.validUntil != null) ...[
                   const SizedBox(height: 8),
                   _buildDetailRow(
-                      'Đến ngày:', _formatSimpleDate(promo.validUntil!)),
+                      'Den ngay:', _formatSimpleDate(promo.validUntil!)),
                 ],
                 const SizedBox(height: 8),
               ],
               _buildDetailRow(
-                'Cập nhật:',
+                'Cap nhat:',
                 _formatTimestamp(promo.createdAt),
               ),
             ],
@@ -353,7 +503,7 @@ class _NotificationScreenState extends State<NotificationScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Đóng'),
+            child: const Text('Dong'),
           ),
           if (voucherCode != null)
             ElevatedButton(
@@ -366,12 +516,12 @@ class _NotificationScreenState extends State<NotificationScreen>
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Mã $voucherCode đã được sao chép!'),
+                    content: Text('Ma  da duoc sao chep!'),
                     duration: const Duration(seconds: 2),
                   ),
                 );
               },
-              child: const Text('Sao chép mã'),
+              child: const Text('Sao chep ma'),
             ),
         ],
       ),
@@ -587,13 +737,23 @@ class _NotificationScreenState extends State<NotificationScreen>
           }
 
           final item = visiblePromos[realIndex];
+          final typeLabel = _voucherTypeLabel(item);
+          final discountSummary = _buildDiscountSummary(item);
+          final minOrderLabel = _buildMinOrderLabel(item);
+          final quantityLabel = _buildQuantityLabel(item);
+          final birthdayLabel = _buildBirthdayLabel(item);
+          final dateRangeLabel = _buildDateRangeLabel(item);
+          final statusLabel = _buildStatusLabel(item);
           return _NotificationCard(
-            title: item.title,
-            message: item.message,
-            voucherCode: item.voucherCode,
-            discountInfo: _formatDiscountInfo(item),
-            timestamp: item.createdAt,
-            isRead: item.isRead,
+            promotion: item,
+            typeLabel: typeLabel,
+            discountSummary:
+                discountSummary.isNotEmpty ? discountSummary : null,
+            minOrderLabel: minOrderLabel,
+            quantityLabel: quantityLabel,
+            birthdayLabel: birthdayLabel,
+            dateRangeLabel: dateRangeLabel,
+            statusLabel: statusLabel,
             onTap: () {
               setState(() {
                 final pos = _promos.indexWhere((e) => e.id == item.id);
@@ -815,31 +975,94 @@ class _NotificationScreenState extends State<NotificationScreen>
 
 // ========================= CARDS =========================
 class _NotificationCard extends StatelessWidget {
-  final String title;
-  final String message;
-  final String? voucherCode;
-  final String? discountInfo;
-  final DateTime timestamp;
-  final bool isRead;
+  final PromotionNotification promotion;
+  final String? typeLabel;
+  final String? discountSummary;
+  final String? minOrderLabel;
+  final String? quantityLabel;
+  final String? birthdayLabel;
+  final String? dateRangeLabel;
+  final String? statusLabel;
   final VoidCallback? onTap;
 
   const _NotificationCard({
-    required this.title,
-    required this.message,
-    this.voucherCode,
-    this.discountInfo,
-    required this.timestamp,
-    required this.isRead,
+    required this.promotion,
+    this.typeLabel,
+    this.discountSummary,
+    this.minOrderLabel,
+    this.quantityLabel,
+    this.birthdayLabel,
+    this.dateRangeLabel,
+    this.statusLabel,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final chips = <Widget>[];
+    if (typeLabel != null && typeLabel!.isNotEmpty) {
+      chips.add(_buildChip(
+        text: typeLabel!,
+        color: Colors.indigo.shade700,
+        background: Colors.indigo.shade50,
+        icon: Icons.category,
+      ));
+    }
+    if (promotion.voucherCode != null &&
+        promotion.voucherCode!.trim().isNotEmpty) {
+      chips.add(_buildChip(
+        text: 'Ma: ${promotion.voucherCode!.trim()}',
+        color: Colors.green.shade700,
+        background: Colors.green.shade50,
+        icon: Icons.confirmation_number_outlined,
+      ));
+    }
+    if (discountSummary != null && discountSummary!.isNotEmpty) {
+      chips.add(_buildChip(
+        text: discountSummary!,
+        color: Colors.red.shade700,
+        background: Colors.red.shade50,
+        icon: Icons.local_offer,
+      ));
+    }
+    if (minOrderLabel != null && minOrderLabel!.isNotEmpty) {
+      chips.add(_buildChip(
+        text: minOrderLabel!,
+        color: Colors.deepPurple.shade700,
+        background: Colors.deepPurple.shade50,
+        icon: Icons.shopping_bag,
+      ));
+    }
+    if (birthdayLabel != null && birthdayLabel!.isNotEmpty) {
+      chips.add(_buildChip(
+        text: birthdayLabel!,
+        color: Colors.orange.shade700,
+        background: Colors.orange.shade50,
+        icon: Icons.cake_outlined,
+      ));
+    }
+
+    final infoRows = <Widget>[];
+    if (quantityLabel != null && quantityLabel!.isNotEmpty) {
+      infoRows.add(_infoRow(Icons.storage_rounded, quantityLabel!));
+    }
+    if (dateRangeLabel != null && dateRangeLabel!.isNotEmpty) {
+      infoRows.add(_infoRow(Icons.event, dateRangeLabel!));
+    }
+    if (statusLabel != null && statusLabel!.isNotEmpty) {
+      infoRows.add(_infoRow(Icons.verified, statusLabel!));
+    }
+    if (promotion.staffName != null && promotion.staffName!.trim().isNotEmpty) {
+      infoRows.add(
+        _infoRow(Icons.person_outline, 'Nhan vien: ${promotion.staffName}'),
+      );
+    }
+
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
-        color: isRead ? Colors.white : Colors.blue.shade50,
+        color: promotion.isRead ? Colors.white : Colors.blue.shade50,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -864,15 +1087,16 @@ class _NotificationCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          title,
+                          promotion.title,
                           style: TextStyle(
-                            fontWeight:
-                                isRead ? FontWeight.w500 : FontWeight.w700,
+                            fontWeight: promotion.isRead
+                                ? FontWeight.w500
+                                : FontWeight.w700,
                             fontSize: 15,
                           ),
                         ),
                       ),
-                      if (!isRead)
+                      if (!promotion.isRead)
                         Container(
                           width: 8,
                           height: 8,
@@ -885,7 +1109,7 @@ class _NotificationCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    message,
+                    promotion.message,
                     style: TextStyle(
                       color: Colors.grey[700],
                       fontSize: 14,
@@ -894,50 +1118,19 @@ class _NotificationCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
-                  if (voucherCode != null || discountInfo != null)
+                  if (chips.isNotEmpty)
                     Wrap(
                       spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        if (voucherCode != null)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade100,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Mã: $voucherCode',
-                              style: TextStyle(
-                                color: Colors.green.shade700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        if (discountInfo != null && discountInfo!.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade100,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              discountInfo!,
-                              style: TextStyle(
-                                color: Colors.red.shade700,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
+                      runSpacing: 6,
+                      children: chips,
                     ),
+                  if (infoRows.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    ...infoRows,
+                  ],
                   const SizedBox(height: 4),
                   Text(
-                    _formatTimestamp(timestamp),
+                    _formatTimestamp(promotion.createdAt),
                     style: TextStyle(
                       color: Colors.grey[500],
                       fontSize: 12,
@@ -957,14 +1150,68 @@ class _NotificationCard extends StatelessWidget {
     final diff = now.difference(dt);
 
     if (diff.inMinutes < 60) {
-      return '${diff.inMinutes} phút trước';
+      return '${diff.inMinutes} phut truoc';
     } else if (diff.inHours < 24) {
-      return '${diff.inHours} giờ trước';
+      return '${diff.inHours} gio truoc';
     } else if (diff.inDays < 7) {
-      return '${diff.inDays} ngày trước';
+      return '${diff.inDays} ngay truoc';
     } else {
       return '${dt.day}/${dt.month}/${dt.year}';
     }
+  }
+
+  Widget _buildChip({
+    required String text,
+    required Color color,
+    required Color background,
+    IconData? icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: Colors.black54),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1216,3 +1463,16 @@ class OrderStatusUpdate {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

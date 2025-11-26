@@ -278,120 +278,71 @@ export default function DoiHangPage() {
       {/* Content */}
       {loading ? (
         <div className="rounded-xl bg-white px-4 py-12 text-center text-gray-500 shadow-sm">
-          Đang tải dữ liệu...
+          ?ang t?i d? li?u...
         </div>
       ) : list.length === 0 ? (
         <div className="rounded-xl bg-white px-4 py-12 text-center text-gray-500 shadow-sm">
-          Không có yêu cầu đổi hàng nào khớp bộ lọc.
+          Kh?ng c? y?u c?u ??i h?ng n?o kh?p b? l?c.
         </div>
       ) : (
-        <div className="space-y-4">
-          {list.map((item) => {
-            const statusMeta = getStatusMeta(item.trangThai);
-            const actions = statusActions(item, statusMeta.key);
-            return (
-              <div
-                key={item.maDoiHang || item.id}
-                className="overflow-hidden rounded-xl bg-white shadow-sm transition hover:shadow-md"
-              >
-                {/* Card Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-4 py-3">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Phiếu đổi</p>
-                    <p className="text-xl font-bold text-gray-900">Mã đơn{item.maDoiHang || item.id}</p>
-                    <p className="text-xs text-gray-500">{formatDate(item.ngayYeuCau)}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusMeta.chip}`}>
-                      {statusMeta.label}
-                    </span>
-                    <Link
-                      to={`/doihang/${item.maDoiHang || item.id}`}
-                      className="flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"
-                    >
-                      Chi tiết <ArrowUpRight size={14} />
-                    </Link>
-                  </div>
-                </div>
-
-                {/* Card Body */}
-                <div className="grid gap-4 p-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Đơn & Khách</p>
-                    <p className="text-sm text-gray-700">
-                      Đơn gốc: <span className="font-semibold text-gray-900">#{item.maDonHang}</span>
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      Khách: <span className="font-semibold text-gray-900">KH{item.maKhachHang}</span>
-                    </p>
-                    {item.maDonHangMoi && (
-                      <p className="text-sm text-gray-700">
-                        Đơn mới: <span className="font-semibold text-gray-900">#{item.maDonHangMoi}</span>
-                      </p>
-                    )}
-                    {item.diaChiGuiHangCu && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Địa chỉ: {item.diaChiGuiHangCu}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Sản phẩm đổi</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {describeVariant(item.variantMoi, item.maChiTietSanPhamMoi)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Từ: {describeVariant(item.variantCu, item.maChiTietSanPhamCu)}
-                    </p>
-                    {item.huongDanDongGoi && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Hướng dẫn: {item.huongDanDongGoi}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-xs font-semibold uppercase text-gray-500">Tiến trình</p>
-                    <p className="text-sm text-gray-700">Duyệt: {formatDate(item.ngayDuyet, false)}</p>
-                    <p className="text-sm text-gray-700">Nhận hàng: {formatDate(item.ngayNhanHangCu, false)}</p>
-                    <p className="text-sm text-gray-700">Kiểm tra: {formatDate(item.ngayKiemTra, false)}</p>
-                    {item.trangThaiKiemTra && (
-                      <p className="mt-2 text-xs text-gray-500">KQ: {item.trangThaiKiemTra}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Card Footer */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 bg-gray-50 px-4 py-3">
-                  <div className="text-sm text-gray-600">
-                    {item.lyDo ? (
-                      <span>
-                        Lý do: <strong className="text-gray-900">{item.lyDo}</strong>
-                      </span>
-                    ) : (
-                      'Không có lý do'
-                    )}
-                    {item.ghiChu && (
-                      <span className="ml-2 text-xs text-gray-500">• {item.ghiChu}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {actions.length ? actions : (
-                      <span className="text-xs text-gray-400">Không có hành động</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-100 text-sm text-gray-700">
+              <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">M? phi?u</th>
+                  <th className="px-4 py-3 text-left">M? ??n</th>
+                  <th className="px-4 py-3 text-left">M? KH</th>
+                  <th className="px-4 py-3 text-left">S?n ph?m</th>
+                  <th className="px-4 py-3 text-left">L? do</th>
+                  <th className="px-4 py-3 text-left">Tr?ng th?i</th>
+                  <th className="px-4 py-3 text-left">Ng?y y?u c?u</th>
+                  <th className="px-4 py-3 text-left">Thao t?c</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {list.map((item) => {
+                  const statusMeta = getStatusMeta(item.trangThai);
+                  const actions = statusActions(item, statusMeta.key);
+                  return (
+                    <tr key={item.maDoiHang || item.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-semibold text-gray-900">DH-{item.maDoiHang || item.id}</td>
+                      <td className="px-4 py-3">#{item.maDonHang || '?'}</td>
+                      <td className="px-4 py-3">KH{item.maKhachHang || '?'}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{describeVariant(item.variantMoi, item.maChiTietSanPhamMoi)}</p>
+                        <p className="text-xs text-gray-500">T?: {describeVariant(item.variantCu, item.maChiTietSanPhamCu)}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="line-clamp-2 text-xs text-gray-600">{item.lyDo || '?'}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusMeta.chip}`}>{statusMeta.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(item.ngayYeuCau)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            to={`/doihang/${item.maDoiHang || item.id}`}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"
+                          >
+                            Xem chi ti?t <ArrowUpRight size={14} />
+                          </Link>
+                          {actions.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">{actions}</div>
+                          ) : (
+                            <span className="text-xs text-gray-400">Kh?ng c? h?nh ??ng</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
-
       <ExchangeDialogs dialog={dialog} closeDialog={closeDialog} submitDialog={submitDialog} />
     </div>
   );
