@@ -5,7 +5,16 @@ const TABLE = 'trahang';
 
 const TraHangRepository = {
   async getAll(filters = {}) {
-    let q = supabase.from(TABLE).select('*');
+    let q = supabase.from(TABLE).select(`
+      *,
+      chitietsanpham!inner(
+        machitietsanpham,
+        sanpham!inner(
+          masanpham,
+          tensanpham
+        )
+      )
+    `);
 
     if (filters.makhachhang) q = q.eq('makhachhang', filters.makhachhang);
     if (filters.madonhang) q = q.eq('madonhang', filters.madonhang);
@@ -15,17 +24,31 @@ const TraHangRepository = {
 
     const { data, error } = await q.order('ngayyeucau', { ascending: false });
     if (error) throw error;
-    return (data || []).map(r => new TraHang(r));
+    return (data || []).map(r => {
+      const tensanpham = r.chitietsanpham?.sanpham?.tensanpham || null;
+      return new TraHang({ ...r, tensanpham });
+    });
   },
 
   async getById(id) {
     const { data, error } = await supabase
       .from(TABLE)
-      .select('*')
+      .select(`
+        *,
+        chitietsanpham!inner(
+          machitietsanpham,
+          sanpham!inner(
+            masanpham,
+            tensanpham
+          )
+        )
+      `)
       .eq('matrahang', id)
       .maybeSingle();
     if (error) throw error;
-    return data ? new TraHang(data) : null;
+    if (!data) return null;
+    const tensanpham = data.chitietsanpham?.sanpham?.tensanpham || null;
+    return new TraHang({ ...data, tensanpham });
   },
 
   async getByDonHang(madonhang) {

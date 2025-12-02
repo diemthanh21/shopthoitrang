@@ -69,10 +69,13 @@ router.get('/:id', ctrl.getById);
  *             required: [tenchuongtrinh, loaikhuyenmai, ngaybatdau, ngayketthuc, manhanvien]
  *             properties:
  *               tenchuongtrinh: { type: string }
- *               loaikhuyenmai: { type: string, example: "PERCENT" }
- *               masanpham: { type: integer, nullable: true }
+ *               loaikhuyenmai:
+ *                 type: string
+ *                 enum: [GIAM_PERCENT, TANG]
+ *                 description: "Giảm % hoặc Tặng"
+ *               sanpham_apdung_ids: { type: array, items: { type: integer }, nullable: true }
  *               tylegiam: { type: number, example: 10, description: "Phần trăm giảm (0,100]" }
- *               masanphamtang: { type: integer, nullable: true }
+ *               sanpham_tang_ids: { type: array, items: { type: integer }, nullable: true }
  *               ngaybatdau: { type: string, format: date }
  *               ngayketthuc: { type: string, format: date }
  *               mota: { type: string }
@@ -103,10 +106,12 @@ router.post('/', ctrl.create);
  *             type: object
  *             properties:
  *               tenchuongtrinh: { type: string }
- *               loaikhuyenmai: { type: string }
- *               masanpham: { type: integer, nullable: true }
+ *               loaikhuyenmai:
+ *                 type: string
+ *                 enum: [GIAM_PERCENT, TANG]
+ *               sanpham_apdung_ids: { type: array, items: { type: integer }, nullable: true }
  *               tylegiam: { type: number }
- *               masanphamtang: { type: integer, nullable: true }
+ *               sanpham_tang_ids: { type: array, items: { type: integer }, nullable: true }
  *               ngaybatdau: { type: string, format: date }
  *               ngayketthuc: { type: string, format: date }
  *               mota: { type: string }

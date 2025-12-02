@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/order_model.dart';
+import '../models/review_model.dart';
 import '../services/review_service.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -10,11 +11,13 @@ import '../providers/auth_provider.dart';
 class ReviewScreen extends StatefulWidget {
   final Order order;
   final OrderItem? item; // Nếu null thì đánh giá toàn bộ đơn
+  final Review? existingReview;
 
   const ReviewScreen({
     super.key,
     required this.order,
     this.item,
+    this.existingReview,
   });
 
   @override
@@ -27,6 +30,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
   bool _submitting = false;
   final List<File> _images = [];
   final ImagePicker _picker = ImagePicker();
+  late final bool _isEditing;
 
   // Các tiêu chí đánh giá theo từng mức sao
   final Map<int, String> _ratingLabels = {
@@ -60,6 +64,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
     ],
     1: ['Rất tệ', 'Không đúng mô tả', 'Không đáng tiền', 'Sẽ không mua lại'],
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _isEditing = widget.existingReview != null;
+    if (_isEditing) {
+      _rating = widget.existingReview!.rating;
+      _commentCtrl.text = widget.existingReview!.comment ?? '';
+    }
+  }
 
   @override
   void dispose() {
@@ -160,16 +174,54 @@ class _ReviewScreenState extends State<ReviewScreen> {
       return;
     }
 
+    final commentText = _commentCtrl.text.trim();
+
     setState(() => _submitting = true);
 
     try {
+      if (_isEditing) {
+        final existing = widget.existingReview;
+        if (existing == null || existing.id == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Thiếu thông tin đánh giá')),
+          );
+          return;
+        }
+        final payload = {
+          'diemdanhgia': _rating,
+          'binhluan': commentText,
+        };
+        final updated =
+            await reviewService.updateReview(existing.id!, payload);
+        if (mounted) {
+          if (updated != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Đã cập nhật đánh giá'),
+                backgroundColor: Colors.green,
+              ),
+            );
+            Navigator.pop(context, true);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                    reviewService.lastError ?? 'Lỗi khi cập nhật đánh giá'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+        return;
+      }
+
       // Nếu đánh giá cho 1 sản phẩm cụ thể
       if (widget.item != null) {
         final result = await reviewService.createReview(
           productId: widget.item!.productId!,
           customerId: auth.user!.maKhachHang,
           rating: _rating,
-          comment: _commentCtrl.text.trim(),
+          comment: commentText,
           images: _images.map((f) => f.path).join(','),
           orderDetailId: widget.item!.id,
         );
@@ -201,7 +253,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
             productId: item.productId!,
             customerId: auth.user!.maKhachHang,
             rating: _rating,
-            comment: _commentCtrl.text.trim(),
+            comment: commentText,
             images: _images.map((f) => f.path).join(','),
             orderDetailId: item.id,
           );
@@ -249,9 +301,9 @@ class _ReviewScreenState extends State<ReviewScreen> {
           icon: const Icon(Icons.close, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Đánh giá sản phẩm',
-          style: TextStyle(
+        title: Text(
+          _isEditing ? 'Chỉnh sửa đánh giá' : 'Đánh giá sản phẩm',
+          style: const TextStyle(
             color: Colors.black87,
             fontSize: 18,
             fontWeight: FontWeight.w600,
@@ -393,93 +445,97 @@ class _ReviewScreenState extends State<ReviewScreen> {
                             contentPadding: const EdgeInsets.all(12),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Thêm hình ảnh',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                        if (!_isEditing) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Thêm hình ảnh',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          height: 100,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              // Add image button
-                              InkWell(
-                                onTap: _pickImage,
-                                child: Container(
-                                  width: 100,
-                                  decoration: BoxDecoration(
-                                    border: Border.all(
-                                      color: Colors.grey[300]!,
-                                      style: BorderStyle.solid,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.camera_alt,
-                                          size: 32, color: Colors.grey[400]),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Thêm ảnh',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey[600],
-                                        ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 100,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                // Add image button
+                                InkWell(
+                                  onTap: _pickImage,
+                                  child: Container(
+                                    width: 100,
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                        style: BorderStyle.solid,
                                       ),
-                                    ],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.camera_alt,
+                                            size: 32, color: Colors.grey[400]),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Thêm ảnh',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // Preview images
-                              ..._images.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final file = entry.value;
-                                return Container(
-                                  margin: const EdgeInsets.only(left: 8),
-                                  width: 100,
-                                  child: Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Image.file(
-                                          file,
-                                          width: 100,
-                                          height: 100,
-                                          fit: BoxFit.cover,
+                                // Preview images
+                                ..._images.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final file = entry.value;
+                                  return Container(
+                                    margin: const EdgeInsets.only(left: 8),
+                                    width: 100,
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Image.file(
+                                            file,
+                                            width: 100,
+                                            height: 100,
+                                            fit: BoxFit.cover,
+                                          ),
                                         ),
-                                      ),
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: InkWell(
-                                          onTap: () => _removeImage(index),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black54,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
+                                        Positioned(
+                                          top: 4,
+                                          right: 4,
+                                          child: InkWell(
+                                            onTap: () => _removeImage(index),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.black54,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -566,16 +622,6 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (item.variantName != null) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Phân loại: ${item.variantName}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),

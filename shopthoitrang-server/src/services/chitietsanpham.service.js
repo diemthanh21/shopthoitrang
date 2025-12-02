@@ -48,16 +48,6 @@ class ChiTietSanPhamService {
       e.status = 400;
       throw e;
     }
-    if (body.soluongton !== undefined && Number(body.soluongton) < 0) {
-      const e = new Error('soluongton cannot be negative');
-      e.status = 400;
-      throw e;
-    }
-    if (!lenLE(body.kichthuoc ?? '', 10)) {
-      const e = new Error('kichthuoc max length is 10');
-      e.status = 400;
-      throw e;
-    }
     if (!lenLE(body.mausac ?? '', 50)) {
       const e = new Error('mausac max length is 50');
       e.status = 400;
@@ -76,12 +66,10 @@ class ChiTietSanPhamService {
 
     const payload = {
       masanpham: Number(body.masanpham),
-      kichthuoc: body.kichthuoc?.trim() ?? null,
       mausac: body.mausac?.trim() ?? null,
       chatlieu: body.chatlieu?.trim() ?? null,
       mota: body.mota?.trim() ?? null,
       giaban: Number(body.giaban),
-      soluongton: body.soluongton !== undefined ? Number(body.soluongton) : 0,
     };
 
     return repo.create(payload);
@@ -111,28 +99,7 @@ class ChiTietSanPhamService {
       }
       fields.giaban = Number(body.giaban);
     }
-    if (body.soluongton !== undefined) {
-      if (Number.isNaN(Number(body.soluongton))) {
-        const e = new Error('soluongton must be a number');
-        e.status = 400;
-        throw e;
-      }
-      if (Number(body.soluongton) < 0) {
-        const e = new Error('soluongton cannot be negative');
-        e.status = 400;
-        throw e;
-      }
-      fields.soluongton = Number(body.soluongton);
-    }
 
-    if (body.kichthuoc !== undefined) {
-      if (!lenLE(body.kichthuoc ?? '', 10)) {
-        const e = new Error('kichthuoc max length is 10');
-        e.status = 400;
-        throw e;
-      }
-      fields.kichthuoc = body.kichthuoc?.trim() ?? null;
-    }
     if (body.mausac !== undefined) {
       if (!lenLE(body.mausac ?? '', 50)) {
         const e = new Error('mausac max length is 50');
@@ -196,11 +163,7 @@ class ChiTietSanPhamService {
     const saved = await sizeRepo.replaceForVariant(Number(variantId), sanitized);
     const normalized = saved.map(normalizeSizeRow);
     const totalStock = sanitized.reduce((sum, row) => sum + (row.so_luong ?? 0), 0);
-    const firstSizeName = normalized[0]?.tenKichThuoc ?? null;
-
-    const updateFields = { soluongton: totalStock };
-    updateFields.kichthuoc = firstSizeName ?? null;
-    await repo.update(Number(variantId), updateFields);
+    // keep historical column untouched
 
     return normalized;
   }

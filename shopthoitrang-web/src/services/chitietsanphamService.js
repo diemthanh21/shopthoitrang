@@ -35,6 +35,7 @@ const normalizeSizes = (raw) => {
         "",
       moTa: item?.moTa ?? item?.mo_ta ?? sizeRow?.mo_ta ?? "",
       soLuong: toNumber(item?.soLuong ?? item?.so_luong, 0),
+      giaThem: toNumber(item?.giaThem ?? item?.gia_them, 0),
  
     };
   });
@@ -61,12 +62,10 @@ const normalize = (row = {}) => {
 // UI -> DB
 const toDB = (d = {}) => ({
   masanpham: d.maSanPham ?? d.masanpham,
-  kichthuoc: d.kichThuoc ?? d.kichthuoc ?? null,
   mausac: d.mauSac ?? d.mausac ?? null,
   chatlieu: d.chatLieu ?? d.chatlieu ?? null,
   mota: d.moTa ?? d.mota ?? null,
   giaban: d.giaBan ?? d.giaban ?? 0,
-  soluongton: d.soLuongTon ?? d.soluongton ?? 0,
 });
 
 // Hàm hỗ trợ trộn nhiều dạng response khác nhau

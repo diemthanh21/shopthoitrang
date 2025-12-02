@@ -20,14 +20,20 @@ class NotificationService {
               ? response['data']
               : (response['items'] is List ? response['items'] : []));
 
-      return data.map((json) => PromotionNotification.fromJson(json)).toList();
+      final promos = data
+          .whereType<Map<String, dynamic>>()
+          .map((json) => PromotionNotification.fromJson(json))
+          .toList();
+
+      promos.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return promos;
     } catch (e) {
       throw Exception('Không thể tải thông báo khuyến mãi: $e');
     }
   }
 
   /// Lấy danh sách cập nhật đơn hàng của user
-  Future<List<OrderNotification>> getOrderUpdates() async {
+  Future<List<OrderNotification>> getOrderUpdates({String? customerId}) async {
     try {
       // Gọi API lấy đơn hàng của user, sắp xếp theo ngày mới nhất
       final response = await _api.get('/donhang');
@@ -40,14 +46,28 @@ class NotificationService {
               : (response['items'] is List ? response['items'] : []));
 
       // Sắp xếp theo ngày đặt hàng mới nhất
-      data.sort((a, b) {
-        final aDate = a['ngaydathang'] ?? a['ngayDatHang'] ?? '';
-        final bDate = b['ngaydathang'] ?? b['ngayDatHang'] ?? '';
+      final filteredData = data.whereType<Map<String, dynamic>>().where((json) {
+        if (customerId == null || customerId.isEmpty) {
+          return true;
+        }
+        final dynamic idValue = json['makhachhang'] ??
+            json['maKhachHang'] ??
+            json['customerId'] ??
+            json['maKh'];
+        return idValue?.toString() == customerId;
+      }).toList();
+
+      final orders =
+          filteredData.map((json) => OrderNotification.fromJson(json)).toList();
+
+      orders.sort((a, b) {
+        final aDate = a.statusUpdatedAt ?? a.orderDate;
+        final bDate = b.statusUpdatedAt ?? b.orderDate;
         return bDate.compareTo(aDate);
       });
 
-      // Chuyển đổi sang OrderNotification
-      return data.map((json) => OrderNotification.fromJson(json)).toList();
+      return orders;
+
     } catch (e) {
       throw Exception('Không thể tải cập nhật đơn hàng: $e');
     }

@@ -1,41 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Settings2, Shield, Edit3, Plus } from 'lucide-react';
-import { message, Modal, Form, Select, DatePicker, Switch, Input, InputNumber } from 'antd';
-import dayjs from 'dayjs';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { Form, Input, Modal, Switch, message } from 'antd';
+import { RefreshCw, Settings2 } from 'lucide-react';
 import thethanhvienService from '../services/thethanhvienService';
-import hangtheService from '../services/hangtheService';
 
 const formatCurrency = (value) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(
-    Number(value || 0),
-  );
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-const formatAmountCell = (value) => {
-  if (value === null || value === undefined) return '';
-  return formatCurrency(value);
-};
-
-const formatDate = (value) => {
-  if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toLocaleDateString('vi-VN');
-};
+const formatNumber = (value) => Number(value || 0).toLocaleString('vi-VN');
 
 export default function TheThanhVienPage() {
-  const [tab, setTab] = useState('cards');
   const [cards, setCards] = useState([]);
-  const [tiers, setTiers] = useState([]);
-  const [cardLoading, setCardLoading] = useState(true);
-  const [tierLoading, setTierLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [editingCard, setEditingCard] = useState(null);
+  const [cardLoading, setCardLoading] = useState(true);
   const [cardModalOpen, setCardModalOpen] = useState(false);
-  const [cardForm] = Form.useForm();
-  const [tierForm] = Form.useForm();
-  const [tierModalOpen, setTierModalOpen] = useState(false);
-  const [editingTier, setEditingTier] = useState(null);
+  const [editingCard, setEditingCard] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [cardForm] = Form.useForm();
 
   const loadCards = async () => {
     try {
@@ -44,59 +29,15 @@ export default function TheThanhVienPage() {
       setCards(data);
     } catch (err) {
       console.error(err);
-      message.error('Không thể tải danh sách thẻ');
+      message.error('Khong the tai danh sach the');
     } finally {
       setCardLoading(false);
     }
   };
 
-  const loadTiers = async () => {
-    try {
-      setTierLoading(true);
-      const data = await hangtheService.getAll();
-      setTiers(data);
-    } catch (err) {
-      console.error(err);
-      message.error('Không thể tải cấu hình hạng thẻ');
-    } finally {
-      setTierLoading(false);
-    }
-  };
-
   useEffect(() => {
     loadCards();
-    loadTiers();
   }, []);
-
-  const handleOpenCardModal = (card) => {
-    setEditingCard(card);
-    setCardModalOpen(true);
-    cardForm.setFieldsValue({
-      mahangthe: card?.mahangthe ?? null,
-      trangthai: card?.trangthai ?? true,
-      ngayhethan: card?.ngayhethan ? dayjs(card.ngayhethan) : null,
-    });
-  };
-
-  const handleSaveCard = async () => {
-    try {
-      const values = await cardForm.validateFields();
-      const payload = {
-        mahangthe: values.mahangthe,
-        trangthai: values.trangthai,
-        ngayhethan: values.ngayhethan ? values.ngayhethan.toISOString() : null,
-      };
-      await thethanhvienService.update(editingCard.mathe, payload);
-      message.success('Đã cập nhật thẻ thành viên');
-      setCardModalOpen(false);
-      setEditingCard(null);
-      loadCards();
-    } catch (err) {
-      if (err?.errorFields) return; // validation error
-      console.error(err);
-      message.error('Không thể cập nhật thẻ');
-    }
-  };
 
   const handleToggleCard = async (card) => {
     try {
@@ -104,93 +45,98 @@ export default function TheThanhVienPage() {
       loadCards();
     } catch (err) {
       console.error(err);
-      message.error('Không thể thay đổi trạng thái');
+      message.error('Khong the thay doi trang thai');
+    }
+  };
+
+  const handleOpenCardModal = (card) => {
+    setEditingCard(card);
+    setCardModalOpen(true);
+    if (card) {
+      cardForm.setFieldsValue({
+        trangthai: card.trangthai ?? true,
+      });
+    } else {
+      cardForm.resetFields();
+    }
+  };
+
+  const handleSaveCard = async () => {
+    try {
+      const values = await cardForm.validateFields();
+      const payload = {
+        trangthai: values.trangthai,
+      };
+      await thethanhvienService.update(editingCard.mathe, payload);
+      message.success('Da cap nhat the');
+      setCardModalOpen(false);
+      setEditingCard(null);
+      loadCards();
+    } catch (err) {
+      if (err?.errorFields) return;
+      console.error(err);
+      message.error('Khong the cap nhat the');
     }
   };
 
   const handleSyncCards = async () => {
-    const ok = window.confirm('Đồng bộ sẽ tự động tạo thẻ cho toàn bộ khách hàng chưa có. Bạn chắc chắn chứ?');
+    const ok = window.confirm('Dong bo the cho tat ca khach hang chua co?');
     if (!ok) return;
     try {
       setSyncing(true);
-      const result = await thethanhvienService.syncAll();
-      message.success(
-        `Đã đồng bộ thẻ thành viên. Tạo mới ${result.created} thẻ cho ${result.totalCustomers} khách hàng.`,
-      );
+      const res = await thethanhvienService.syncAll();
+      message.success(res.message || 'Da dong bo the');
       loadCards();
     } catch (err) {
       console.error(err);
-      message.error('Không thể đồng bộ thẻ');
+      message.error('Khong the dong bo');
     } finally {
       setSyncing(false);
     }
   };
 
-  const openTierModal = (tier = null) => {
-    setEditingTier(tier);
-    setTierModalOpen(true);
-    tierForm.setFieldsValue({
-      tenhang: tier?.tenHang || '',
-      dieukien_nam: tier?.dieuKienNam ?? null,
-      dieukien_tichluy: tier?.dieuKienTichLuy ?? null,
-      giamgia: tier?.giamGia ?? null,
-      voucher_sinhnhat: tier?.voucherSinhNhat ?? null,
-      uudai: tier?.uuDai ?? '',
-    });
-  };
-
-  const handleSaveTier = async () => {
+  const handleReleasePending = async () => {
     try {
-      const values = await tierForm.validateFields();
-      const payload = {
-        tenhang: values.tenhang,
-        dieukien_nam: values.dieukien_nam ?? null,
-        dieukien_tichluy: values.dieukien_tichluy ?? null,
-        giamgia: values.giamgia ?? 0,
-        voucher_sinhnhat: values.voucher_sinhnhat ?? 0,
-        uudai: values.uudai ?? '',
-      };
-
-      if (editingTier) {
-        await hangtheService.update(editingTier.maHangThe, payload);
-        message.success('Đã cập nhật hạng thẻ');
-      } else {
-        await hangtheService.create(payload);
-        message.success('Đã thêm hạng thẻ mới');
-      }
-      setTierModalOpen(false);
-      setEditingTier(null);
-      loadTiers();
-      loadCards(); // refresh card info
+      setReleasing(true);
+      const res = await thethanhvienService.releasePendingPoints();
+      message.success(res.message || 'Da chuyen diem cho');
+      loadCards();
     } catch (err) {
-      if (err?.errorFields) return;
       console.error(err);
-      message.error('Không thể lưu hạng thẻ');
+      message.error('Khong the chuyen diem cho');
+    } finally {
+      setReleasing(false);
     }
   };
 
+
+
   const stats = useMemo(() => {
     const total = cards.length;
-    const active = cards.filter((c) => c.trangthai).length;
-    const missingTier = cards.filter((c) => !c.hangThe).length;
-    return { total, active, missingTier };
+    const active = cards.filter((card) => card.trangthai).length;
+    const pointsAvailable = cards.reduce((sum, card) => sum + Number(card.diem_hien_tai || 0), 0);
+    const pointsPending = cards.reduce((sum, card) => sum + Number(card.diem_pending || 0), 0);
+    const pointsYearly = cards.reduce((sum, card) => sum + Number(card.diem_nam_hien_tai || 0), 0);
+    return { total, active, pointsAvailable, pointsPending, pointsYearly };
   }, [cards]);
 
   const filteredCards = useMemo(() => {
     const term = search.trim().toLowerCase();
     if (!term) return cards;
+    if (!Array.isArray(cards)) return [];
     return cards.filter((card) => {
-      const customer = card.customer || {};
-      const tier = card.hangThe || {};
+      if (!card) return false;
       const haystacks = [
         card.mathe,
-        customer.hoten,
-        customer.email,
-        customer.sodienthoai,
-        tier.tenhang,
+        card.makhachhang,
+        card.customer?.hoten,
+        card.customer?.email,
+        card.customer?.sodienthoai,
       ]
-        .filter(Boolean)
-        .map((s) => String(s).toLowerCase());
+        .filter((val) => val != null && val !== '')
+        .map((value) => String(value).toLowerCase());
+      
+      if (haystacks.length === 0) return false;
       return haystacks.some((text) => text.includes(term));
     });
   }, [cards, search]);
@@ -199,98 +145,75 @@ export default function TheThanhVienPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Thẻ thành viên</h1>
-          <p className="text-gray-600">Quản lý hạng thẻ, quyền lợi và thẻ của từng khách hàng.</p>
+          <h1 className="text-3xl font-bold text-gray-900">The thanh vien</h1>
+          <p className="text-gray-600">Quan ly hang the, diem tich luy va uu dai</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={handleSyncCards}
-            disabled={syncing}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 disabled:opacity-60"
+            onClick={handleReleasePending}
+            disabled={releasing}
+            className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-60"
           >
-            <RefreshCw size={16} /> {syncing ? 'Đang đồng bộ...' : 'Đồng bộ thẻ'}
+            <RefreshCw size={16} /> {releasing ? 'Dang xu ly...' : 'Chuyen diem cho'}
           </button>
           <button
-            onClick={() => {
-              loadCards();
-              loadTiers();
-            }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+            onClick={handleSyncCards}
+            disabled={syncing}
+            className="inline-flex items-center gap-2 rounded-lg border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
           >
-            <RefreshCw size={16} /> Làm mới
+            <RefreshCw size={16} /> {syncing ? 'Dang dong bo...' : 'Dong bo the'}
+          </button>
+          <button
+            onClick={loadCards}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <RefreshCw size={16} /> Lam moi
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="text-xs uppercase text-gray-500">Tổng số thẻ</div>
-          <div className="text-3xl font-semibold text-gray-900">{stats.total.toLocaleString('vi-VN')}</div>
-        </div>
-        <div className="rounded-2xl border border-green-100 bg-green-50 p-4 shadow-sm">
-          <div className="text-xs uppercase text-green-600">Thẻ đang hoạt động</div>
-          <div className="text-3xl font-semibold text-green-800">{stats.active.toLocaleString('vi-VN')}</div>
-        </div>
-        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 shadow-sm">
-          <div className="text-xs uppercase text-amber-600">Thiếu cấu hình</div>
-          <div className="text-3xl font-semibold text-amber-800">{stats.missingTier.toLocaleString('vi-VN')}</div>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+        <StatCard title="Tong the" value={formatNumber(stats.total)} subtitle="The da tao" />
+        <StatCard title="Dang hoat dong" value={formatNumber(stats.active)} subtitle="The mo" accent="bg-green-50 text-green-700" />
+        <StatCard title="Diem kha dung" value={formatNumber(stats.pointsAvailable)} subtitle="Co the su dung" accent="bg-blue-50 text-blue-700" />
+        <StatCard title="Diem dang cho" value={formatNumber(stats.pointsPending)} subtitle="Se cong sau 7 ngay" accent="bg-purple-50 text-purple-700" />
+        <StatCard title="Diem nam nay" value={formatNumber(stats.pointsYearly)} subtitle="Tich luy trong nam" accent="bg-indigo-50 text-indigo-700" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm">
-        <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-5 pt-4">
-          <button
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold ${
-              tab === 'cards' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
-            }`}
-            onClick={() => setTab('cards')}
-          >
-            Thẻ khách hàng
-          </button>
-          <button
-            className={`px-4 py-2 rounded-t-lg text-sm font-semibold ${
-              tab === 'tiers' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500'
-            }`}
-            onClick={() => setTab('tiers')}
-          >
-            Cấu hình hạng thẻ
-          </button>
-        </div>
 
-        {tab === 'cards' ? (
-          <div className="p-5 space-y-4">
-            <div className="flex flex-wrap justify-between gap-3">
+        <div className="p-5 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 flex-1 min-w-[220px]">
                 <Settings2 size={16} className="text-gray-400" />
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm theo tên, email, hạng..."
+                  placeholder="Tim ten, email hoac hang"
                   className="flex-1 bg-transparent outline-none text-sm"
                 />
               </div>
             </div>
 
             {cardLoading ? (
-              <div className="py-12 text-center text-gray-500">Đang tải danh sách thẻ...</div>
+              <div className="py-12 text-center text-gray-500">Dang tai danh sach the...</div>
             ) : filteredCards.length === 0 ? (
-              <div className="py-12 text-center text-gray-500">Không tìm thấy thẻ phù hợp.</div>
+              <div className="py-12 text-center text-gray-500">Khong tim thay the phu hop.</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full">
+                <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                     <tr>
-                      <th className="px-4 py-3 text-left">Mã thẻ</th>
-                      <th className="px-4 py-3 text-left">Khách hàng</th>
-                      <th className="px-4 py-3 text-left">Hạng thẻ</th>
-                      <th className="px-4 py-3 text-left">Ưu đãi</th>
-                      <th className="px-4 py-3 text-left">Ngày cấp</th>
-                      <th className="px-4 py-3 text-left">Hết hạn</th>
-                      <th className="px-4 py-3 text-center">Trạng thái</th>
-                      <th className="px-4 py-3 text-right">Thao tác</th>
+                      <th className="px-4 py-3 text-left">Ma the</th>
+                      <th className="px-4 py-3 text-left">Khach hang</th>
+                      <th className="px-4 py-3 text-right">Diem kha dung</th>
+                      <th className="px-4 py-3 text-right">Diem cho</th>
+                      <th className="px-4 py-3 text-right">Diem nam nay</th>
+                      <th className="px-4 py-3 text-left">Ngay cap</th>
+                      <th className="px-4 py-3 text-center">Trang thai</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100 text-sm">
+                  <tbody className="divide-y divide-gray-100">
                     {filteredCards.map((card) => (
                       <tr key={card.mathe} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
@@ -298,37 +221,20 @@ export default function TheThanhVienPage() {
                           <div className="text-xs text-gray-500">KH #{card.makhachhang}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-semibold text-gray-900">{card.customer?.hoten || 'Không rõ'}</div>
+                          <div className="font-semibold text-gray-900">{card.customer?.hoten || '---'}</div>
                           <div className="text-xs text-gray-500">{card.customer?.email || ''}</div>
+                          <div className="text-xs text-gray-500">{card.customer?.sodienthoai || ''}</div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-gray-900">
-                            {card.hangThe?.tenhang || card.tenhang || 'Chưa gán'}
-                          </div>
-                          <div className="text-xs text-gray-500">Mã hạng: {card.mahangthe || ''}</div>
-                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-green-700">{formatNumber(card.diem_hien_tai)}</td>
+                        <td className="px-4 py-3 text-right text-gray-700">{formatNumber(card.diem_pending)}</td>
+                        <td className="px-4 py-3 text-right text-gray-700">{formatNumber(card.diem_nam_hien_tai)}</td>
                         <td className="px-4 py-3 text-gray-700">
-                          <div>
-                            Giảm {card.hangThe?.giamGia ?? card.giamgia ?? 0}% · Voucher{' '}
-                            {formatCurrency(card.hangThe?.voucherSinhNhat ?? card.voucher_sinhnhat ?? 0)}
-                          </div>
-                          {card.hangThe?.uuDai && (
-                            <div className="text-xs text-gray-500 line-clamp-1">{card.hangThe.uuDai}</div>
-                          )}
+                          <div>{card.ngaycap ? new Date(card.ngaycap).toLocaleDateString('vi-VN') : '---'}</div>
+                          <div className="text-xs text-gray-500">Nam: {card.nam_diem || '---'}</div>
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{formatDate(card.ngaycap)}</td>
-                        <td className="px-4 py-3 text-gray-700">{formatDate(card.ngayhethan)}</td>
                         <td className="px-4 py-3 text-center">
                           <Switch checked={card.trangthai} onChange={() => handleToggleCard(card)} />
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleOpenCardModal(card)}
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                          >
-                            <Edit3 size={16} /> Sửa
-                          </button>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -336,132 +242,47 @@ export default function TheThanhVienPage() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="p-5 space-y-4">
-            <div className="flex justify-between items-center">
-              <p className="text-sm text-gray-600">
-                Thiết lập ngưỡng tích luỹ và quyền lợi cho từng hạng thẻ. Các thay đổi áp dụng cho những lần xét hạng
-                mới.
-              </p>
-              <button
-                onClick={() => openTierModal(null)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-              >
-                <Plus size={16} /> Thêm hạng
-              </button>
-            </div>
-
-            {tierLoading ? (
-              <div className="py-12 text-center text-gray-500">Đang tải cấu hình...</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="bg-gray-50 text-xs uppercase text-gray-500">
-                    <tr>
-                      <th className="px-4 py-3 text-left">Hạng</th>
-                      <th className="px-4 py-3 text-left">Chi tiêu/năm</th>
-                      <th className="px-4 py-3 text-left">Tích luỹ nâng hạng</th>
-                      <th className="px-4 py-3 text-left">Ưu đãi</th>
-                      <th className="px-4 py-3 text-left">Khác</th>
-                      <th className="px-4 py-3 text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-sm">
-                    {tiers.map((tier) => (
-                      <tr key={tier.maHangThe}>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-gray-900">{tier.tenHang}</div>
-                          <div className="text-xs text-gray-500">Mã: {tier.maHangThe}</div>
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {formatAmountCell(tier.dieuKienNam)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">
-                          {formatAmountCell(tier.dieuKienTichLuy)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-700">
-                          Giảm {tier.giamGia ?? 0}% · Voucher {formatCurrency(tier.voucherSinhNhat ?? 0)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{tier.uuDai || ''}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => openTierModal(tier)}
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                          >
-                            <Settings2 size={16} /> Sửa
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <Modal
-        title={editingCard ? `Cập nhật thẻ #${editingCard.mathe}` : 'Cập nhật thẻ'}
+        title={editingCard ? `Cap nhat the #${editingCard.mathe}` : 'Cap nhat the'}
         open={cardModalOpen}
         onCancel={() => {
           setCardModalOpen(false);
           setEditingCard(null);
         }}
         onOk={handleSaveCard}
-        okText="Lưu"
+        okText="Luu"
       >
         <Form form={cardForm} layout="vertical">
-          <Form.Item name="mahangthe" label="Hạng thẻ" rules={[{ required: true, message: 'Chọn hạng' }]}>
-            <Select placeholder="Chọn hạng thẻ">
-              {tiers.map((tier) => (
-                <Select.Option key={tier.maHangThe} value={tier.maHangThe}>
-                  {tier.tenHang} ({tier.giamGia ?? 0}%)
-                </Select.Option>
-              ))}
-            </Select>
+          <Form.Item label="Khach hang">
+            <Input value={editingCard?.customer?.hoten || '---'} disabled />
           </Form.Item>
-          <Form.Item name="ngayhethan" label="Ngày hết hạn">
-            <DatePicker className="w-full" format="DD/MM/YYYY" allowClear />
+          <Form.Item label="Diem hien tai">
+            <Input value={formatNumber(editingCard?.diem_hien_tai || 0)} disabled />
           </Form.Item>
-          <Form.Item name="trangthai" label="Trạng thái" valuePropName="checked">
-            <Switch checkedChildren="Hoạt động" unCheckedChildren="Ngưng" />
+          <Form.Item label="Diem cho duyet">
+            <Input value={formatNumber(editingCard?.diem_pending || 0)} disabled />
+          </Form.Item>
+          <Form.Item name="trangthai" label="Trang thai" valuePropName="checked">
+            <Switch checkedChildren="Hoat dong" unCheckedChildren="Ngung" />
           </Form.Item>
         </Form>
       </Modal>
 
-      <Modal
-        title={editingTier ? `Cập nhật hạng ${editingTier.tenHang}` : 'Thêm hạng thẻ mới'}
-        open={tierModalOpen}
-        onCancel={() => {
-          setTierModalOpen(false);
-          setEditingTier(null);
-          tierForm.resetFields();
-        }}
-        onOk={handleSaveTier}
-        okText="Lưu"
-      >
-        <Form form={tierForm} layout="vertical">
-          <Form.Item name="tenhang" label="Tên hạng" rules={[{ required: true, message: 'Nhập tên hạng' }]}>
-            <Input placeholder="Ví dụ: Thường, Bạc, Vàng, Kim cương..." />
-          </Form.Item>
-          <Form.Item name="dieukien_nam" label="Chi tiêu trong năm (VND)">
-            <InputNumber className="w-full" min={0} step={500000} placeholder="Ví dụ: 12000000" />
-          </Form.Item>
-          <Form.Item name="dieukien_tichluy" label="Tích luỹ kể từ hạng hiện tại (VND)">
-            <InputNumber className="w-full" min={0} step={500000} placeholder="Ví dụ: 5000000" />
-          </Form.Item>
-          <Form.Item name="giamgia" label="Giảm giá trên hoá đơn (%)">
-            <InputNumber className="w-full" min={0} max={100} step={1} placeholder="Ví dụ: 10" />
-          </Form.Item>
-          <Form.Item name="voucher_sinhnhat" label="Voucher sinh nhật (VND)">
-            <InputNumber className="w-full" min={0} step={100000} placeholder="Ví dụ: 500000" />
-          </Form.Item>
-          <Form.Item name="uudai" label="Ưu đãi khác">
-            <Input.TextArea rows={3} placeholder="Ghi chú thêm về quyền lợi ưu đãi" />
-          </Form.Item>
-        </Form>
-      </Modal>
+
+    </div>
+  );
+}
+
+
+
+function StatCard({ title, value, subtitle, accent }) {
+  return (
+    <div className={`rounded-2xl border border-slate-100 bg-white p-4 shadow-sm ${accent ? accent : ''}`}>
+      <div className="text-xs uppercase text-gray-500">{title}</div>
+      <div className="text-2xl font-semibold text-gray-900">{value}</div>
+      {subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
     </div>
   );
 }

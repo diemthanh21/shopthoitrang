@@ -1189,8 +1189,9 @@ const colorOptions = useMemo(() => {
       {/* Modal form thêm / sửa chi tiết */}
       {showForm && canEdit && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="px-6 py-4 border-b flex items-center justify-between">
+          {/* Modal container: smaller width + height constraint with scroll */}
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col">
+            <div className="px-5 py-3 border-b flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingItem ? "Chỉnh sửa chi tiết" : "Thêm chi tiết mới"}
               </h3>
@@ -1201,8 +1202,8 @@ const colorOptions = useMemo(() => {
                 <X size={20} />
               </button>
             </div>
-
-            <form onSubmit={handleSaveItem} className="p-6 space-y-4">
+            {/* Scrollable content */}
+            <form onSubmit={handleSaveItem} className="p-5 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Sản phẩm <span className="text-red-500">*</span>
@@ -1227,7 +1228,7 @@ const colorOptions = useMemo(() => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Kích thước
@@ -1289,42 +1290,43 @@ const colorOptions = useMemo(() => {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Số lượng <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={formData.soLuong}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      soLuong: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Đơn giá <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.donGia}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      donGia: Number(e.target.value),
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Số lượng <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.soLuong}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        soLuong: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Đơn giá <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.donGia}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        donGia: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
@@ -1350,7 +1352,7 @@ const colorOptions = useMemo(() => {
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleCloseForm}

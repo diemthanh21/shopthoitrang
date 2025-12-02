@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'package:shopthoitrang_mobile/screens/dashboard_screen.dart';
 import 'providers/auth_provider.dart';
@@ -9,6 +10,7 @@ import 'screens/register_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('vi_VN');
   runApp(const ShopThoitrangApp());
 }
 

@@ -9,8 +9,8 @@ const BannerRepository = {
     let q = supabase.from(TABLE).select('*', { count: 'exact' });
 
     if (search && search.trim()) {
-      // tìm theo mô tả hoặc link
-      q = q.or(`mota.ilike.%${search}%,lienket.ilike.%${search}%`);
+      // tìm theo mô tả
+      q = q.ilike('mota', `%${search}%`);
     }
     if (typeof active === 'boolean') {
       q = q.eq('danghoatdong', active);

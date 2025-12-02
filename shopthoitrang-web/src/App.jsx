@@ -14,6 +14,7 @@ import DoiHangDetailPage from './pages/DoiHangDetailPage';
 import DoiHangPage from './pages/DoiHangPage';
 import DonHangDetailPage from './pages/DonHangDetailPage';
 import DonHangPage from './pages/DonHangPage';
+import CreateDonHangPage from './pages/CreateDonHangPage';
 import HangThePage from './pages/HangThePage';
 import KhachHangPage from './pages/KhachHangPage';
 import KhuyenMaiPage from './pages/KhuyenMaiPage';
@@ -32,11 +33,13 @@ import ThongBaoPage from './pages/ThongBaoPage';
 import TinNhanPage from './pages/TinNhanPage';
 import TraHangDetailPage from './pages/TraHangDetailPage';
 import TraHangPage from './pages/TraHangPage';
-import VoucherGiamGiaPage from './pages/VoucherGiamGiaPage';
+import CreateTraHangPage from './pages/CreateTraHangPage';
+import MaGiamGiaPage from './pages/MaGiamGiaPage';
 import KichThuocPage from './pages/KichThuocPage';
 import ChotCaPage from './pages/ChotCaPage';
 import ChotCaDetailPage from './pages/ChotCaDetailPage';
-
+import ThongTinNhanVienPage from './pages/ThongTinNhanVienPage';
+import PhiVanChuyenPage from './pages/PhiVanChuyenPage';
 function App() {
   return (
     <AuthProvider>
@@ -52,6 +55,9 @@ function App() {
               </ProtectedRoute>
             }
           >
+            <Route path="me" element={<ThongTinNhanVienPage />} />
+            <Route path="chotca" element={<ChotCaPage />} />  
+            <Route path="chotca/:id" element={<ChotCaDetailPage />} />  
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="nhanvien" element={<NhanVienPage />} />
@@ -64,14 +70,16 @@ function App() {
             <Route path="banner" element={<BannerPage />} />
             <Route path="phancongca" element={<PhanCongCaPage />} />
             <Route path="khuyenmai" element={<KhuyenMaiPage />} />
-            <Route path="vouchergiamgia" element={<VoucherGiamGiaPage />} />
+            <Route path="magiamgia" element={<MaGiamGiaPage />} />
             <Route path="donhang" element={<DonHangPage />} />
+            <Route path="donhang/create" element={<CreateDonHangPage />} />
             <Route path="donhang/:id" element={<DonHangDetailPage />} />
             <Route path="phieudathang" element={<PhieuDatHangPage />} />
             <Route path="phieudathang/:id" element={<ChiTietPhieuDatHangPage />} />
             <Route path="phieunhapkho" element={<PhieuNhapKhoPage />} />
             <Route path="phieunhapkho/:id" element={<ChiTietPhieuNhapKhoPage />} />
             <Route path="trahang" element={<TraHangPage />} />
+            <Route path="trahang/create" element={<CreateTraHangPage />} />
             <Route path="trahang/:id" element={<TraHangDetailPage />} />
             <Route path="doihang" element={<DoiHangPage />} />
             <Route path="doihang/:id" element={<DoiHangDetailPage />} />
@@ -86,6 +94,8 @@ function App() {
             <Route path="thongbao" element={<ThongBaoPage />} />
             <Route path="chotca" element={<ChotCaPage />} />  
             <Route path="chotca/:id" element={<ChotCaDetailPage />} />  
+            <Route path="phivanchuyen" element={<PhiVanChuyenPage />} />
+
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

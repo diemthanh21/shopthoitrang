@@ -1,22 +1,42 @@
-const { createClient } = require('@supabase/supabase-js');
+// src/repositories/magiamgia.repository.js
+const supabase = require('../../config/db');
 const MaGiamGia = require('../models/magiamgia.model');
 
-const supabase = require('../../config/db');
 const TABLE = 'magiamgia';
+
+function buildLocalDateString() {
+  const now = new Date();
+  const offsetMinutes = now.getTimezoneOffset();
+  const localMs = now.getTime() - offsetMinutes * 60 * 1000;
+  return new Date(localMs).toISOString().slice(0, 10);
+}
 
 const MaGiamGiaRepository = {
   async getAll(filters = {}) {
     let query = supabase.from(TABLE).select('*');
 
-    if (filters.macode) query = query.ilike('macode', `%${filters.macode}%`);
+    if (filters.macode) {
+      query = query.ilike('macode', `%${filters.macode}%`);
+    }
+
+    if (filters.maloaivoucher) {
+      query = query.eq('maloaivoucher', filters.maloaivoucher);
+    }
+
+    if (filters.hinhthuc_giam) {
+      query = query.eq('hinhthuc_giam', String(filters.hinhthuc_giam).toUpperCase());
+    }
+
+    // active = 'true' -> đang trong khoảng ngày bắt đầu / kết thúc
     if (filters.active === 'true') {
-      const today = new Date().toISOString().slice(0, 10);
-      query = query.lte('ngaybatdau', today).gte('ngayketthuc', today);
+      const todayLocal = buildLocalDateString();
+      query = query.lte('ngaybatdau', todayLocal).gte('ngayketthuc', todayLocal);
     }
 
     const { data, error } = await query.order('mavoucher', { ascending: true });
     if (error) throw error;
-    return data.map(r => new MaGiamGia(r));
+
+    return (data || []).map((row) => new MaGiamGia(row));
   },
 
   async getById(id) {
@@ -25,14 +45,37 @@ const MaGiamGiaRepository = {
       .select('*')
       .eq('mavoucher', id)
       .maybeSingle();
+
     if (error) throw error;
-    return data ? new MaGiamGia(data) : null;
+    if (!data) return null;
+    return new MaGiamGia(data);
   },
 
   async create(payload) {
-    const { data, error } = await supabase.from(TABLE).insert([payload]).select('*').single();
+    const { data, error } = await supabase
+      .from(TABLE)
+      .insert([payload])
+      .select('*')
+      .single();
+
     if (error) throw error;
     return new MaGiamGia(data);
+  },
+
+  async getByIds(ids = []) {
+    if (!Array.isArray(ids) || !ids.length) return [];
+    const normalizedIds = ids
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    if (!normalizedIds.length) return [];
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .in('mavoucher', normalizedIds);
+
+    if (error) throw error;
+    return (data || []).map((row) => new MaGiamGia(row));
   },
 
   async update(id, fields) {
@@ -42,8 +85,10 @@ const MaGiamGiaRepository = {
       .eq('mavoucher', id)
       .select('*')
       .maybeSingle();
+
     if (error) throw error;
-    return data ? new MaGiamGia(data) : null;
+    if (!data) return null;
+    return new MaGiamGia(data);
   },
 
   async remove(id) {
@@ -53,9 +98,11 @@ const MaGiamGiaRepository = {
       .eq('mavoucher', id)
       .select('*')
       .maybeSingle();
+
     if (error) throw error;
-    return data ? new MaGiamGia(data) : null;
-  }
+    if (!data) return null;
+    return new MaGiamGia(data);
+  },
 };
 
 module.exports = MaGiamGiaRepository;

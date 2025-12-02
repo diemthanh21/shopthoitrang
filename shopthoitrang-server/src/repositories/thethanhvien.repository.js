@@ -80,7 +80,7 @@ const TheThanhVienRepository = {
     const now = new Date().toISOString();
     const { error } = await supabase
       .from(TABLE)
-      .update({ trangthai: false, ngayhethan: now })
+      .update({ trangthai: false, updated_at: now })
       .eq('makhachhang', makhachhang)
       .eq('trangthai', true);
     if (error) throw error;

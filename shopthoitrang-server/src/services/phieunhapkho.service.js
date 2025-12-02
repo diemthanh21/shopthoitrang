@@ -4,6 +4,7 @@ const ctSanPhamRepo = require('../repositories/chitietsanpham.repository');
 const ctSanPhamSizeRepo = require('../repositories/chitietsanphamSize.repository');
 const ctPhieuDatRepo = require('../repositories/chitietphieudathang.repository');
 const phieuDatRepo = require('../repositories/phieudathang.repository');
+const systemlogController = require('../controllers/systemlog.controller');
 
 const normalize = (s = '') =>
   s
@@ -12,6 +13,13 @@ const normalize = (s = '') =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
+
+// Hàm đổi giờ sang UTC+7 (giờ VN) rồi trả ISO string
+function toVietnamTimeIso(input) {
+  const base = input ? new Date(input) : new Date();
+  const ms = base.getTime() + 7 * 60 * 60 * 1000;
+  return new Date(ms).toISOString();
+}
 
 class PhieuNhapKhoService {
   async list(filters) {
@@ -41,7 +49,8 @@ class PhieuNhapKhoService {
     const payload = {
       manhanvien: body.manhanvien,
       maphieudathang: body.maphieudathang,
-      ngaynhap: body.ngaynhap ?? new Date().toISOString(),
+      // luôn lưu ngaynhap theo UTC+7
+      ngaynhap: toVietnamTimeIso(body.ngaynhap || undefined),
       ghichu: body.ghichu ?? null
     };
 
@@ -49,7 +58,26 @@ class PhieuNhapKhoService {
       payload.trangthai = body.trangthai;
     }
 
-    return repo.create(payload);
+    const created = await repo.create(payload);
+    
+    // Tạo thông báo khi tạo phiếu nhập kho mới
+    // actorId = SYSTEM để quản lý có thể nhận thông báo (filter ở frontend)
+    if (created) {
+      try {
+        await systemlogController.createPhieuNhapKhoLog(
+          created.maPhieuNhap || created.maphieunhap,
+          'SYSTEM',
+          'CREATED',
+          'Phiếu nhập kho mới đã được tạo, chờ duyệt',
+          'NHANVIEN'
+        );
+        console.log('✅ Created notification for new phieunhapkho');
+      } catch (logErr) {
+        console.error('⚠️ Failed to create notification:', logErr);
+      }
+    }
+    
+    return created;
   }
 
   async update(id, body) {
@@ -62,8 +90,14 @@ class PhieuNhapKhoService {
         throw e;
       }
 
+      // Clone body để xử lý ngày nhập (cộng +7h) trước khi update
+      const updateBody = { ...body };
+      if (body.ngaynhap !== undefined) {
+        updateBody.ngaynhap = toVietnamTimeIso(body.ngaynhap || undefined);
+      }
+
       // Cập nhật phiếu nhập
-      const updated = await repo.update(id, body);
+      const updated = await repo.update(id, updateBody);
       if (!updated) {
         const e = new Error('Khong tim thay phieu nhap kho de cap nhat');
         e.status = 404;
@@ -71,16 +105,59 @@ class PhieuNhapKhoService {
       }
 
       // Kiểm tra trạng thái để xử lý logic duyệt
-      const newStatus = (body.trangthai || updated.trangthai || '').toString();
-      const wasApprovedBefore = normalize(prev.trangthai || '').includes('duyet');
+      const newStatus = (body.trangthai || updated.trangthai || updated.trangThai || '').toString();
+      const oldStatus = (prev.trangthai || prev.trangThai || '').toString();
+      const wasApprovedBefore = normalize(oldStatus).includes('duyet');
       const isNowApproved = normalize(newStatus).includes('duyet');
 
       console.log('=== RECEIPT UPDATE DEBUG ===');
       console.log('Receipt ID:', id);
-      console.log('Previous Status:', prev.trangthai);
+      console.log('Previous Status:', oldStatus);
       console.log('New Status:', newStatus);
       console.log('Was Approved Before:', wasApprovedBefore);
       console.log('Is Now Approved:', isNowApproved);
+
+      // Tạo log thông báo khi trạng thái thay đổi
+      if (newStatus && newStatus !== oldStatus) {
+        try {
+          console.log('📋 Phiếu nhập kho #' + id + ' - Trạng thái thay đổi:', oldStatus, '→', newStatus);
+          console.log('📋 prev.maNhanVien:', prev.maNhanVien);
+          
+          let action = null;
+          let note = null;
+          let actorType = 'ADMIN';
+          let actorId = 'SYSTEM';
+          
+          if (isNowApproved && !wasApprovedBefore) {
+            action = 'APPROVED';
+            note = 'Phiếu nhập kho đã được duyệt';
+            actorType = 'ADMIN';
+            // actorId là nhân viên tạo phiếu - họ sẽ nhận thông báo
+            actorId = String(prev.maNhanVien || prev.manhanvien || 'SYSTEM');
+            console.log('📧 Sending APPROVED notification to employee:', actorId);
+          } else if (normalize(newStatus).includes('huy') || normalize(newStatus).includes('choi')) {
+            action = 'REJECTED';
+            note = 'Phiếu nhập kho bị từ chối';
+            actorType = 'ADMIN';
+            // actorId là nhân viên tạo phiếu - họ sẽ nhận thông báo
+            actorId = String(prev.maNhanVien || prev.manhanvien || 'SYSTEM');
+            console.log('📧 Sending REJECTED notification to employee:', actorId);
+          }
+          
+          if (action) {
+            await systemlogController.createPhieuNhapKhoLog(
+              id,
+              actorId,
+              action,
+              note,
+              actorType
+            );
+            console.log('✅ Created status update log for phieunhapkho:', id, 'action:', action, 'actorId:', actorId);
+          }
+        } catch (logErr) {
+          console.error('⚠️ Failed to create status update log:', logErr);
+        }
+      }
 
       // Nếu vừa chuyển sang trạng thái "Đã duyệt"
       if (isNowApproved && !wasApprovedBefore) {
@@ -282,7 +359,9 @@ class PhieuNhapKhoService {
       if (allFulfilled) {
         try {
           console.log('Updating purchase order status to Hoàn thành...');
-          const updateResult = await phieuDatRepo.update(purchaseOrderId, { trangthaiphieu: 'Hoàn thành' });
+          // Gọi service thay vì repository để trigger notification
+          const phieuDatService = require('./phieudathang.service');
+          const updateResult = await phieuDatService.update(purchaseOrderId, { trangthaiphieu: 'Hoàn thành' });
           console.log('Purchase order update result:', updateResult ? 'Success' : 'Failed');
         } catch (updateError) {
           console.error('Error updating purchase order status:', updateError.message);

@@ -509,24 +509,31 @@ export default function ChiTietPhieuNhapKhoPage() {
     : 0;
 
   // ======= Quyền + trạng thái =======
-  const role = user?.maQuyen;
+  const role = (user?.maQuyen || "").toUpperCase();
   const isAdmin = role === "ADMIN";
   const isManager = role === "MANAGER";
+  const isWarehouse = role === "WAREHOUSE";
+  const allowedDetailRoles = ["ADMIN", "MANAGER", "WAREHOUSE"];
+  const allowedSendRoles = allowedDetailRoles; // cùng nhóm được phép gửi
 
   const trangThai = phieu?.trangThai ?? phieu?.trangthai ?? "Tạo mới";
   const normalizedStatus = normalizeStatus(trangThai);
 
   // chỉ được sửa khi "Tạo mới"
-  const canEdit = normalizedStatus === "tao moi";
-  // nút GỬI: mọi role, chỉ khi "Tạo mới"
-  const canSend = normalizedStatus === "tao moi";
+  // Chỉ cho phép thêm / sửa chi tiết nếu trạng thái "Tạo mới" và role thuộc nhóm cho phép
+  const canEdit = normalizedStatus === "tao moi" && allowedDetailRoles.includes(role);
+  // nút GỬI: chỉ khi "Tạo mới" và thuộc nhóm role cho phép
+  const canSend = normalizedStatus === "tao moi" && allowedSendRoles.includes(role);
   // nút DUYỆT / HỦY: ADMIN + MANAGER, khi "Chờ xác nhận"
   const canApprove =
     (isAdmin || isManager) && normalizedStatus === "cho xac nhan";
 
   // ========== Form thêm / sửa chi tiết ==========
   const handleOpenForm = (item = null) => {
-    if (!canEdit) return; // chặn khi không được sửa
+    if (!canEdit) {
+      alert("Bạn không có quyền thêm / sửa chi tiết nhập kho.");
+      return;
+    }
 
     if (item) {
       setEditingItem(item);
@@ -571,7 +578,10 @@ export default function ChiTietPhieuNhapKhoPage() {
 
   const handleSaveItem = async (e) => {
     e.preventDefault();
-    if (!canEdit) return;
+    if (!canEdit) {
+      alert("Bạn không có quyền lưu chi tiết nhập kho.");
+      return;
+    }
 
     if (!formData.maSanPham) {
       alert("Vui lòng chọn sản phẩm!");

@@ -118,10 +118,35 @@ export default function NhaCungCapPage() {
       return;
     }
 
+    // ===== Validate số điện thoại: đúng 10 chữ số =====
+    const rawPhone = formData.soDienThoai?.trim() || "";
+    if (rawPhone && !/^\d{10}$/.test(rawPhone)) {
+      alert("Số điện thoại phải gồm đúng 10 chữ số");
+      return;
+    }
+
+    // ===== Validate email không trùng =====
+    const rawEmail = formData.email?.trim() || "";
+    if (rawEmail) {
+      const emailLower = rawEmail.toLowerCase();
+      const existingEmails = rows
+        .map(normalizeRow)
+        .map((r) => r.email?.toLowerCase())
+        .filter((e) => e);
+      const currentEmailLower = editingItem?.email?.toLowerCase();
+      const isDuplicate = existingEmails.some(
+        (e) => e === emailLower && e !== currentEmailLower
+      );
+      if (isDuplicate) {
+        alert("Email đã tồn tại. Vui lòng nhập email khác");
+        return;
+      }
+    }
+
     const payload = {
       tennhacungcap: formData.tenNhaCungCap.trim(),
       email: formData.email?.trim() || null,
-      diachi: formData.diaChi?.trim() || null,
+      diaChi: formData.diaChi?.trim() || null,
       sodienthoai: formData.soDienThoai?.trim() || null,
     };
 
@@ -266,20 +291,13 @@ export default function NhaCungCapPage() {
                       {r.tenNhaCungCap}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {r.email || "—"}
+                      {r.email || " "}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      {r.soDienThoai || "—"}
+                      {r.soDienThoai || " "}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
-                      {r.diaChi || "—"}
-                      {r.email || ""}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {r.soDienThoai || ""}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 max-w-xs truncate">
-                      {r.diaChi || ""}
+                      {r.diaChi || " "}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="inline-flex items-center gap-2">

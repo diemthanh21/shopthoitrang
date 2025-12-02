@@ -7,6 +7,8 @@ import phieuNhapKhoService from "../services/phieunhapkhoService";
 import phieuDatHangService from "../services/phieuDatHangService";
 import nhanvienService from "../services/nhanvienService";
 import nhacungcapService from "../services/nhacungcapService";
+import { useAuth } from "../contexts/AuthContext";
+import chucnangService from "../services/chucnangService";
 
 // Format helpers
 const fmtDate = (iso) =>
@@ -53,11 +55,17 @@ function normalizeStatus(status) {
 
 export default function PhieuNhapKhoPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const userRole = (user?.maQuyen || "").toUpperCase();
+  const canCreate = ["ADMIN", "MANAGER", "WAREHOUSE"].includes(userRole);
+  const canSelectEmployee = ["ADMIN", "MANAGER"].includes(userRole);
+  const currentUserId = user?.maNhanVien ?? user?.manhanvien ?? null;
 
   const [rows, setRows] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [chucnangs, setChucnangs] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
@@ -84,29 +92,44 @@ export default function PhieuNhapKhoPage() {
         setLoading(true);
         setErr("");
 
-        const [p, emps, orders, nccs] = await Promise.all([
+        const [p, emps, orders, nccs, chucList] = await Promise.all([
           phieuNhapKhoService.getAll(),
           nhanvienService.getAll(),
           phieuDatHangService.getAll(),
           nhacungcapService.getAll(),
+          chucnangService.getAll(),
         ]);
 
         setRows(Array.isArray(p) ? p : p?.data ?? []);
         setEmployees(Array.isArray(emps) ? emps : emps?.data ?? []);
         setPurchaseOrders(Array.isArray(orders) ? orders : orders?.data ?? []);
         setSuppliers(Array.isArray(nccs) ? nccs : nccs?.data ?? []);
+        setChucnangs(Array.isArray(chucList) ? chucList : chucList?.data ?? []);
       } catch (e) {
         console.error(e);
         setRows([]);
         setEmployees([]);
         setPurchaseOrders([]);
         setSuppliers([]);
+        setChucnangs([]);
         setErr("Không thể tải danh sách phiếu nhập kho / phiếu đặt hàng / nhân viên / nhà cung cấp");
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+  // Map maChucNang -> maQuyen
+  const chucnangMap = useMemo(() => {
+    const map = new Map();
+    chucnangs.forEach((c) => {
+      const id = c.maChucNang ?? c.machucnang;
+      if (id != null) {
+        const role = c.maQuyen ?? c.maquyen ?? "";
+        map.set(Number(id), role);
+      }
+    });
+    return map;
+  }, [chucnangs]);
 
   // ===== Helper: id -> tên nhân viên =====
   function getTenNhanVien(maNhanVien) {
@@ -276,21 +299,23 @@ export default function PhieuNhapKhoPage() {
             <h1 className="text-3xl font-bold text-gray-900">Quản lý phiếu nhập kho</h1>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setAddFormData({
-              maPhieuDatHang: "",
-              maNhanVien: "",
-              ngayNhap: new Date().toISOString().split("T")[0],
-              ghiChu: "",
-            });
-            setShowAddForm(true);
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Thêm phiếu nhập kho
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => {
+              setAddFormData({
+                maPhieuDatHang: "",
+                maNhanVien: canSelectEmployee ? "" : (currentUserId ? String(currentUserId) : ""),
+                ngayNhap: new Date().toISOString().split("T")[0],
+                ghiChu: "",
+              });
+              setShowAddForm(true);
+            }}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+          >
+            <Plus size={20} />
+            Thêm phiếu nhập kho
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -539,7 +564,7 @@ export default function PhieuNhapKhoPage() {
       </div>
 
       {/* Modal form thêm phiếu nhập kho */}
-      {showAddForm && (
+      {showAddForm && canCreate && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
             <div className="px-6 py-4 border-b flex items-center justify-between">
@@ -557,6 +582,14 @@ export default function PhieuNhapKhoPage() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!canCreate) {
+                  alert("Bạn không có quyền tạo phiếu nhập kho.");
+                  return;
+                }
+                // Nếu user không được chọn nhân viên (WAREHOUSE) thì tự động gán chính họ
+                if (!canSelectEmployee && currentUserId && !addFormData.maNhanVien) {
+                  setAddFormData((old) => ({ ...old, maNhanVien: String(currentUserId) }));
+                }
                 try {
                   setSaving(true);
 
@@ -659,27 +692,54 @@ export default function PhieuNhapKhoPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Nhân viên nhập <span className="text-red-500">*</span>
                   </label>
-                  <select
-                    value={addFormData.maNhanVien}
-                    onChange={(e) =>
-                      setAddFormData((old) => ({
-                        ...old,
-                        maNhanVien: e.target.value,
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">-- Chọn nhân viên --</option>
-                    {employees.map((e) => (
-                      <option
-                        key={e.maNhanVien ?? e.manhanvien}
-                        value={e.maNhanVien ?? e.manhanvien}
-                      >
-                        {e.hoTen ?? e.hoten}
-                      </option>
-                    ))}
-                  </select>
+                  {canSelectEmployee ? (
+                    <select
+                      value={addFormData.maNhanVien}
+                      onChange={(e) =>
+                        setAddFormData((old) => ({
+                          ...old,
+                          maNhanVien: e.target.value,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">-- Chọn nhân viên --</option>
+                      {employees
+                        .filter((e) => {
+                          const rawRole = (e.maQuyen ?? e.maquyen ?? "").toUpperCase();
+                          const chucId = e.maChucNang ?? e.machucnang;
+                          const mappedRole = (chucId != null
+                            ? (chucnangMap.get(Number(chucId)) || "")
+                            : ""
+                          ).toUpperCase();
+                          const finalRole = rawRole || mappedRole; // ưu tiên trực tiếp, fallback map
+                          const allowed = ["ADMIN", "MANAGER", "WAREHOUSE"];
+                          // Nếu không xác định được role, vẫn cho hiển thị để tránh danh sách rỗng cho ADMIN
+                          if (!finalRole) return true;
+                          return allowed.includes(finalRole);
+                        })
+                        .map((e) => (
+                          <option
+                            key={e.maNhanVien ?? e.manhanvien}
+                            value={e.maNhanVien ?? e.manhanvien}
+                          >
+                            {(e.hoTen ?? e.hoten) || (e.maNhanVien ?? e.manhanvien)}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      readOnly
+                      value={
+                        employees.find((e) => (e.maNhanVien ?? e.manhanvien) == currentUserId)?.hoTen ??
+                        employees.find((e) => (e.maNhanVien ?? e.manhanvien) == currentUserId)?.hoten ??
+                        (currentUserId ? `#${currentUserId}` : "")
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                    />
+                  )}
                 </div>
 
                 <div>

@@ -1,17 +1,23 @@
-/// Model đơn hàng (donhang table)
+/// Models for orders and order items.
 import 'membership_model.dart';
 
+/// Order model (donhang table)
 class Order {
   final int? id; // madonhang
   final int customerId; // makhachhang
   final DateTime orderDate; // ngaydathang
-  final DateTime? deliveredDate; // ngaygiaohang - thời điểm xác nhận đã giao
+  final DateTime? deliveredDate; // ngaygiaohang
   final double total; // thanhtien
   final String paymentMethod; // phuongthucthanhtoan
   final String paymentStatus; // trangthaithanhtoan
   final String orderStatus; // trangthaidonhang
   final List<OrderItem> items; // chitietdonhang
-  final DiaChiKhachHang? shippingAddress; // địa chỉ giao đã chọn lúc checkout
+  final DiaChiKhachHang? shippingAddress; // dia chi giao hang
+  final double shippingFee;
+  final String? shippingProvinceSnapshot;
+  final List<int> appliedVoucherIds;
+  final int pointsUsed;
+  final double pointsDiscountValue;
 
   Order({
     this.id,
@@ -24,6 +30,11 @@ class Order {
     required this.orderStatus,
     this.items = const [],
     this.shippingAddress,
+    this.shippingFee = 0,
+    this.shippingProvinceSnapshot,
+    this.appliedVoucherIds = const [],
+    this.pointsUsed = 0,
+    this.pointsDiscountValue = 0,
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -56,6 +67,18 @@ class Order {
               macDinh: json['diaChi']['macdinh'] == true,
             )
           : null,
+      shippingFee:
+          _parseDouble(json['phivanchuyen'] ?? json['shippingFee'] ?? 0),
+      shippingProvinceSnapshot: json['tinh_giaohang_snapshot'] ??
+          json['shippingProvinceSnapshot'] ??
+          json['shippingProvince'],
+      appliedVoucherIds: _parseVoucherIds(json),
+      pointsUsed: json['diem_su_dung'] ??
+          json['pointsUsed'] ??
+          json['points_used'] ??
+          0,
+      pointsDiscountValue:
+          _parseDouble(json['points_discount_value'] ?? json['pointsDiscount'] ?? 0),
     );
   }
 
@@ -72,6 +95,13 @@ class Order {
       'trangthaidonhang': orderStatus,
       if (items.isNotEmpty)
         'items': items.map((item) => item.toJson()).toList(),
+      if (appliedVoucherIds.isNotEmpty) 'voucher_ids': appliedVoucherIds,
+      if (pointsUsed > 0) ...{
+        'diem_su_dung': pointsUsed,
+        'pointsUsed': pointsUsed,
+      },
+      if (pointsDiscountValue > 0)
+        'points_discount_value': pointsDiscountValue,
       if (shippingAddress != null) ...{
         'madiachi': shippingAddress!.maDiaChi,
         'diachi': {
@@ -85,21 +115,68 @@ class Order {
           'macdinh': shippingAddress!.macDinh,
         }
       },
+      'phivanchuyen': shippingFee,
+      'tinh_giaohang_snapshot':
+          shippingProvinceSnapshot ?? shippingAddress?.tinh,
     };
+  }
+
+  static List<int> _parseVoucherIds(Map<String, dynamic> json) {
+    final result = <int>[];
+    void addValue(dynamic value) {
+      if (value == null) return;
+      final parsed = value is int ? value : int.tryParse(value.toString());
+      if (parsed != null && parsed > 0) result.add(parsed);
+    }
+
+    final candidates = [
+      json['voucher_ids'],
+      json['voucherIds'],
+      json['appliedVoucherIds'],
+      json['applied_voucher_ids'],
+    ];
+    for (final candidate in candidates) {
+      if (candidate is List) {
+        for (final value in candidate) {
+          addValue(value);
+        }
+      }
+    }
+
+    if (json['appliedVouchers'] is List) {
+      for (final item in json['appliedVouchers']) {
+        if (item is Map<String, dynamic>) {
+          addValue(item['mavoucher'] ?? item['maVoucher'] ?? item['id']);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? 0;
   }
 }
 
-/// Model chi tiết đơn hàng (chitietdonhang table)
+/// Order item model (chitietdonhang table)
 class OrderItem {
   final int? id; // machitietdonhang
   final int? orderId; // madonhang
   final int variantId; // machitietsanpham
-  final int? productId; // masanpham (từ join)
+  final int? productId; // masanpham (join)
   final int quantity; // soluong
   final double price; // dongia
-  final String? productName; // tensanpham (từ join)
-  final String? variantName; // tên phân loại (từ join)
-  final String? imageUrl; // hinhanh (từ join)
+  final String? productName; // tensanpham (join)
+  final String? variantName; // phan loai (join)
+  final String? imageUrl; // hinhanh (join)
+  final int? sizeBridgeId; // chitietsize_id (chitietsanpham_kichthuoc.id)
+  final int? giftVariantId;
+  final int? giftSizeBridgeId;
+  final int giftQuantity;
+  final int? giftPromotionId;
 
   OrderItem({
     this.id,
@@ -111,6 +188,11 @@ class OrderItem {
     this.productName,
     this.variantName,
     this.imageUrl,
+    this.sizeBridgeId,
+    this.giftVariantId,
+    this.giftSizeBridgeId,
+    this.giftQuantity = 0,
+    this.giftPromotionId,
   });
 
   factory OrderItem.fromJson(Map<String, dynamic> json) {
@@ -129,13 +211,8 @@ class OrderItem {
       }
     }
 
-    // Server trả về productId từ variant enrichment
-    // Nếu không có thì cần query riêng (nhưng thường có)
-    int? productId = json['masanpham'] ?? json['productId'];
-
-    // WORKAROUND: Nếu server không trả productId, cần lấy từ API khác
-    // Hoặc yêu cầu server thêm masanpham vào response items
-    // Tạm thời để null nếu không có
+    // productId might come from enriched variant
+    final int? productId = json['masanpham'] ?? json['productId'];
 
     return OrderItem(
       id: json['machitietdonhang'] ?? json['id'],
@@ -147,6 +224,13 @@ class OrderItem {
       productName: json['productName'] ?? json['tensanpham'],
       variantName: variantText ?? json['variantName'],
       imageUrl: json['imageUrl'] ?? json['hinhanh'],
+      sizeBridgeId: json['sizeBridgeId'] ??
+          json['chitietsize_id'] ??
+          json['chitietsizeId'],
+      giftVariantId: json['giftVariantId'] ?? json['gift_variant_id'],
+      giftSizeBridgeId: json['giftSizeBridgeId'] ?? json['gift_size_bridge_id'],
+      giftQuantity: json['giftQuantity'] ?? json['gift_quantity'] ?? 0,
+      giftPromotionId: json['giftPromotionId'] ?? json['gift_promotion_id'],
     );
   }
 
@@ -161,13 +245,18 @@ class OrderItem {
       if (productName != null) 'tensanpham': productName,
       if (variantName != null) 'variantName': variantName,
       if (imageUrl != null) 'hinhanh': imageUrl,
+      if (sizeBridgeId != null) 'chitietsizeId': sizeBridgeId,
+      if (giftVariantId != null) 'giftVariantId': giftVariantId,
+      if (giftSizeBridgeId != null) 'giftSizeBridgeId': giftSizeBridgeId,
+      if (giftQuantity > 0) 'giftQuantity': giftQuantity,
+      if (giftPromotionId != null) 'giftPromotionId': giftPromotionId,
     };
   }
 
   double get total => price * quantity;
 }
 
-/// Model địa chỉ khách hàng (diachikhachhang table)
+/// Simple shipping address model (legacy; main address type is DiaChiKhachHang)
 class ShippingAddress {
   final int? id; // madiachi
   final int customerId; // makhachhang

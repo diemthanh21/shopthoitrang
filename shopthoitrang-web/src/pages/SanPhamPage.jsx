@@ -47,9 +47,10 @@ export default function SanPhamPage() {
   async function fetchDanhMuc() {
     try {
       const data = await danhmucService.getAll();
-      setDanhMucList(data);
+      const safeData = Array.isArray(data) ? data : [];
+      setDanhMucList(safeData);
       const danhMucMapping = {};
-      data.forEach((dm) => {
+      safeData.forEach((dm) => {
         danhMucMapping[dm.madanhmuc ?? dm.maDanhMuc] =
           dm.tendanhmuc ?? dm.tenDanhMuc;
       });
@@ -57,6 +58,8 @@ export default function SanPhamPage() {
     } catch (e) {
       console.error(e);
       message.error("Không thể tải danh sách danh mục");
+      setDanhMucList([]);
+      setDanhMucMap({});
     }
   }
 

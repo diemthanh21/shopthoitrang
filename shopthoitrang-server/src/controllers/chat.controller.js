@@ -20,6 +20,121 @@ async function getDefaultStaffId() {
 }
 
 const ChatController = {
+  // Admin: list ALL customers with their chatbox data (if exists)
+  async listAllCustomersWithChats(req, res) {
+    try {
+      // Get all customers
+      const { data: customers, error: custErr } = await supabase
+        .from('taikhoankhachhang')
+        .select('makhachhang, hoten, email, sodienthoai')
+        .order('makhachhang', { ascending: false });
+      if (custErr) throw custErr;
+
+      // Get all chatboxes
+      const { data: boxes, error: boxErr } = await supabase
+        .from('chatbox')
+        .select('*')
+        .order('ngaytao', { ascending: false });
+      if (boxErr) throw boxErr;
+
+      // Auto-fix legacy rows missing manhanvien
+      const legacy = boxes.filter(b => !b.manhanvien);
+      if (legacy.length) {
+        const staffId = await getDefaultStaffId();
+        if (staffId) {
+          const idsToFix = legacy.map(b => b.machatbox);
+          const { error: updErr } = await supabase
+            .from('chatbox')
+            .update({ manhanvien: staffId })
+            .in('machatbox', idsToFix);
+          if (updErr) console.warn('[ChatController.listAllCustomersWithChats] cannot update legacy manhanvien:', updErr);
+          else {
+            for (const b of boxes) if (!b.manhanvien) b.manhanvien = staffId;
+          }
+        }
+      }
+
+      // Build map of chatbox by customer
+      const boxByCustomer = new Map();
+      for (const b of boxes) {
+        if (b.makhachhang) boxByCustomer.set(b.makhachhang, b);
+      }
+
+      // For each chatbox, compute latest non-system message + unread
+      const ids = boxes.map(b => b.machatbox);
+      let latestNonSystemByBox = new Map();
+      let unreadByBox = new Map();
+      const isSystemMessage = (m) => {
+        if (!m) return false;
+        try {
+          const text = (m.noidung || '').toString();
+          if (text.startsWith('[SYSTEM]')) return true;
+          if (m.nguoigui && m.nguoigui.toString().toUpperCase() === 'SYSTEM') return true;
+        } catch (_) {}
+        return false;
+      };
+
+      if (ids.length) {
+        const { data: msgs } = await supabase
+          .from('noidungchat')
+          .select('*')
+          .in('machatbox', ids)
+          .order('thoigiangui', { ascending: true });
+        if (Array.isArray(msgs)) {
+          for (const m of msgs) {
+            if (m.nguoigui === 'KH' && !m.daxem) {
+              unreadByBox.set(m.machatbox, (unreadByBox.get(m.machatbox) || 0) + 1);
+            }
+            if (!isSystemMessage(m)) {
+              latestNonSystemByBox.set(m.machatbox, m);
+            }
+          }
+        }
+      }
+
+      // Get staff names
+      const staffIds = [...new Set(boxes.map(b => b.manhanvien).filter(Boolean))];
+      const staffRes = staffIds.length
+        ? await supabase.from('taikhoannhanvien').select('manhanvien, tendangnhap').in('manhanvien', staffIds)
+        : { data: [] };
+      const staffMap = new Map((staffRes.data || []).map(s => [s.manhanvien, s]));
+
+      // Build result: each customer with optional chatbox data
+      const result = customers.map(cust => {
+        const box = boxByCustomer.get(cust.makhachhang);
+        if (box) {
+          // Customer has a chatbox
+          return {
+            makhachhang: cust.makhachhang,
+            hoten: cust.hoten,
+            email: cust.email,
+            sodienthoai: cust.sodienthoai,
+            chatbox: {
+              ...box,
+              nhanVien: staffMap.get(box.manhanvien) || null,
+              lastMessage: latestNonSystemByBox.get(box.machatbox) || null,
+              unreadFromCustomer: unreadByBox.get(box.machatbox) || 0,
+            }
+          };
+        } else {
+          // Customer has no chatbox yet
+          return {
+            makhachhang: cust.makhachhang,
+            hoten: cust.hoten,
+            email: cust.email,
+            sodienthoai: cust.sodienthoai,
+            chatbox: null
+          };
+        }
+      });
+
+      res.json(result);
+    } catch (err) {
+      console.error('[ChatController.listAllCustomersWithChats] error:', err);
+      res.status(500).json({ message: err.message || 'Lỗi khi lấy danh sách khách hàng' });
+    }
+  },
+
   // Admin: list all chat boxes with last message and unread counts
   async listChatBoxes(req, res) {
     try {
@@ -47,10 +162,21 @@ const ChatController = {
         }
       }
 
-      // For each chatbox, compute latest message + unread (from customer)
+      // For each chatbox, compute latest non-system message + unread (from customer)
       const ids = boxes.map(b => b.machatbox);
-      let latestByBox = new Map();
+      let latestNonSystemByBox = new Map();
       let unreadByBox = new Map();
+      // helper to detect simple system notifications
+      const isSystemMessage = (m) => {
+        if (!m) return false;
+        try {
+          const text = (m.noidung || '').toString();
+          if (text.startsWith('[SYSTEM]')) return true;
+          if (m.nguoigui && m.nguoigui.toString().toUpperCase() === 'SYSTEM') return true;
+        } catch (_) {}
+        return false;
+      };
+
       if (ids.length) {
         const { data: msgs } = await supabase
           .from('noidungchat')
@@ -59,9 +185,13 @@ const ChatController = {
           .order('thoigiangui', { ascending: true });
         if (Array.isArray(msgs)) {
           for (const m of msgs) {
-            latestByBox.set(m.machatbox, m);
+            // track unread from customers regardless of system flag
             if (m.nguoigui === 'KH' && !m.daxem) {
               unreadByBox.set(m.machatbox, (unreadByBox.get(m.machatbox) || 0) + 1);
+            }
+            // only consider non-system messages for the 'last message' shown in list
+            if (!isSystemMessage(m)) {
+              latestNonSystemByBox.set(m.machatbox, m);
             }
           }
         }
@@ -87,7 +217,8 @@ const ChatController = {
         ...b,
         khachHang: custMap.get(b.makhachhang) || null,
         nhanVien: staffMap.get(b.manhanvien) || null,
-        lastMessage: latestByBox.get(b.machatbox) || null,
+        // expose the last non-system message (if any) so frontend can show the real last message
+        lastMessage: latestNonSystemByBox.get(b.machatbox) || null,
         unreadFromCustomer: unreadByBox.get(b.machatbox) || 0,
       }));
 
@@ -148,6 +279,75 @@ const ChatController = {
     }
   },
 
+  // Admin/Staff: create or get chatbox for a specific customer
+  async startChatForCustomer(req, res) {
+    try {
+      const { makhachhang } = req.body;
+      if (!makhachhang) return res.status(400).json({ message: 'Thiếu makhachhang' });
+
+      // Check if customer exists
+      const { data: customer, error: custErr } = await supabase
+        .from('taikhoankhachhang')
+        .select('makhachhang, hoten')
+        .eq('makhachhang', makhachhang)
+        .single();
+      if (custErr || !customer) {
+        return res.status(404).json({ message: 'Không tìm thấy khách hàng' });
+      }
+
+      // Check if chatbox already exists
+      const { data: existing } = await supabase
+        .from('chatbox')
+        .select('*')
+        .eq('makhachhang', makhachhang)
+        .order('ngaytao', { ascending: false })
+        .limit(1);
+
+      // Get staff ID from current user or default
+      const user = req.user || {};
+      const staffIdFromToken = user.manhanvien || user.maNhanVien || user.id;
+      const staffId = staffIdFromToken || await getDefaultStaffId();
+
+      if (!staffId) {
+        return res.status(400).json({ message: 'Không thể xác định nhân viên phụ trách' });
+      }
+
+      if (existing && existing.length) {
+        const box = existing[0];
+        // Update staff if needed
+        if (!box.manhanvien || box.manhanvien !== staffId) {
+          const { data: updated, error: upErr } = await supabase
+            .from('chatbox')
+            .update({ manhanvien: staffId })
+            .eq('machatbox', box.machatbox)
+            .select('*')
+            .single();
+          if (upErr) throw upErr;
+          return res.json(updated);
+        }
+        return res.json(box);
+      }
+
+      // Create new chatbox
+      const { data, error } = await supabase
+        .from('chatbox')
+        .insert([{ 
+          makhachhang, 
+          manhanvien: staffId, 
+          ngaytao: new Date().toISOString(), 
+          trangthai: 'Đang hoạt động' 
+        }])
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      res.status(201).json(data);
+    } catch (err) {
+      console.error('[ChatController.startChatForCustomer] error:', err);
+      res.status(500).json({ message: err.message || 'Lỗi khi tạo hội thoại' });
+    }
+  },
+
   // Both: get messages by chatbox id (attach staff name per message)
   async getMessages(req, res) {
     try {
@@ -181,8 +381,8 @@ const ChatController = {
   // Employee or Customer send message
   async sendMessage(req, res) {
     try {
-      const { machatbox, noidung } = req.body;
-      if (!machatbox || !noidung) return res.status(400).json({ message: 'Thiếu machatbox hoặc noidung' });
+      const { machatbox, noidung, anhchat, videochat } = req.body;
+      if (!machatbox || (!noidung && !anhchat && !videochat)) return res.status(400).json({ message: 'Thiếu machatbox hoặc noidung/anhchat/videochat' });
       const user = req.user || {};
       const role = (user.role || '').toString().toLowerCase();
       // Detect staff by role or by presence of staff id fields in token
@@ -202,9 +402,11 @@ const ChatController = {
       const payload = {
         machatbox,
         nguoigui: isStaff ? 'NV' : 'KH',
-        noidung,
+        noidung: noidung || '',
         thoigiangui: new Date().toISOString(),
         daxem: false,
+        anhchat: anhchat || null,
+        videochat: videochat || null,
       };
       if (isStaff) {
         // prefer numeric staff id

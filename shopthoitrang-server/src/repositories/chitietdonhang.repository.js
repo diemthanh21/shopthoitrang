@@ -28,7 +28,14 @@ const ChiTietDonHangRepository = {
   },
 
   async create(entity) {
-    const { data, error } = await supabase.from(TABLE).insert([entity]).select().single();
+    const { data, error } = await supabase.from(TABLE).insert([{
+      machitietdonhang: entity.machitietdonhang,
+      madonhang: entity.madonhang,
+      machitietsanpham: entity.machitietsanpham,
+      soluong: entity.soluong,
+      dongia: entity.dongia,
+      chitietsize_id: entity.chitietsize_id ?? null
+    }]).select().single();
     if (error) throw error;
     return new ChiTietDonHang(data);
   },

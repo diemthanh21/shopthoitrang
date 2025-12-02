@@ -20,20 +20,26 @@ class ApiClient {
       [http.Client? httpClient, this.timeout = const Duration(seconds: 15)])
       : _http = httpClient ?? http.Client();
 
-  Future<Map<String, dynamic>> get(String path,
-      {Map<String, String>? headers, Map<String, String>? query}) async {
+  Future<Map<String, dynamic>> get(
+    String path, {
+    Map<String, String>? headers,
+    Map<String, String>? query,
+    Map<String, String>? queryParameters,
+  }) async {
     final base = await _headers();
     final merged = {
       ...base,
       if (headers != null) ...headers,
     };
     Uri uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
-    if (query != null && query.isNotEmpty) {
+    final effectiveQuery = <String, String>{
+      ...uri.queryParameters,
+      if (query != null) ...query,
+      if (queryParameters != null) ...queryParameters,
+    };
+    if (effectiveQuery.isNotEmpty) {
       uri = uri.replace(
-        queryParameters: {
-          ...uri.queryParameters,
-          ...query,
-        },
+        queryParameters: effectiveQuery,
       );
     }
     try {
@@ -82,6 +88,55 @@ class ApiClient {
       final res = await _http
           .put(uri, headers: merged, body: jsonEncode(body))
           .timeout(timeout);
+      return _handleResponse(res);
+    } on SocketException {
+      throw ApiException('Không thể kết nối máy chủ');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Lỗi không xác định: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> delete(String path,
+      {Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    try {
+      final res = await _http.delete(uri, headers: merged).timeout(timeout);
+      return _handleResponse(res);
+    } on SocketException {
+      throw ApiException('Không thể kết nối máy chủ');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('Lỗi không xác định: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> postMultipart(String path,
+      {Map<String, String>? fields,
+      List<http.MultipartFile>? files,
+      Map<String, String>? headers}) async {
+    final base = await _headers();
+    final merged = {
+      ...base,
+      if (headers != null) ...headers,
+    };
+    merged.removeWhere(
+        (key, _) => key.toLowerCase() == 'content-type');
+    final uri = Uri.parse('${AppConfig.apiBaseUrl}$path');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(merged);
+    if (fields != null) request.fields.addAll(fields);
+    if (files != null) request.files.addAll(files);
+    try {
+      final streamed = await request.send().timeout(timeout);
+      final res = await http.Response.fromStream(streamed);
       return _handleResponse(res);
     } on SocketException {
       throw ApiException('Không thể kết nối máy chủ');

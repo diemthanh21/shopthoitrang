@@ -3,6 +3,11 @@ import axios from '../configs/axios';
 const hangtheService = {
   getAll: async () => {
     const response = await axios.get('/hangthe');
+    console.log('hangtheService.getAll response:', response.data);
+    if (!Array.isArray(response.data)) {
+      console.error('hangtheService.getAll: response.data is not an array!', typeof response.data, response.data);
+      return [];
+    }
     return response.data;
   },
 

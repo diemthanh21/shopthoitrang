@@ -186,6 +186,50 @@ export default function TaiKhoanNhanVienPage() {
     return haystacks.some((x) => x.includes(term));
   });
 
+  // ================ PAGINATION ================
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const totalItems = filteredAccounts.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+
+  // ensure currentPage is valid when filters change
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(1);
+  }, [totalPages]);
+
+  // reset to page 1 when search changes or data reloads
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, accounts]);
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pagedAccounts = filteredAccounts.slice(startIndex, endIndex);
+
+  // Build compact page number list with ellipsis
+  const getPageNumbers = (tp, cp, max = 7) => {
+    const result = [];
+    if (tp <= max) {
+      for (let i = 1; i <= tp; i++) result.push(i);
+      return result;
+    }
+    const first = 1;
+    const last = tp;
+    const set = new Set([first, last, cp]);
+    for (let i = 1; i <= 2; i++) {
+      set.add(cp - i);
+      set.add(cp + i);
+    }
+    const nums = [...set]
+      .filter((n) => n >= 1 && n <= tp)
+      .sort((a, b) => a - b);
+    for (let i = 0; i < nums.length; i++) {
+      result.push(nums[i]);
+      if (i < nums.length - 1 && nums[i + 1] - nums[i] > 1) result.push("...");
+    }
+    return result;
+  };
+
   // ================= UI =================
   if (loading) {
     return (
@@ -249,7 +293,7 @@ export default function TaiKhoanNhanVienPage() {
 
       {/* TABLE */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-        {filteredAccounts.length === 0 ? (
+              {pagedAccounts.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             {term
               ? "Không tìm thấy tài khoản phù hợp."
@@ -279,7 +323,7 @@ export default function TaiKhoanNhanVienPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAccounts.map((tk) => {
+              {pagedAccounts.map((tk) => {
                 const maNV = tk.maNhanVien ?? tk.manhanvien;
                 const tenNV =
                   nhanVienMap[maNV] ?? (maNV != null ? `NV #${maNV}` : "");
@@ -322,6 +366,48 @@ export default function TaiKhoanNhanVienPage() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {/* Pagination bottom bar */}
+      <div className="flex items-center justify-between mt-4">
+        <div className="text-sm text-gray-700">Trang {currentPage} / {totalPages}</div>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          >
+            Trước
+          </button>
+
+          {/* Numbered pages */}
+          <div className="flex items-center gap-1">
+            {getPageNumbers(totalPages, currentPage).map((p, idx) =>
+              p === "..." ? (
+                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">…</span>
+              ) : (
+                <button
+                  key={p}
+                  className={`min-w-[36px] px-2 py-1 border rounded text-sm ${
+                    p === currentPage ? "bg-blue-600 text-white border-blue-600" : "hover:bg-gray-50"
+                  }`}
+                  onClick={() => setCurrentPage(p)}
+                >
+                  {p}
+                </button>
+              )
+            )}
+          </div>
+
+          <button
+            className="px-3 py-1 border rounded disabled:opacity-50"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Tiếp
+          </button>
+        </div>
       </div>
 
       {/* MODAL THÊM / SỬA TÀI KHOẢN */}

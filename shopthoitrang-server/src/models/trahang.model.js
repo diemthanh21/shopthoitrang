@@ -20,7 +20,10 @@ class TraHang {
     trangthaikiemtra,
     sotien_hoan,
     phuongthuc_hoan,
-    ngayhoantien
+    ngayhoantien,
+    manhanvien,
+    nguon_tao,
+    tensanpham
   }) {
     // Canonical camelCase fields
     this.maTraHang = matrahang;
@@ -46,6 +49,9 @@ class TraHang {
     this.soTienHoan = sotien_hoan;
     this.phuongThucHoan = phuongthuc_hoan;
     this.ngayHoanTien = ngayhoantien;
+    this.maNhanVien = manhanvien;
+    this.nguonTao = nguon_tao;
+    this.tenSanPham = tensanpham;
 
     // Lowercase alias fields for backward compatibility with service code
     this.matrahang = matrahang;
@@ -57,6 +63,9 @@ class TraHang {
     this.hinhanhloi = hinhanhloi;
     this.ngayyeucau = ngayyeucau;
     this.ghichu = ghichu;
+    this.manhanvien = manhanvien;
+    this.nguon_tao = nguon_tao;
+    this.tensanpham = tensanpham;
   }
 
   toJSON() {
@@ -81,7 +90,10 @@ class TraHang {
       trangthaikiemtra: this.trangThaiKiemTra,
       sotien_hoan: this.soTienHoan,
       phuongthuc_hoan: this.phuongThucHoan,
-      ngayhoantien: this.ngayHoanTien
+      ngayhoantien: this.ngayHoanTien,
+      manhanvien: this.maNhanVien,
+      nguon_tao: this.nguonTao,
+      tensanpham: this.tenSanPham
     };
   }
 }

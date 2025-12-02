@@ -15,6 +15,18 @@ router.use(authenticateToken);
 
 /**
  * @swagger
+ * /api/chat/admin/all-customers:
+ *   get:
+ *     summary: Admin/nhân viên lấy danh sách tất cả khách hàng với thông tin chatbox (nếu có)
+ *     tags: [Chat]
+ *     responses:
+ *       200:
+ *         description: Thành công
+ */
+router.get('/admin/all-customers', requireRole('employee','admin'), ctrl.listAllCustomersWithChats);
+
+/**
+ * @swagger
  * /api/chat/admin/boxes:
  *   get:
  *     summary: Admin/nhân viên lấy danh sách hộp thoại với tin mới nhất và số tin chưa đọc
@@ -36,6 +48,28 @@ router.get('/admin/boxes', requireRole('employee','admin'), ctrl.listChatBoxes);
  *         description: Tạo hoặc trả về chatbox
  */
 router.post('/start', requireCustomer, ctrl.startChat);
+
+/**
+ * @swagger
+ * /api/chat/admin/start-for-customer:
+ *   post:
+ *     summary: Admin/nhân viên tạo hoặc lấy hội thoại cho một khách hàng cụ thể
+ *     tags: [Chat]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [makhachhang]
+ *             properties:
+ *               makhachhang: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Tạo hoặc trả về chatbox
+ */
+router.post('/admin/start-for-customer', requireRole('employee','admin'), ctrl.startChatForCustomer);
+
 
 /**
  * @swagger

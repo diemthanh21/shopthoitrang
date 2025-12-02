@@ -11,12 +11,17 @@ const addOneYear = (dateInput) => {
 
 class TheThanhVienService {
   async _enrich(records) {
-    if (!records || records.length === 0) return [];
+    // Đảm bảo records là array
+    if (!records) return [];
+    if (!Array.isArray(records)) {
+      records = [records];
+    }
+    if (records.length === 0) return [];
 
     const tiers = await hangTheRepo.getAll();
     const tierMap = new Map(tiers.map((tier) => [tier.mahangthe, tier.toJSON()]));
 
-    const customerIds = Array.from(new Set(records.map((card) => card.maKhachHang))).filter(Boolean);
+    const customerIds = Array.from(new Set(records.map((card) => card.maKhachHang || card.makhachhang))).filter(Boolean);
     let customerMap = new Map();
     if (customerIds.length) {
       const { data, error } = await supabase
@@ -27,21 +32,27 @@ class TheThanhVienService {
     }
 
     return records.map((card) => {
-      const json = card.toJSON();
+      const json = typeof card.toJSON === 'function' ? card.toJSON() : card;
       if (!json.ngayhethan && json.ngaycap) {
         json.ngayhethan = addOneYear(json.ngaycap);
       }
-      const tier = tierMap.get(card.maHangThe) || null;
+      const maHangTheValue = json.mahangthe || json.maHangThe || card.maHangThe;
+      const tier = tierMap.get(maHangTheValue) || null;
+      json.diem_hien_tai = Number(json.diem_hien_tai ?? 0);
+      json.diem_pending = Number(json.diem_pending ?? 0);
+      json.diem_nam_hien_tai = Number(json.diem_nam_hien_tai ?? 0);
+      json.nam_diem = Number(json.nam_diem ?? new Date().getFullYear());
       if (tier) {
         json.tenhang = json.tenhang || tier.tenhang;
         json.giamgia = json.giamgia ?? tier.giamgia;
         json.voucher_sinhnhat = json.voucher_sinhnhat ?? tier.voucher_sinhnhat;
         json.uudai = json.uudai ?? tier.uudai;
       }
+      const maKhachHangValue = json.makhachhang || json.maKhachHang || card.maKhachHang;
       return {
         ...json,
         hangThe: tier,
-        customer: customerMap.get(card.maKhachHang) || null,
+        customer: customerMap.get(maKhachHangValue) || null,
       };
     });
   }

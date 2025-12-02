@@ -3,7 +3,10 @@ class ProductImage {
   ProductImage({required this.url});
 
   factory ProductImage.fromJson(Map<String, dynamic> j) => ProductImage(
-        url: (j['duongdanhinhanh'] ?? j['duongDanHinhAnh'] ?? j['url'] ?? '')
+        url: (j['duongdanhinhanh'] ??
+                j['duongDanHinhAnh'] ??
+                j['url'] ??
+                '')
             .toString(),
       );
 }
@@ -33,7 +36,6 @@ class VariantSize {
         sizeRow['ten_kichthuoc'] ??
         '';
     final stockValue = json['soLuong'] ?? json['so_luong'] ?? 0;
-  
 
     return VariantSize(
       id: json['id'] ??
@@ -47,7 +49,13 @@ class VariantSize {
       stock: stockValue is num
           ? stockValue.toInt()
           : int.tryParse('$stockValue') ?? 0,
-
+      extraPrice: (json['giaThem'] is num)
+          ? (json['giaThem'] as num).toDouble()
+          : (json['gia_them'] is num)
+              ? (json['gia_them'] as num).toDouble()
+              : double.tryParse(
+                      '${json['giaThem'] ?? json['gia_them'] ?? 0}') ??
+                  0,
     );
   }
 }
@@ -104,7 +112,8 @@ class ProductVariant {
       material: j['chatlieu']?.toString(),
       desc: j['mota']?.toString(),
       price: (j['giaban'] is num) ? (j['giaban'] as num).toDouble() : 0,
-      stock: (j['soluongton'] is num) ? (j['soluongton'] as num).toInt() : 0,
+      stock:
+          (j['soluongton'] is num) ? (j['soluongton'] as num).toInt() : 0,
       images: ((j['hinhanhsanpham'] as List?) ?? [])
           .whereType<Map<String, dynamic>>()
           .map(ProductImage.fromJson)
@@ -125,18 +134,22 @@ class Product {
   final int id; // masanpham
   final String name; // tensanpham
   final int? categoryId; // madanhmuc
+  final String? categoryName; // tendanhmuc (join từ bảng danh mục)
   final int? brandId; // mathuonghieu
   final String? status; // trangthai
   final String? coverImage; // hinhanh cover
+  final String? sizeChartUrl; // bangsize
   final List<ProductVariant> variants;
 
   Product({
     required this.id,
     required this.name,
     this.categoryId,
+    this.categoryName,
     this.brandId,
     this.status,
     this.coverImage,
+    this.sizeChartUrl,
     this.variants = const [],
   });
 
@@ -144,21 +157,31 @@ class Product {
         id: j['masanpham'] ?? j['id'],
         name: j['tensanpham'] ?? j['ten'] ?? '',
         categoryId: j['madanhmuc'],
+        categoryName: j['tendanhmuc'] ??
+            j['tenDanhMuc'] ??
+            j['categoryName'] ??
+            j['ten_danh_muc'],
         brandId: j['mathuonghieu'],
         status: j['trangthai'],
         coverImage: j['hinhanh']?.toString(),
+        sizeChartUrl:
+            j['bangsize']?.toString() ?? j['bangSize']?.toString(),
         // Supabase embed: chitietsanpham is a List
         variants: ((j['chitietsanpham'] as List?) ?? [])
-            .map((e) => ProductVariant.fromJson(e as Map<String, dynamic>))
+            .whereType<Map<String, dynamic>>()
+            .map(ProductVariant.fromJson)
             .toList(),
       );
 
   // ===== helpers cho UI =====
-  List<ProductImage> get allImages => variants.expand((v) => v.images).toList();
+  List<ProductImage> get allImages =>
+      variants.expand((v) => v.images).toList();
 
   double? get minPrice => variants.isEmpty
       ? null
-      : variants.map((v) => v.price).reduce((a, b) => a < b ? a : b);
+      : variants
+          .map((v) => v.price)
+          .reduce((a, b) => a < b ? a : b);
 
   /// Danh sách URL ảnh (unique, loại bỏ rỗng) dùng cho gallery / slider.
   List<String> galleryImageUrls({bool shuffle = false}) {
@@ -188,5 +211,26 @@ class Product {
     }
 
     return ordered;
+  }
+}
+
+class ProductStats {
+  final int sold;
+  final int stock;
+
+  ProductStats({
+    required this.sold,
+    required this.stock,
+  });
+
+  factory ProductStats.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value) =>
+        value is num ? value.toInt() : int.tryParse(value?.toString() ?? '0') ?? 0;
+
+    final source = json['data'] is Map<String, dynamic> ? json['data'] : json;
+    return ProductStats(
+      sold: parseInt(source['sold'] ?? source['soldQuantity']),
+      stock: parseInt(source['stock'] ?? source['currentStock']),
+    );
   }
 }

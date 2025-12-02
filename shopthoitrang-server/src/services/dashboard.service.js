@@ -14,13 +14,16 @@ const TABLES = {
 };
 
 // Các khả năng tên cột tổng tiền trong đơn hàng (ưu tiên theo thứ tự)
-const ORDER_TOTAL_CANDIDATES = ['tongtien', 'total', 'amount'];
+const ORDER_TOTAL_CANDIDATES = ['thanhtien', 'tongtien', 'total', 'amount'];
 // Cột trạng thái (nếu không tồn tại sẽ bỏ lọc)
-const ORDER_STATUS_CANDIDATES = ['trangthai', 'status'];
-const COMPLETED_VALUES = ['hoanthanh', 'completed', 'done'];
+const ORDER_STATUS_CANDIDATES = ['trangthaidonhang', 'trangthai', 'status'];
+const ORDER_PAYMENT_STATUS_CANDIDATES = ['trangthaithanhtoan', 'paymentstatus', 'payment_status'];
+const COMPLETED_VALUES = ['hoàn thành', 'hoanthanh', 'completed', 'done', 'đã giao', 'da giao', 'delivered', 'đã thanh toán'];
+const PAID_VALUES = ['đã thanh toán', 'da thanh toan', 'paid', 'completed', 'tiền mặt', 'tien mat', 'cod', 'momo'];
+const REFUND_DONE_VALUES = ['hoàn tiền thành công', 'da hoan tien', 'đã hoàn tiền', 'hoan tien thanh cong'];
 
 // Cột thời gian tạo đơn (để sort gần nhất) – thử lần lượt
-const ORDER_CREATED_CANDIDATES = ['created_at', 'ngaytao', 'createdat'];
+const ORDER_CREATED_CANDIDATES = ['ngaydathang', 'created_at', 'ngaytao', 'createdat'];
 
 // Primary key columns cho mỗi bảng
 const ORDER_ID_CANDIDATES = ['madonhang', 'id'];
@@ -84,36 +87,89 @@ async function resolveOrderColumns() {
     idCol: pickFirstExisting(cols, ORDER_ID_CANDIDATES),
     totalCol: pickFirstExisting(cols, ORDER_TOTAL_CANDIDATES),
     statusCol: pickFirstExisting(cols, ORDER_STATUS_CANDIDATES),
+    paymentStatusCol: pickFirstExisting(cols, ORDER_PAYMENT_STATUS_CANDIDATES),
     createdCol: pickFirstExisting(cols, ORDER_CREATED_CANDIDATES)
   };
 }
 
-async function sumRevenue() {
-  const { totalCol, statusCol } = await resolveOrderColumns();
+async function sumRevenue({ from, to } = {}) {
+  const { totalCol, statusCol, paymentStatusCol, createdCol } = await resolveOrderColumns();
+  
+  console.log('[dashboard.sumRevenue] Resolved columns:', {
+    totalCol,
+    statusCol,
+    paymentStatusCol,
+    createdCol,
+    dateRange: { from, to }
+  });
+  
   if (!totalCol) return 0; // không có cột tổng tiền
 
-  // Chỉ select 2 cột cần thiết để nhẹ hơn
+  // Chỉ select các cột cần thiết để nhẹ hơn
   const selectCols = [totalCol];
   if (statusCol) selectCols.push(statusCol);
+  if (paymentStatusCol) selectCols.push(paymentStatusCol);
+  if (createdCol) selectCols.push(createdCol);
 
-  const { data, error } = await supabase
-    .from(TABLES.ORDERS)
-    .select(selectCols.join(','));
+  let query = supabase.from(TABLES.ORDERS).select(selectCols.join(','));
+  
+  // Apply date range filter if provided
+  if (from && to && createdCol) {
+    const startISO = dayStartStr(from);
+    const endISO = dayEndStr(to);
+    if (startISO) query = query.gte(createdCol, startISO);
+    if (endISO) query = query.lte(createdCol, endISO);
+  }
+
+  const { data, error } = await query;
   if (error) {
     if (error.code === '42P01') return 0;
     throw error;
   }
-  return (data || [])
+  
+  console.log(`[dashboard.sumRevenue] Total orders fetched: ${data?.length || 0}`);
+  
+  // Chỉ tính doanh thu từ các đơn hàng đã thanh toán VÀ đã hoàn thành/đã giao
+  const validOrders = (data || [])
     .filter(r => {
-      if (!statusCol) return true;
-      const v = String(r[statusCol] || '').toLowerCase();
-      // Nếu đơn có trạng thái và thuộc nhóm hoàn tất thì tính, nếu không có trạng thái vẫn tính
-      return !statusCol || COMPLETED_VALUES.includes(v) || v === '';
-    })
-    .reduce((sum, r) => sum + (Number(r[totalCol]) || 0), 0);
+      // Kiểm tra trạng thái đơn hàng: "Đã giao" hoặc "Hoàn thành"
+      if (!statusCol) {
+        console.log('[dashboard.sumRevenue] WARNING: statusCol not found, skipping all orders');
+        return false;
+      }
+      const orderStatus = String(r[statusCol] || '').toLowerCase().trim();
+      const isCompleted = COMPLETED_VALUES.includes(orderStatus);
+      
+      // Kiểm tra trạng thái thanh toán: "Đã thanh toán"
+      if (!paymentStatusCol) {
+        console.log('[dashboard.sumRevenue] WARNING: paymentStatusCol not found, skipping all orders');
+        return false;
+      }
+      const paymentStatus = String(r[paymentStatusCol] || '').toLowerCase().trim();
+      const isPaid = PAID_VALUES.includes(paymentStatus);
+      
+      const isValid = isCompleted && isPaid;
+      
+      console.log('[dashboard.sumRevenue] Checking order:', {
+        orderStatus: `"${orderStatus}"`,
+        isCompleted,
+        paymentStatus: `"${paymentStatus}"`,
+        isPaid,
+        isValid,
+        amount: r[totalCol]
+      });
+      
+      // Chỉ tính doanh thu khi CẢ HAI điều kiện thỏa mãn
+      return isValid;
+    });
+  
+  const total = validOrders.reduce((sum, r) => sum + (Number(r[totalCol]) || 0), 0);
+  console.log(`[dashboard.sumRevenue] Valid orders: ${validOrders.length}, Total revenue: ${total}`);
+  
+  return total;
 }
 
-async function countTable(table) {
+async function countTable(table, { from, to } = {}) {
   try {
     // Xác định cột primary key cho mỗi bảng
     let pkCol = 'id'; // default
@@ -121,7 +177,47 @@ async function countTable(table) {
     else if (table === TABLES.CUSTOMERS) pkCol = 'makhachhang';
     else if (table === TABLES.PRODUCTS) pkCol = 'masanpham';
     
-    // Thử select primary key column để đếm
+    // Nếu là bảng đơn hàng, cần lọc bỏ trạng thái 'cart' và áp dụng date range
+    if (table === TABLES.ORDERS) {
+      const { statusCol, createdCol } = await resolveOrderColumns();
+      
+      // Select cả status column và created column để filter
+      const selectCols = [pkCol];
+      if (statusCol) selectCols.push(statusCol);
+      if (createdCol) selectCols.push(createdCol);
+      
+      let query = supabase.from(table).select(selectCols.join(','));
+      
+      // Apply date range if provided
+      if (from && to && createdCol) {
+        const startISO = dayStartStr(from);
+        const endISO = dayEndStr(to);
+        if (startISO) query = query.gte(createdCol, startISO);
+        if (endISO) query = query.lte(createdCol, endISO);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        if (error.code === '42P01') {
+          console.warn(`[dashboard] Table not found: ${table}`);
+          return 0;
+        }
+        throw error;
+      }
+      
+      // Đếm TẤT CẢ đơn hàng, CHỈ loại bỏ cart
+      if (statusCol && data) {
+        return data.filter(r => {
+          const status = String(r[statusCol] || '').toLowerCase();
+          return status !== 'cart' && status !== 'giỏ hàng' && status !== 'gio hang';
+        }).length;
+      }
+      
+      return data ? data.length : 0;
+    }
+    
+    // Các bảng khác đếm bình thường
     const { data, error } = await supabase
       .from(table)
       .select(pkCol);
@@ -202,7 +298,27 @@ async function topProducts(limit = 5) {
   }));
 }
 
-async function summary() {
+// Helper functions for date formatting
+function dayStartStr(d) {
+  if (!d) return null;
+  const m = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : (new Date(d)).toISOString().slice(0,10);
+  return `${m}T00:00:00`;
+}
+function dayEndStr(d) {
+  if (!d) return null;
+  const m = /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : (new Date(d)).toISOString().slice(0,10);
+  return `${m}T23:59:59.999`;
+}
+function nextDayStartStr(d) {
+  if (!d) return null;
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`) : new Date(d);
+  if (Number.isNaN(base.getTime())) return null;
+  const dt = new Date(base);
+  dt.setDate(dt.getDate() + 1);
+  return `${dt.toISOString().slice(0,10)}T00:00:00`;
+}
+
+async function summary({ from, to } = {}) {
   // Early return nếu thiếu env Supabase để tránh crash
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn('[dashboard] Missing Supabase env vars - returning empty dashboard');
@@ -214,9 +330,10 @@ async function summary() {
   }
 
   try {
+    const dateRange = { from, to };
     const [revenue, ordersCount, productsCount, customersCount, recent, top] = await Promise.all([
-      sumRevenue().catch(e => { console.error('[dashboard] revenue', e.message); return 0; }),
-      countTable(TABLES.ORDERS).catch(e => { console.error('[dashboard] orders count', e.message); return 0; }),
+      sumRevenue(dateRange).catch(e => { console.error('[dashboard] revenue', e.message); return 0; }),
+      countTable(TABLES.ORDERS, dateRange).catch(e => { console.error('[dashboard] orders count', e.message); return 0; }),
       countTable(TABLES.PRODUCTS).catch(e => { console.error('[dashboard] products count', e.message); return 0; }),
       countTable(TABLES.CUSTOMERS).catch(e => { console.error('[dashboard] customers count', e.message); return 0; }),
       recentOrders().catch(e => { console.error('[dashboard] recent orders', e.message); return []; }),
@@ -234,4 +351,343 @@ async function summary() {
   }
 }
 
-module.exports = { summary };
+/**
+ * Get chart data for orders and revenue by date
+ */
+async function getChartData({ from, to } = {}) {
+  const { idCol, totalCol, statusCol, paymentStatusCol, createdCol } = await resolveOrderColumns();
+  if (!createdCol || !totalCol) return [];
+
+  // Default to last 30 days if no range provided
+  const now = new Date();
+  const defaultFrom = new Date(now);
+  defaultFrom.setDate(defaultFrom.getDate() - 29);
+  
+  const startDate = from || defaultFrom.toISOString().slice(0, 10);
+  const endDate = to || now.toISOString().slice(0, 10);
+
+  const startISO = dayStartStr(startDate);
+  const endISO = dayEndStr(endDate);
+
+  const selectCols = [createdCol, totalCol, statusCol];
+  if (paymentStatusCol) selectCols.push(paymentStatusCol);
+  
+  let query = supabase
+    .from(TABLES.ORDERS)
+    .select(selectCols.join(', '))
+    .gte(createdCol, startISO)
+    .lte(createdCol, endISO)
+    .order(createdCol, { ascending: true });
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Group by date
+  const dateMap = new Map();
+  
+  (data || []).forEach(row => {
+    const dateStr = row[createdCol] ? row[createdCol].slice(0, 10) : null;
+    if (!dateStr) return;
+    
+    const status = String(row[statusCol] || '').toLowerCase();
+    const isCart = status === 'cart' || status === 'giỏ hàng' || status === 'gio hang';
+    const isCompleted = COMPLETED_VALUES.includes(status);
+    
+    // Kiểm tra trạng thái thanh toán
+    const paymentStatus = row[paymentStatusCol] ? String(row[paymentStatusCol] || '').toLowerCase() : '';
+    const isPaid = PAID_VALUES.includes(paymentStatus);
+    
+    if (!dateMap.has(dateStr)) {
+      dateMap.set(dateStr, { date: dateStr, orders: 0, revenue: 0 });
+    }
+    
+    const dayData = dateMap.get(dateStr);
+    
+    // Count all orders except cart
+    if (!isCart) {
+      dayData.orders += 1;
+    }
+    
+    // Sum revenue only for completed orders AND paid
+    if (isCompleted && isPaid) {
+      dayData.revenue += Number(row[totalCol]) || 0;
+    }
+  });
+
+  // Convert to array and fill missing dates - use local dates to avoid timezone issues
+  const result = [];
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+  
+  // Create Date objects in local timezone
+  const currentDate = new Date(startYear, startMonth - 1, startDay);
+  const endDateObj = new Date(endYear, endMonth - 1, endDay);
+  
+  // Iterate through each day in the range
+  while (currentDate <= endDateObj) {
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+    const dayData = dateMap.get(dateStr) || { date: dateStr, orders: 0, revenue: 0 };
+    result.push(dayData);
+    
+    // Move to next day
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  return result;
+}
+
+module.exports = { summary, revenueFlow, topProductsByPeriod, getChartData };
+
+/**
+ * Revenue Flow: Tổng thu/chi theo khoảng thời gian
+ */
+
+async function getRefundedOrderIds() {
+  // Trả về Set các madonhang đã hoàn tiền thành công
+  try {
+    const { data, error } = await supabase
+      .from('trahang')
+      .select('madonhang, trangthai');
+    if (error) throw error;
+    const set = new Set();
+    (data || []).forEach(r => {
+      const st = String(r.trangthai || '').toLowerCase();
+      if (REFUND_DONE_VALUES.includes(st) && r.madonhang != null) set.add(r.madonhang);
+    });
+    return set;
+  } catch (e) {
+    console.warn('[dashboard] getRefundedOrderIds error', e.message);
+    return new Set();
+  }
+}
+
+async function sumOrdersInflow({ from, to }) {
+  const { idCol, totalCol, statusCol, paymentStatusCol, createdCol } = await resolveOrderColumns();
+  if (!totalCol) return 0;
+
+  let query = supabase.from(TABLES.ORDERS).select([idCol, totalCol, statusCol, paymentStatusCol, createdCol].filter(Boolean).join(','));
+  const startISO = dayStartStr(from);
+  const endISO = dayEndStr(to);
+  if (createdCol) {
+    if (startISO) query = query.gte(createdCol, startISO);
+    if (endISO) query = query.lte(createdCol, endISO);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  const refundedSet = await getRefundedOrderIds();
+  return (data || [])
+    .filter(r => {
+      if (!statusCol) return false;
+      const orderStatus = String(r[statusCol] || '').toLowerCase();
+      const isCompleted = COMPLETED_VALUES.includes(orderStatus);
+      
+      // Kiểm tra trạng thái thanh toán
+      if (!paymentStatusCol) return false;
+      const paymentStatus = String(r[paymentStatusCol] || '').toLowerCase();
+      const isPaid = PAID_VALUES.includes(paymentStatus);
+      
+      // Loại trừ đơn đã hoàn tiền thành công theo bảng trahang
+      const orderId = idCol ? r[idCol] : (r.madonhang || r.id || r.ID);
+      const isRefunded = refundedSet.has(orderId);
+      
+      return isCompleted && isPaid && !isRefunded;
+    })
+    .reduce((s, r) => s + (Number(r[totalCol]) || 0), 0);
+}
+
+async function sumPurchaseOrdersOutflow({ from, to }) {
+  // phieudathang: tongtien, tiencoc, trangthaiphieu, ngaydatphieu
+  const table = 'phieudathang';
+  const DONE = ['hoàn thành', 'hoan thanh'];
+  let query = supabase
+    .from(table)
+    .select('tongtien, tiencoc, trangthaiphieu, ngaydatphieu');
+  const startISO = dayStartStr(from);
+  const endISO = dayEndStr(to);
+  if (startISO) query = query.gte('ngaydatphieu', startISO);
+  if (endISO) query = query.lte('ngaydatphieu', endISO);
+  const { data, error } = await query;
+  if (error && error.code !== '42P01') throw error;
+  const rows = (data || []).filter(r => {
+    const st = String(r.trangthaiphieu || '').toLowerCase();
+    return DONE.includes(st);
+  });
+  // Tính tổng chi = tongtien - tiencoc (số tiền thực tế phải trả sau khi đã trừ cọc)
+  return rows.reduce((s, r) => {
+    const total = Number(r.tongtien) || 0;
+    const deposit = Number(r.tiencoc) || 0;
+    return s + (total - deposit);
+  }, 0);
+}
+
+async function sumDepositInflow({ from, to }) {
+  // Tính tổng tiền cọc đã thu từ các phiếu đặt hàng
+  const table = 'phieudathang';
+  let query = supabase
+    .from(table)
+    .select('tiencoc, ngaydatphieu');
+  const startISO = dayStartStr(from);
+  const endISO = dayEndStr(to);
+  if (startISO) query = query.gte('ngaydatphieu', startISO);
+  if (endISO) query = query.lte('ngaydatphieu', endISO);
+  const { data, error } = await query;
+  if (error && error.code !== '42P01') throw error;
+  // Tính tổng tiền cọc (chỉ những phiếu có tiền cọc)
+  return (data || []).reduce((s, r) => s + (Number(r.tiencoc) || 0), 0);
+}
+
+async function revenueFlow({ from, to } = {}) {
+  // default: first day of current month -> now
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const period = {
+    from: from || start.toISOString().slice(0, 10),
+    to: to || now.toISOString().slice(0, 10)
+  };
+
+  const inflowTotal = await sumOrdersInflow(period).catch(() => 0);
+  const depositTotal = await sumDepositInflow(period).catch(() => 0);
+  const purchaseTotal = await sumPurchaseOrdersOutflow(period).catch(() => 0);
+  const outflowTotal = purchaseTotal;
+  
+  const totalInflow = inflowTotal + depositTotal;
+
+  return {
+    period,
+    inflow: {
+      total: totalInflow,
+      sources: [
+        { key: 'sales', label: 'Đơn hàng', amount: inflowTotal },
+        { key: 'deposits', label: 'Tiền cọc', amount: depositTotal }
+      ]
+    },
+    outflow: {
+      total: outflowTotal,
+      sources: [
+        { key: 'purchase-orders', label: 'Phiếu đặt hàng', amount: purchaseTotal }
+      ]
+    },
+    net: totalInflow - outflowTotal
+  };
+}
+
+/**
+ * Top products (best sellers) within period by quantity sold.
+ * Aggregates order details -> variant -> product and computes weighted average price.
+ */
+async function topProductsByPeriod({ from, to, limit = 5, minSold = 1 } = {}) {
+  // Resolve important columns
+  const { idCol: orderIdCol, statusCol: orderStatusCol, createdCol: orderCreatedCol } = await resolveOrderColumns();
+  const completed = new Set(COMPLETED_VALUES);
+
+  // Default range: current month
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const period = {
+    from: from || start.toISOString().slice(0, 10),
+    to: to || now.toISOString().slice(0, 10)
+  };
+  const startISO = dayStartStr(period.from);
+  const endISO = dayEndStr(period.to);
+
+  // 1) Fetch eligible orders in range
+  let orderQuery = supabase.from(TABLES.ORDERS).select([orderIdCol, orderStatusCol, orderCreatedCol].filter(Boolean).join(','));
+  if (orderCreatedCol) {
+    if (startISO) orderQuery = orderQuery.gte(orderCreatedCol, startISO);
+    if (endISO) orderQuery = orderQuery.lte(orderCreatedCol, endISO);
+  }
+  const { data: orderRows, error: orderErr } = await orderQuery;
+  if (orderErr) throw orderErr;
+
+  const refundedSet = await getRefundedOrderIds();
+  const orderIds = (orderRows || [])
+    .filter((r) => {
+      if (!orderStatusCol) return true;
+      const v = String(r[orderStatusCol] || '').toLowerCase();
+      const done = completed.has(v);
+      const oid = orderIdCol ? r[orderIdCol] : r.madonhang;
+      return done && !refundedSet.has(oid);
+    })
+    .map((r) => (orderIdCol ? r[orderIdCol] : r.madonhang))
+    .filter((v) => v != null);
+
+  if (orderIds.length === 0) return [];
+
+  // 2) Fetch order details for those orders
+  const { data: detailRows, error: detErr } = await supabase
+    .from('chitietdonhang')
+    .select('madonhang, machitietsanpham, soluong, dongia')
+    .in('madonhang', orderIds);
+  if (detErr) throw detErr;
+
+  if (!detailRows || detailRows.length === 0) return [];
+
+  // 3) Aggregate by variant id first
+  const variantAgg = new Map(); // key: machitietsanpham -> { qty, revenue }
+  for (const r of detailRows) {
+    const vid = r.machitietsanpham;
+    const qty = Number(r.soluong) || 0;
+    const price = Number(r.dongia) || 0;
+    if (!vid || qty <= 0) continue;
+    let obj = variantAgg.get(vid);
+    if (!obj) { obj = { qty: 0, revenue: 0 }; variantAgg.set(vid, obj); }
+    obj.qty += qty;
+    obj.revenue += qty * price;
+  }
+
+  if (variantAgg.size === 0) return [];
+
+  const variantIds = Array.from(variantAgg.keys());
+
+  // 4) Map variant -> product id
+  const { data: variantRows, error: varErr } = await supabase
+    .from('chitietsanpham')
+    .select('machitietsanpham, masanpham')
+    .in('machitietsanpham', variantIds);
+  if (varErr) throw varErr;
+
+  const variantToProduct = new Map();
+  (variantRows || []).forEach((r) => {
+    if (r.machitietsanpham != null && r.masanpham != null) {
+      variantToProduct.set(r.machitietsanpham, r.masanpham);
+    }
+  });
+
+  // 5) Aggregate by product id
+  const productAgg = new Map(); // masanpham -> { qty, revenue }
+  for (const [vid, agg] of variantAgg.entries()) {
+    const pid = variantToProduct.get(vid);
+    if (!pid) continue;
+    let p = productAgg.get(pid);
+    if (!p) { p = { qty: 0, revenue: 0 }; productAgg.set(pid, p); }
+    p.qty += agg.qty;
+    p.revenue += agg.revenue;
+  }
+
+  if (productAgg.size === 0) return [];
+
+  // 6) Fetch product names
+  const productIds = Array.from(productAgg.keys());
+  const { data: prodRows, error: prodErr } = await supabase
+    .from('sanpham')
+    .select('masanpham, tensanpham')
+    .in('masanpham', productIds);
+  if (prodErr) throw prodErr;
+
+  const nameMap = new Map();
+  (prodRows || []).forEach((r) => nameMap.set(r.masanpham, r.tensanpham));
+
+  // 7) Build list and sort
+  const items = Array.from(productAgg.entries())
+    .map(([pid, v]) => ({
+      id: pid,
+      name: nameMap.get(pid) || `SP-${pid}`,
+      soldCount: v.qty,
+      price: v.qty > 0 ? Math.round(v.revenue / v.qty) : 0,
+    }))
+    .filter((x) => x.soldCount >= minSold)
+    .sort((a, b) => b.soldCount - a.soldCount)
+    .slice(0, limit);
+
+  return items;
+}

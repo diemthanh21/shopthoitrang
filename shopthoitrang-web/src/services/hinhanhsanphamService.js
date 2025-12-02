@@ -36,6 +36,7 @@ const toDB = (d) => ({
 });
 
 const PREFIX = "/hinhanhsanpham";
+const VARIANT_PREFIX = `${PREFIX}/sanpham`;
 
 // Lấy tất cả hình ảnh (có thể truyền params nếu cần lọc)
 const getAll = async (params = {}) => {
@@ -52,11 +53,20 @@ const getById = async (id) => {
 
 // Lấy tất cả hình ảnh theo mã chi tiết sản phẩm (tiện dùng nếu sau này muốn gọi riêng)
 const getByChiTietSanPham = async (maChiTietSanPham) => {
-  const res = await api.get(PREFIX, {
-    params: { machitietsanpham: maChiTietSanPham },
-  });
-  const payload = Array.isArray(res.data) ? { data: res.data } : res.data;
-  return (payload.data ?? payload ?? []).map(normalize);
+  if (!maChiTietSanPham) return [];
+
+  try {
+    const res = await api.get(`${VARIANT_PREFIX}/${maChiTietSanPham}`);
+    const payload = Array.isArray(res.data) ? { data: res.data } : res.data;
+    return (payload.data ?? payload ?? []).map(normalize);
+  } catch (error) {
+    // Fallback cho backend cũ chưa có route /sanpham/:id
+    const res = await api.get(PREFIX, {
+      params: { machitietsanpham: maChiTietSanPham },
+    });
+    const payload = Array.isArray(res.data) ? { data: res.data } : res.data;
+    return (payload.data ?? payload ?? []).map(normalize);
+  }
 };
 
 // Tạo mới hình ảnh

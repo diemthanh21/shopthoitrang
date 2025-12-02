@@ -44,6 +44,24 @@ const SanPhamController = {
     } catch (err) {
       res.status(err.status || 400).json({ message: err.message });
     }
+  },
+
+  async getStats(req, res) {
+    try {
+      const data = await service.stats(req.params.id);
+      res.json(data);
+    } catch (err) {
+      res.status(err.status || 400).json({ message: err.message });
+    }
+  },
+
+  async count(req, res) {
+    try {
+      const total = await service.count();
+      res.json({ total });
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
   }
 };
 

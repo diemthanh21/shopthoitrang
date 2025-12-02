@@ -19,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _membershipService = MembershipService();
 
   TheThanhVien? _membershipCard;
+  PointsSummary? _pointsSummary;
   TichLuyChiTieu? _loyaltyPoints;
 
   @override
@@ -33,15 +34,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (user == null) return;
 
     try {
-      // Load membership và loyalty points
+      // Load membership card, points và loyalty
       final membership =
           await _membershipService.getMembershipCard(user.maKhachHang);
+      final points =
+          await _membershipService.getPointsSummary(user.maKhachHang);
       final loyalty =
           await _membershipService.getLoyaltyPoints(user.maKhachHang);
 
       if (mounted) {
         setState(() {
           _membershipCard = membership;
+          _pointsSummary = points;
           _loyaltyPoints = loyalty;
         });
       }
@@ -226,6 +230,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMembershipSection() {
     final formatter = NumberFormat('#,###', 'vi_VN');
+    final diemHienTai = _pointsSummary?.diemHienTai ?? 0;
+    final diemPending = _pointsSummary?.diemPending ?? 0;
 
     return Container(
       color: Colors.white,
@@ -245,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Colors.orange, Colors.deepOrange],
+                colors: [Color(0xFF667eea), Color(0xFF764ba2)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -257,56 +263,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      _membershipCard?.tenHang ?? 'Thành viên',
-                      style: const TextStyle(
+                    const Text(
+                      'TÍCH ĐIỂM',
+                      style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    if (_membershipCard?.giamGia != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Giảm ${(_membershipCard!.giamGia! * 100).toInt()}%',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.stars, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'Thành viên',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                if (_loyaltyPoints != null) ...[
-                  Text(
-                    'Tích lũy: ${formatter.format(_loyaltyPoints!.tongChiTichLuy ?? 0)} đ',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
+                // Điểm hiện tại
+                Row(
+                  children: [
+                    const Icon(Icons.account_balance_wallet,
+                        color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Điểm khả dụng:',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
+                    const Spacer(),
+                    Text(
+                      formatter.format(diemHienTai),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                if (diemPending > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.pending_actions,
+                          color: Colors.white70, size: 18),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Điểm chờ duyệt:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        formatter.format(diemPending),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
+                ],
+                if (_loyaltyPoints != null) ...[
+                  const SizedBox(height: 12),
+                  const Divider(color: Colors.white30),
+                  const SizedBox(height: 8),
                   Text(
                     'Chi tiêu năm nay: ${formatter.format(_loyaltyPoints!.tongChiNam ?? 0)} đ',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                if (_membershipCard?.uuDai != null) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'Ưu đãi: ${_membershipCard!.uuDai}',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white.withOpacity(0.85),
                       fontSize: 13,
                     ),
                   ),

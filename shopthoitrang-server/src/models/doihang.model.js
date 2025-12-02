@@ -1,15 +1,13 @@
+const ChiTietDoiHang = require('./chitietdoihang.model');
+
 class DoiHang {
   constructor({
     madoihang,
     madonhang,
     makhachhang,
-    machitietsanphamcu,
-    machitietsanphammoi,
-    soluong,
     lydo,
     ngayyeucau,
     trangthai,
-    ghichu,
     // extended fields
     giacu,
     giamoi,
@@ -25,18 +23,16 @@ class DoiHang {
     ngaykiemtra,
     trangthaikiemtra,
     voucher_code,
-    voucher_amount
+    voucher_amount,
+    chiTietDoiHang,
+    chitietdoihang,
   }) {
     this.madoihang = madoihang;
     this.madonhang = madonhang;
     this.makhachhang = makhachhang;
-    this.machitietsanphamcu = machitietsanphamcu;
-    this.machitietsanphammoi = machitietsanphammoi;
-    this.soluong = soluong;
     this.lydo = lydo;
     this.ngayyeucau = ngayyeucau;
     this.trangthai = trangthai;
-    this.ghichu = ghichu;
     this.giacu = giacu;
     this.giamoi = giamoi;
     this.chenhlech = chenhlech;
@@ -52,10 +48,23 @@ class DoiHang {
     this.trangthaikiemtra = trangthaikiemtra;
     this.voucher_code = voucher_code;
     this.voucher_amount = voucher_amount;
+    const detailRows = chitietdoihang || chiTietDoiHang || [];
+    this.items = detailRows.map((row) =>
+      row instanceof ChiTietDoiHang ? row : new ChiTietDoiHang(row)
+    );
+    const primary = this.items[0];
+    this.machitietsanphamcu = primary?.machitietsanphamcu ?? null;
+    this.machitietsanphammoi = primary?.machitietsanphammoi ?? null;
+    this.soluong = primary?.soluong ?? null;
+    this.variantCu = primary?.variantCu ?? null;
+    this.variantMoi = primary?.variantMoi ?? null;
   }
 
   toJSON() {
-    return { ...this };
+    return {
+      ...this,
+      chitietdoihang: this.items.map((item) => item.toJSON()),
+    };
   }
 }
 

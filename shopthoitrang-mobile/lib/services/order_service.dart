@@ -28,7 +28,7 @@ class OrderService {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: json.encode(order.toJson()),
+        body: json.encode(_buildUpdatePayload(order)),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -187,6 +187,10 @@ class OrderService {
               paymentMethod: order.paymentMethod,
               paymentStatus: order.paymentStatus,
               orderStatus: order.orderStatus,
+              shippingAddress: order.shippingAddress,
+              shippingFee: order.shippingFee,
+              shippingProvinceSnapshot: order.shippingProvinceSnapshot,
+              appliedVoucherIds: order.appliedVoucherIds,
               items: items,
             );
             print('🔁 Fetched ${items.length} items via fallback endpoint');
@@ -286,6 +290,38 @@ class OrderService {
     }
   }
 
+  /// Cập nhật toàn bộ đơn hàng (PUT /api/donhang/:id)
+  Future<Order?> updateOrder(int orderId, Order order) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Chưa đăng nhập';
+        return null;
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/$orderId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(_buildUpdatePayload(order)),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        lastError = null;
+        return Order.fromJson(data);
+      } else {
+        lastError = _parseError(response.body) ?? 'Cập nhật đơn thất bại';
+        return null;
+      }
+    } catch (e) {
+      lastError = e.toString();
+      return null;
+    }
+  }
+
   /// Hủy đơn hàng
   Future<bool> cancelOrder(int orderId) async {
     final result = await updateOrderStatus(
@@ -293,5 +329,102 @@ class OrderService {
       orderStatus: 'Đã hủy',
     );
     return result != null;
+  }
+
+  /// Xoá đơn hàng (dùng khi giao dịch thanh toán thất bại/cancel trước khi xác nhận)
+  Future<bool> deleteOrder(int orderId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Chưa đăng nhập';
+        return false;
+      }
+
+      final resp = await http.delete(
+        Uri.parse('$baseUrl/$orderId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        lastError = null;
+        return true;
+      }
+      lastError = _parseError(resp.body) ?? 'Xoá đơn hàng thất bại';
+      return false;
+    } catch (e) {
+      lastError = e.toString();
+      return false;
+    }
+  }
+
+  /// Cập nhật phương thức thanh toán của đơn hàng
+  Future<bool> updatePaymentMethod(int orderId, String method) async {
+    try {
+      final token = await _getToken();
+      if (token == null) {
+        lastError = 'Chưa đăng nhập';
+        return false;
+      }
+
+      final resp = await http.patch(
+        Uri.parse('$baseUrl/$orderId/phuongthucthanhtoan'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode({'value': method}),
+      );
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        lastError = null;
+        return true;
+      }
+      lastError = _parseError(resp.body) ??
+          'Cập nhật phương thức thanh toán thất bại';
+      return false;
+    } catch (e) {
+      lastError = e.toString();
+      return false;
+    }
+  }
+
+  String? _parseError(String body) {
+    try {
+      final j = json.decode(body);
+      if (j is Map<String, dynamic>) {
+        return (j['message'] ?? j['error'])?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Map<String, dynamic> _buildUpdatePayload(Order order) {
+    final payload = <String, dynamic>{
+      'makhachhang': order.customerId,
+      'thanhtien': order.total,
+      'phuongthucthanhtoan': order.paymentMethod,
+      'trangthaithanhtoan': order.paymentStatus,
+      'trangthaidonhang': order.orderStatus,
+      'phivanchuyen': order.shippingFee,
+      'tinh_giaohang_snapshot': order.shippingProvinceSnapshot,
+    };
+
+    if (order.appliedVoucherIds.isNotEmpty) {
+      payload['voucher_ids'] = order.appliedVoucherIds;
+    }
+    if (order.pointsUsed > 0) {
+      payload['diem_su_dung'] = order.pointsUsed;
+    }
+    if (order.pointsDiscountValue > 0) {
+      payload['points_discount_value'] = order.pointsDiscountValue;
+    }
+    final addr = order.shippingAddress;
+    if (addr?.maDiaChi != null) {
+      payload['madiachi'] = addr!.maDiaChi;
+    }
+    return payload;
   }
 }

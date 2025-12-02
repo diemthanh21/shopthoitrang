@@ -4,7 +4,8 @@ export async function getDashboardData(opts = {}) {
   // baseURL đã là http://host:port hoặc VITE_API_URL (đã gồm /api?) => tránh lặp "/api"
   // Nếu API_URL = http://localhost:3000 thì route thực tế là /api/dashboard/summary
   // => gọi chỉ "/dashboard/summary" (Express: app.use('/api/dashboard', ...))
-  const res = await api.get("/dashboard/summary", { signal: opts.signal });
+  const { params = {} } = opts;
+  const res = await api.get("/dashboard/summary", { signal: opts.signal, params });
   const raw  = res?.data ?? {};
   const wrap = raw.summary ?? raw.data ?? raw;
 
@@ -43,4 +44,34 @@ export async function getDashboardData(opts = {}) {
 
   return { stats, recentOrders, topProducts };
 }
-export default { getDashboardData };
+export async function getRevenueFlow(params = {}) {
+  const { from, to } = params;
+  const res = await api.get('/dashboard/revenue-flow', { params: { from, to } });
+  const data = res?.data ?? {};
+  return {
+    period: data.period || {},
+    inflow: data.inflow || { total: 0, sources: [] },
+    outflow: data.outflow || { total: 0, sources: [] },
+    net: data.net ?? 0,
+  };
+}
+
+export async function getTopProducts(params = {}) {
+  const { from, to, limit = 5, minSold = 1 } = params;
+  const res = await api.get('/dashboard/top-products', { params: { from, to, limit, minSold } });
+  const arr = Array.isArray(res?.data?.items) ? res.data.items : (Array.isArray(res?.data) ? res.data : []);
+  return arr.map(p => ({
+    id: p.id ?? p.masanpham ?? p.maSanPham,
+    name: p.name ?? p.tensanpham ?? p.tenSanPham ?? 'Sản phẩm',
+    price: +(p.price ?? p.gia ?? p.giaban ?? 0),
+    soldCount: +(p.soldCount ?? p.soluongban ?? 0),
+  }));
+}
+
+export async function getChartData(params = {}) {
+  const { from, to } = params;
+  const res = await api.get('/dashboard/chart-data', { params: { from, to } });
+  return Array.isArray(res?.data?.data) ? res.data.data : [];
+}
+
+export default { getDashboardData, getRevenueFlow, getTopProducts, getChartData };

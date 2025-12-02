@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../utils/supabaseClient";
+import thongbaoService from "../services/thongbaoService";
 import {
   LayoutDashboard,
   Users,
@@ -23,30 +25,135 @@ const DashboardLayout = () => {
 
   const [openDropdown, setOpenDropdown] = useState(null);
   const [openAccount, setOpenAccount] = useState(false);
-  const [openNotification, setOpenNotification] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotificationDot, setShowNotificationDot] = useState(false);
   const dropdownRef = useRef(null);
+
+  const isManager = user && ['ADMIN', 'MANAGER'].includes(user?.maQuyen);
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
-  // Tên + chức vụ hiển thị
-  const accountName =
-  user?.hoTen ||
-  user?.tenDangNhap ||
-  user?.tendangnhap || // phòng khi đâu đó vẫn còn snake_case
-  "Admin";
+  // Load unread notification count
+  const loadUnreadCount = async () => {
+    if (!user) return;
+    try {
+      const logs = await thongbaoService.getRecent({ limit: 100 });
+      
+      // Lọc theo quyền
+      const filtered = (logs || []).filter(l => {
+        if (l.entity === 'CHOTCA') {
+          if (isManager) {
+            // Quản lý xem thông báo khi nhân viên TẠO chốt ca
+            return l.action === 'CREATED';
+          } else {
+            // Nhân viên xem thông báo khi chốt ca của mình được DUYỆT/TỪ CHỐI
+            return l.actor_id === String(user?.maNhanVien) && 
+                   ['APPROVED', 'REJECTED'].includes(l.action);
+          }
+        }
+        if (l.entity === 'PHIEUDATHANG') {
+          if (isManager) {
+            // Quản lý xem thông báo khi nhân viên HOÀN TẤT phiếu đặt hàng HOẶC khi hoàn thành
+            return ['CREATED', 'COMPLETED'].includes(l.action);
+          } else {
+            // Nhân viên CHỈ xem thông báo khi phiếu ĐẶT HÀNG CỦA MÌNH được DUYỆT/TỪ CHỐI
+            return l.actor_id === String(user?.maNhanVien) && 
+                   ['APPROVED', 'REJECTED'].includes(l.action);
+          }
+        }
+        if (l.entity === 'PHIEUNHAPKHO') {
+          if (isManager) {
+            // Quản lý xem thông báo khi nhân viên TẠO phiếu nhập kho
+            return l.action === 'CREATED';
+          } else {
+            // Nhân viên CHỈ xem thông báo khi phiếu NHẬP KHO CỦA MÌNH được DUYỆT/TỪ CHỐI
+            return l.actor_id === String(user?.maNhanVien) && 
+                   ['APPROVED', 'REJECTED'].includes(l.action);
+          }
+        }
+        if (l.entity === 'DOIHANG' || l.entity === 'TRAHANG') {
+          if (isManager) {
+            // Quản lý xem tất cả thông báo đổi hàng/trả hàng
+            return true;
+          } else {
+            // Nhân viên chỉ xem thông báo liên quan đến mình
+            return l.actor_id === String(user?.maNhanVien);
+          }
+        }
+        return false;
+      });
+      
+      // Loại bỏ duplicate: Dùng created_at để tránh xóa nhầm thông báo khác nhau
+      const uniqueLogs = [];
+      const seen = new Set();
+      
+      filtered.forEach(log => {
+        const key = `${log.entity}_${log.entity_id}_${log.action}_${log.created_at}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueLogs.push(log);
+        }
+      });
+      
+      // Đếm thông báo mới trong 24h
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+      
+      const recentLogs = uniqueLogs.filter(l => {
+        const logTime = new Date(l.created_at);
+        return logTime > oneDayAgo;
+      });
+      
+      setUnreadCount(recentLogs.length);
+      setShowNotificationDot(recentLogs.length > 0);
+    } catch (e) {
+      console.error('[DashboardLayout] Failed to load notifications:', e);
+    }
+  };
 
-const accountRole =
-  user?.chucVu || (user?.maNhanVien ? "Nhân viên" : "Quản trị viên");
+  // Realtime listener cho chốt ca mới
+  useEffect(() => {
+    if (!user || !supabase) return;
+    
+    loadUnreadCount();
+    
+    // Lắng nghe thay đổi trong bảng chotca_log
+    const channel = supabase
+      .channel('chotca_log_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chotca_log' },
+        (payload) => {
+          console.log('[DashboardLayout] New chotca_log event:', payload);
+          loadUnreadCount();
+          setShowNotificationDot(true);
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      if (supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user, isManager]);
+
+  // Reset notification dot khi vào trang thông báo
+  useEffect(() => {
+    if (location.pathname === '/thongbao') {
+      setShowNotificationDot(false);
+    }
+  }, [location.pathname]);
+
   // 🔹 Đóng dropdown khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setOpenDropdown(null);
         setOpenAccount(false);
-        setOpenNotification(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -86,10 +193,6 @@ const accountRole =
     {
       label: "Khuyến mãi",
       icon: Tag,
-      items: [
-        { label: "Chương trình khuyến mãi", link: "/khuyenmai"},
-        {label: "Voucher giảm giá", link: "/vouchergiamgia"}
-      ],
       items: [{ label: "Chương trình khuyến mãi", link: "/khuyenmai" },
         { label: "Voucher giảm giá", link: "/vouchergiamgia" }
       ],
@@ -106,7 +209,10 @@ const accountRole =
     {
       label: "Khách hàng",
       icon: User,
-      items: [{ label: "Thông tin khách hàng", link: "/khachhang" }],
+      items: [
+        { label: "Danh sách khách hàng", link: "/khachhang" },
+        { label: "Thẻ thành viên", link: "/thethanhvien" },
+      ],
     },
     {
       label: "Chứng từ",
@@ -120,6 +226,8 @@ const accountRole =
     {
       label: "Thông báo",
       icon: Bell,
+      badge: null,
+      showDot: showNotificationDot,
       items: [
         { label: "Tin nhắn", link: "/tinnhan", icon: MessageSquareText },
         { label: "Đánh giá", link: "/danhgia" },
@@ -130,10 +238,8 @@ const accountRole =
       label: "Khác",
       icon: Building2,
       items: [
-        { label: "Nhà cung cấp", link: "/nhacungcap" },
-        { label: "Ca làm việc", link: "/calamviec" },
+        
         { label: "Banner", link: "/banner" },
-        { label: "Danh sách thẻ", link: "/hangthe" },
       ],
     },
   ];
@@ -153,10 +259,7 @@ const accountRole =
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div
-          className="flex items-center justify-between px-6 py-3"
-          ref={dropdownRef}
-        >
+        <div className="flex items-center justify-between px-6 py-3" ref={dropdownRef}>
           {/* Logo */}
           <h2 className="text-xl font-bold text-blue-600">ELORA</h2>
 
@@ -181,6 +284,14 @@ const accountRole =
                     >
                       <Icon size={18} />
                       <span>{menu.label}</span>
+                      {menu.badge && (
+                        <span className="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+                          {menu.badge}
+                        </span>
+                      )}
+                      {menu.showDot && !menu.badge && (
+                        <span className="ml-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                      )}
                     </button>
 
                     {/* Dropdown nội dung */}
@@ -227,87 +338,51 @@ const accountRole =
             })}
           </nav>
 
-          {/* Chuông + Tài khoản */}
-          <div className="flex items-center gap-3">
-            {/* Chuông thông báo */}
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setOpenNotification((prev) => !prev);
-                  setOpenAccount(false);
-                  setOpenDropdown(null);
-                }}
-                className="relative flex items-center justify-center w-9 h-9 rounded-full hover:bg-gray-100 text-gray-600 hover:text-blue-600 transition"
+          {/* Dropdown tài khoản */}
+          <div className="relative">
+            <button
+              onClick={() => setOpenAccount(!openAccount)}
+              className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition"
+            >
+              <UserCircle size={20} />
+              <span>Tài khoản</span>
+            </button>
+
+            {openAccount && (
+              <div
+                className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
+                role="menu"
               >
-                <Bell size={18} />
-                {/* Badge số lượng (demo) */}
-                <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500 text-white">
-                  0
-                </span>
-              </button>
-
-              {openNotification && (
-                <div
-                  className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
-                  role="menu"
-                >
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-900">
-                      Thông báo
-                    </p>
-                  </div>
-                  <div className="max-h-80 overflow-y-auto">
-                    <div className="px-4 py-3 text-sm text-gray-600">
-                      Hiện chưa có thông báo mới.
-                    </div>
-                  </div>
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user?.tenDangNhap || "Admin"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {user?.maNhanVien ? "Nhân viên" : "Quản lý"}
+                  </p>
                 </div>
-              )}
-            </div>
 
-            {/* Dropdown tài khoản */}
-            <div className="relative">
-              <button
-                onClick={() => setOpenAccount(!openAccount)}
-                className="flex items-center gap-2 px-3 py-2 rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100 transition"
-              >
-                <UserCircle size={20} />
-                <span>{accountName}</span>
-              </button>
-
-              {openAccount && (
-                <div
-                  className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-40 animate-fadeIn"
-                  role="menu"
+                <button
+                  onClick={() => {
+                    setOpenAccount(false);
+                    navigate('/me');
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {accountName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {accountRole}
-                    </p>
+                  Thông tin nhân viên
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <LogOut size={16} />
+                    <span>Đăng xuất</span>
                   </div>
-
-                  <button
-                    onClick={() => alert("Thông tin tài khoản")}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    Thông tin tài khoản
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <div className="flex items-center gap-2">
-                      <LogOut size={16} />
-                      <span>Đăng xuất</span>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
